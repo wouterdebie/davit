@@ -583,23 +583,24 @@ final class LogStreamer: ObservableObject, @unchecked Sendable {
         lines = []
         isRunning = true
         task = Task { [weak self] in
+            guard let self else { return }
             do {
                 let handles = try await ContainerClient().logs(id: containerID)
                 guard handles.count > (boot ? 1 : 0) else {
-                    await self?.finish(error: "no log stream available")
+                    await self.finish(error: "no log stream available")
                     return
                 }
                 let fh = boot ? handles[1] : handles[0]
-                await MainActor.run { self?.handle = fh }
+                await MainActor.run { self.handle = fh }
                 let initial = Self.readTail(fh: fh, maxLines: tail > 0 ? tail : Int.max)
-                await self?.append(initial)
+                await self.append(initial)
                 if follow {
-                    self?.follow(fh: fh)
+                    self.follow(fh: fh)
                 } else {
-                    await self?.finish(error: nil)
+                    await self.finish(error: nil)
                 }
             } catch {
-                await self?.finish(error: "failed to open logs: \(error)")
+                await self.finish(error: "failed to open logs: \(error)")
             }
         }
     }
@@ -907,7 +908,7 @@ enum PlatformInstaller {
 
         progress("Installing to Application Support…", nil)
         // Clear quarantine so launchd can execute the extracted binaries.
-        try? await runTool("/usr/bin/xattr", ["-dr", "com.apple.quarantine", payload.path])
+        _ = try? await runTool("/usr/bin/xattr", ["-dr", "com.apple.quarantine", payload.path])
         let root = managedRoot
         if fm.fileExists(atPath: root) { try fm.removeItem(atPath: root) }
         try fm.createDirectory(atPath: (root as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
