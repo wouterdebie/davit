@@ -41,6 +41,22 @@ struct MainWindow: View {
         }
         .task {
             SnapshotDriver.runIfRequested(state: state)
+            if ProcessInfo.processInfo.arguments.contains(where: { $0.hasPrefix("--probe-recreate") }) {
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(6))
+                    selection = .containers
+                    try? await Task.sleep(for: .seconds(3))
+                    FileHandle.standardError.write(Data("DBG probe: setting recreateTarget to \(state.containers.first?.id ?? "none")\n".utf8))
+                    state.recreateTarget = state.containers.first
+                    try? await Task.sleep(for: .seconds(3))
+                    FileHandle.standardError.write(Data("DBG probe: done\n".utf8))
+                }
+            }
+        }
+        // Window-root anchor: sheets attached to the NavigationStack don't
+        // present while a navigationDestination is pushed on macOS.
+        .sheet(item: $state.recreateTarget) { target in
+            RunContainerSheet(recreate: target)
         }
         .alert(item: $state.lastError) { err in
             Alert(

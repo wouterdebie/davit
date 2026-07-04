@@ -36,7 +36,13 @@ struct ContainerDetailView: View {
             if let container {
                 ToolbarItemGroup(placement: .primaryAction) {
                     if state.busyIDs.contains(container.id) {
-                        ProgressView().controlSize(.small)
+                        // Wrapped in a disabled button so the spinner shares the
+                        // toolbar capsule's metrics instead of floating misaligned.
+                        Button {} label: {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                        .disabled(true)
                     }
                     if container.isRunning {
                         Button { state.stopContainer(container) } label: {

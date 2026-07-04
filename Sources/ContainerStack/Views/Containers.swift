@@ -64,10 +64,17 @@ struct ContainersView: View {
                 RunContainerSheet()
             }
         }
-        // Attached to the NavigationStack, not the content Group: two .sheet
-        // modifiers on the same node shadow each other on macOS.
-        .sheet(item: $state.recreateTarget) { target in
-            RunContainerSheet(recreate: target)
+        .task {
+            if ProcessInfo.processInfo.arguments.contains("--probe-recreate-detail") {
+                for _ in 0..<20 {
+                    if let first = state.containers.first {
+                        path.append(first.id)
+                        FileHandle.standardError.write(Data("DBG probe: pushed detail \(first.id)\n".utf8))
+                        break
+                    }
+                    try? await Task.sleep(for: .seconds(1))
+                }
+            }
         }
     }
 
