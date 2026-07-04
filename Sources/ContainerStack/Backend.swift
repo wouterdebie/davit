@@ -26,6 +26,7 @@ enum ContainerBinary {
         let custom = UserDefaults.standard.string(forKey: defaultsKey) ?? ""
         var candidates: [(String, ResolvedBinary.Source)] = []
         if !custom.isEmpty { candidates.append((custom, .userConfigured)) }
+        candidates.append((PlatformInstaller.managedRoot, .managed))
         candidates.append(("/usr/local", .system))
         if let res = Bundle.main.resourceURL {
             candidates.append((res.appendingPathComponent("vendor").path, .bundled))
@@ -50,7 +51,12 @@ enum ContainerBinary {
 }
 
 struct ResolvedBinary: Equatable {
-    enum Source: String { case userConfigured = "custom path", system = "system install", bundled = "bundled" }
+    enum Source: String {
+        case userConfigured = "custom path"
+        case managed = "installed by Davit"
+        case system = "system install"
+        case bundled = "bundled"
+    }
     let installRoot: String
     let apiserverPath: String
     let source: Source
@@ -845,5 +851,122 @@ enum SystemConfigStore {
         }
         if inPlugin, !current.isEmpty { blocks.append(current.joined(separator: "\n")) }
         return blocks
+    }
+}
+
+// MARK: - In-app platform installer
+
+/// Downloads Apple's signed installer package for the container platform, extracts
+/// its payload into an app-managed install root (no admin rights required, unlike
+/// the official installer), verifies code signatures, and activates it. The managed
+/// root then hosts the launchd services exactly like a /usr/local install.
+enum PlatformInstaller {
+    /// Must match the ContainerAPIClient version this app links (Package.swift pin).
+    static let pinnedVersion = "1.0.0"
+
+    static var managedRoot: String {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return base.appendingPathComponent("dev.wouter.davit/platform/\(pinnedVersion)").path
+    }
+
+    static var isInstalled: Bool {
+        FileManager.default.isExecutableFile(atPath: managedRoot + "/bin/container-apiserver")
+    }
+
+    static func install(progress: @escaping @Sendable (String) -> Void) async throws {
+        let fm = FileManager.default
+        let work = fm.temporaryDirectory.appendingPathComponent("davit-install-\(UUID().uuidString)")
+        try fm.createDirectory(at: work, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: work) }
+
+        progress("Downloading container \(pinnedVersion) (~180 MB)…")
+        let url = URL(string: "https://github.com/apple/container/releases/download/\(pinnedVersion)/container-\(pinnedVersion)-installer-signed.pkg")!
+        let (downloaded, response) = try await URLSession.shared.download(from: url)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw CLIError(command: "platform install", message: "download failed: HTTP \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+        }
+        let pkgPath = work.appendingPathComponent("container.pkg")
+        try fm.moveItem(at: downloaded, to: pkgPath)
+
+        progress("Extracting installer payload…")
+        let expanded = work.appendingPathComponent("expanded")
+        try await runTool("/usr/sbin/pkgutil", ["--expand-full", pkgPath.path, expanded.path])
+        guard let payload = findPayload(in: expanded) else {
+            throw CLIError(command: "platform install", message: "could not locate Payload in the installer package")
+        }
+
+        progress("Verifying code signatures…")
+        let stagedAPIServer = payload.appendingPathComponent("bin/container-apiserver").path
+        guard fm.isExecutableFile(atPath: stagedAPIServer) else {
+            throw CLIError(command: "platform install", message: "payload is missing bin/container-apiserver")
+        }
+        try await runTool("/usr/bin/codesign", ["--verify", "--strict", stagedAPIServer])
+
+        progress("Installing to Application Support…")
+        // Clear quarantine so launchd can execute the extracted binaries.
+        try? await runTool("/usr/bin/xattr", ["-dr", "com.apple.quarantine", payload.path])
+        let root = managedRoot
+        if fm.fileExists(atPath: root) { try fm.removeItem(atPath: root) }
+        try fm.createDirectory(atPath: (root as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+        try fm.copyItem(atPath: payload.path, toPath: root)
+
+        guard isInstalled else {
+            throw CLIError(command: "platform install", message: "installation completed but bin/container-apiserver is not executable")
+        }
+        // Point resolution at the managed root before any library API caches paths.
+        setenv(InstallRoot.environmentName, root, 1)
+        progress("Installed to \(root)")
+    }
+
+    /// Removes the managed install (containers/images are unaffected — they live in
+    /// the shared app root under com.apple.container).
+    static func removeManaged() throws {
+        try FileManager.default.removeItem(atPath: managedRoot)
+    }
+
+    private static func findPayload(in dir: URL) -> URL? {
+        let fm = FileManager.default
+        let enumerator = fm.enumerator(at: dir, includingPropertiesForKeys: [.isDirectoryKey])
+        while let item = enumerator?.nextObject() as? URL {
+            if item.lastPathComponent == "Payload",
+               (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true,
+               fm.fileExists(atPath: item.appendingPathComponent("bin").path) {
+                return item
+            }
+        }
+        return nil
+    }
+
+    /// Minimal runner for system tools (pkgutil/codesign/xattr) — not the container CLI.
+    @discardableResult
+    static func runTool(_ path: String, _ args: [String]) async throws -> String {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = args
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        process.standardInput = FileHandle.nullDevice
+        return try await withCheckedThrowingContinuation { cont in
+            do {
+                try process.run()
+            } catch {
+                cont.resume(throwing: error)
+                return
+            }
+            DispatchQueue.global(qos: .userInitiated).async {
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                let output = String(data: data, encoding: .utf8) ?? ""
+                if process.terminationStatus != 0 {
+                    cont.resume(throwing: CLIError(
+                        command: ([path] + args).joined(separator: " "),
+                        message: output.trimmingCharacters(in: .whitespacesAndNewlines),
+                        exitCode: process.terminationStatus))
+                } else {
+                    cont.resume(returning: output)
+                }
+            }
+        }
     }
 }

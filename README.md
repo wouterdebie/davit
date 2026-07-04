@@ -47,8 +47,17 @@ and its runtime/network plugin binaries are host launchd services that the libra
 talks to. Davit resolves the platform install root in this order:
 
 1. custom install root from Settings
-2. `/usr/local` (the official installer)
-3. vendored inside the app at `Davit.app/Contents/Resources/vendor`
+2. a Davit-managed install at `~/Library/Application Support/dev.wouter.davit/platform/<version>`
+3. `/usr/local` (the official installer)
+4. vendored inside the app at `Davit.app/Contents/Resources/vendor`
+
+**In-app install:** when no platform is found, the onboarding screen offers one-click
+install — Davit downloads Apple's signed installer pkg, verifies the code signature,
+extracts the payload into the managed root (no administrator rights needed, unlike the
+official installer), and bootstraps the services from there. The managed copy sits
+above `/usr/local` in the resolution order on purpose: it always matches the client
+version the app links, so a newer system daemon can't break XPC compatibility.
+Also available headless: `Davit platform install|remove`.
 
 To ship a fully self-contained app that works without the system installer:
 
@@ -82,6 +91,7 @@ The app binary doubles as a small tool:
 Davit exec <container-id>        # interactive TTY shell into a container (used by "Open Terminal")
 Davit selftest                   # end-to-end test of the XPC service layer against the live daemon
 Davit system start|stop          # bootstrap / tear down the container launchd services
+Davit platform install|remove    # download + verify Apple's signed pkg into an app-managed install root
 Davit --snapshot /tmp/shots      # render every screen to PNGs via ImageRenderer (no screen-recording permission)
 ```
 

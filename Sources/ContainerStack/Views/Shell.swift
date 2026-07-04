@@ -127,6 +127,9 @@ struct MainWindow: View {
 struct OnboardingView: View {
     @EnvironmentObject var state: AppState
     @AppStorage(ContainerBinary.defaultsKey) private var binaryPath = ""
+    @State private var installing = false
+    @State private var installStage = ""
+    @State private var installError: String?
 
     var body: some View {
         VStack(spacing: 18) {
@@ -135,31 +138,73 @@ struct OnboardingView: View {
                 .foregroundStyle(.tint)
             Text("Apple container platform not found")
                 .font(.title2.weight(.semibold))
-            Text("Davit talks directly to Apple's open-source container services.\nInstall the platform once, then this app will pick it up automatically.")
+            Text("Davit talks directly to Apple's open-source container services.\nInstall them once — no administrator rights needed — and you're set.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
 
-            HStack(spacing: 12) {
-                Button("Download Installer…") {
-                    NSWorkspace.shared.open(URL(string: "https://github.com/apple/container/releases")!)
+            if installing {
+                VStack(spacing: 8) {
+                    ProgressView()
+                    Text(installStage)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.borderedProminent)
-                Button("Check Again") {
-                    Task { await state.refreshAll() }
+                .padding(.top, 4)
+            } else {
+                HStack(spacing: 12) {
+                    Button("Install Container Platform") {
+                        install()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    Button("Check Again") {
+                        Task { await state.refreshAll() }
+                    }
                 }
+                Text("Downloads Apple's signed installer (v\(PlatformInstaller.pinnedVersion), ~180 MB), verifies it,\nand installs into your user Library. You can also use the [official installer](https://github.com/apple/container/releases).")
+                    .font(.caption)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.tertiary)
             }
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Already installed somewhere unusual? Enter the install root:")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField("/usr/local", text: $binaryPath)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 340)
-                    .onSubmit { Task { await state.refreshAll() } }
+            if let installError {
+                Text(installError)
+                    .font(.callout)
+                    .foregroundStyle(.red)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: 420)
             }
-            .padding(.top, 6)
+
+            if !installing {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Already installed somewhere unusual? Enter the install root:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextField("/usr/local", text: $binaryPath)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 340)
+                        .onSubmit { Task { await state.refreshAll() } }
+                }
+                .padding(.top, 6)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func install() {
+        installing = true
+        installError = nil
+        Task {
+            do {
+                try await PlatformInstaller.install { stage in
+                    Task { @MainActor in installStage = stage }
+                }
+                installStage = "Starting container services…"
+                try await ContainerService.systemStart()
+            } catch {
+                installError = error.localizedDescription
+            }
+            installing = false
+            await state.refreshAll()
+        }
     }
 }

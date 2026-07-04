@@ -20,6 +20,27 @@ enum Main {
             SelfTest.runBlocking()
             return
         }
+        if args.count >= 3, args[1] == "platform", args[2] == "install" || args[2] == "remove" {
+            let action = args[2]
+            let semaphore = DispatchSemaphore(value: 0)
+            Task.detached {
+                do {
+                    if action == "install" {
+                        try await PlatformInstaller.install { print($0) }
+                        print("platform install: ok — \(PlatformInstaller.managedRoot)")
+                    } else {
+                        try PlatformInstaller.removeManaged()
+                        print("platform remove: ok")
+                    }
+                    exit(0)
+                } catch {
+                    FileHandle.standardError.write(Data("platform \(action) failed: \(error)\n".utf8))
+                    exit(1)
+                }
+            }
+            semaphore.wait()
+            return
+        }
         if args.count >= 3, args[1] == "system", args[2] == "start" || args[2] == "stop" {
             let action = args[2]
             let semaphore = DispatchSemaphore(value: 0)
