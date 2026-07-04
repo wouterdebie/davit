@@ -1,5 +1,46 @@
 import SwiftUI
 
+/// Switches the app between a regular app (Dock icon, ⌘Tab) while a window is
+/// open and a menu-bar-only accessory when the last window closes — the
+/// standard behavior for menu-bar utilities (unless the user opts out).
+@MainActor
+final class DockVisibility {
+    static let shared = DockVisibility()
+    private var observers: [NSObjectProtocol] = []
+
+    var keepInDock: Bool {
+        UserDefaults.standard.bool(forKey: "keepInDock")
+    }
+
+    func start() {
+        guard observers.isEmpty else { return }
+        observers.append(NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification, object: nil, queue: .main
+        ) { note in
+            let closing = note.object as? NSWindow
+            Task { @MainActor in
+                guard !DockVisibility.shared.keepInDock else { return }
+                let remaining = NSApp.windows.filter {
+                    $0 !== closing && $0.isVisible && $0.canBecomeMain
+                }
+                if remaining.isEmpty {
+                    NSApp.setActivationPolicy(.accessory)
+                }
+            }
+        })
+        observers.append(NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main
+        ) { note in
+            let window = note.object as? NSWindow
+            Task { @MainActor in
+                if window?.canBecomeMain == true, NSApp.activationPolicy() != .regular {
+                    NSApp.setActivationPolicy(.regular)
+                }
+            }
+        })
+    }
+}
+
 struct ContainerStackApp: App {
     @StateObject private var state = AppState()
 
@@ -11,6 +52,7 @@ struct ContainerStackApp: App {
                 .environmentObject(state)
                 .frame(minWidth: 940, minHeight: 560)
                 .task {
+                    DockVisibility.shared.start()
                     state.startPolling()
                 }
         }
@@ -73,6 +115,7 @@ struct MenuBarContent: View {
             Divider()
 
             Button("Open Davit") {
+                NSApp.setActivationPolicy(.regular)
                 openWindow(id: "main")
                 NSApp.activate(ignoringOtherApps: true)
             }

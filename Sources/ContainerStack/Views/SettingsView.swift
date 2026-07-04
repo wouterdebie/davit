@@ -20,6 +20,7 @@ struct GeneralSettings: View {
     @EnvironmentObject var state: AppState
     @AppStorage(ContainerBinary.defaultsKey) private var binaryPath = ""
     @AppStorage("refreshInterval") private var refreshInterval = 4.0
+    @AppStorage("keepInDock") private var keepInDock = false
 
     var body: some View {
         Form {
@@ -40,6 +41,12 @@ struct GeneralSettings: View {
                 Section("Command Line") {
                     ShellCommandRow()
                 }
+            }
+            Section("Appearance") {
+                Toggle("Keep in Dock when the window is closed", isOn: $keepInDock)
+                Text("Off: closing the window leaves Davit only in the menu bar, like other menu bar utilities.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Section("Refresh") {
                 Slider(value: $refreshInterval, in: 2...15, step: 1) {
