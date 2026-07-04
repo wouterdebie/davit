@@ -72,22 +72,35 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
         run: |
+          AUTH=(--apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD")
           ditto -c -k --keepParent "dist/Davit.app" "notarize.zip"
-          RESULT=$(xcrun notarytool submit notarize.zip \
-            --apple-id "$APPLE_ID" \
-            --team-id "$APPLE_TEAM_ID" \
-            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-            --wait --timeout 45m --output-format json) || true
-          echo "$RESULT"
-          SUBMISSION_ID=$(echo "$RESULT" | jq -r '.id // empty')
-          STATUS=$(echo "$RESULT" | jq -r '.status // "unknown"')
-          # Always fetch Apple's detailed log — it names the exact issues on rejection.
-          if [ -n "$SUBMISSION_ID" ]; then
-            xcrun notarytool log "$SUBMISSION_ID" \
-              --apple-id "$APPLE_ID" \
-              --team-id "$APPLE_TEAM_ID" \
-              --password "$APPLE_APP_SPECIFIC_PASSWORD" || true
+
+          # Submit without --wait: a single long-lived poll session dies to
+          # transient runner network flakes. Poll with fresh connections instead.
+          SUBMIT=$(xcrun notarytool submit notarize.zip "${AUTH[@]}" --output-format json)
+          echo "$SUBMIT"
+          SUBMISSION_ID=$(echo "$SUBMIT" | jq -r '.id // empty')
+          if [ -z "$SUBMISSION_ID" ]; then
+            echo "Submission failed — no id returned" >&2
+            exit 1
           fi
+
+          STATUS="In Progress"
+          DEADLINE=$((SECONDS + 3300))   # ~55 min
+          while [ $SECONDS -lt $DEADLINE ]; do
+            sleep 30
+            INFO=$(xcrun notarytool info "$SUBMISSION_ID" "${AUTH[@]}" --output-format json 2>&1) || {
+              echo "poll error (transient, retrying): $INFO"
+              continue
+            }
+            STATUS=$(echo "$INFO" | jq -r '.status // "unknown"')
+            echo "status: $STATUS ($((SECONDS / 60))m elapsed)"
+            [ "$STATUS" = "In Progress" ] || break
+          done
+
+          # Always fetch Apple's detailed log — it names the exact issues on rejection.
+          xcrun notarytool log "$SUBMISSION_ID" "${AUTH[@]}" || true
+
           if [ "$STATUS" != "Accepted" ]; then
             echo "Notarization not accepted (status: $STATUS)" >&2
             exit 1
