@@ -220,7 +220,9 @@ struct RunContainerSheet: View {
 
         Task {
             do {
-                if let replacing {
+                let sameName = replacing?.id == containerName
+                if let replacing, sameName {
+                    // Same name: must clear it first (names are unique, no rename API).
                     try? await ContainerService.stop(replacing.id)
                     try await ContainerService.delete(replacing.id, force: true)
                 }
@@ -232,6 +234,11 @@ struct RunContainerSheet: View {
                     resourceArgs: resourceArgs,
                     commandArgs: commandArgs
                 )
+                if let replacing, !sameName {
+                    // Rename: the new container is up, now retire the old one.
+                    try? await ContainerService.stop(replacing.id)
+                    try await ContainerService.delete(replacing.id, force: true)
+                }
                 await state.refreshAll()
                 dismiss()
             } catch let e as CLIError {
