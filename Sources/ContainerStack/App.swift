@@ -57,6 +57,10 @@ struct ContainerStackApp: App {
                 }
         }
         .defaultSize(width: 1180, height: 720)
+        // Always present the window on launch: without this, state restoration
+        // remembers a closed window and the app launches windowless (which also
+        // hangs headless --snapshot/--probe runs waiting for MainWindow).
+        .defaultLaunchBehavior(.presented)
         .commands {
             CommandGroup(after: .newItem) {
                 Button("Refresh") { Task { await state.refreshAll() } }
@@ -68,13 +72,34 @@ struct ContainerStackApp: App {
             MenuBarContent()
                 .environmentObject(state)
         } label: {
-            Image(systemName: "shippingbox.fill")
+            MenuBarIcon()
         }
 
         Settings {
             SettingsView()
                 .environmentObject(state)
         }
+    }
+}
+
+/// The menu bar icon exists from launch even when no window does, so it also
+/// hosts the harness fallback: headless launches of the bundled app sometimes
+/// never materialize the Window scene — if no window appears, open it.
+struct MenuBarIcon: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Image(systemName: "shippingbox.fill")
+            .task {
+                let args = ProcessInfo.processInfo.arguments
+                guard args.contains(where: { $0.hasPrefix("--snapshot") || $0.hasPrefix("--probe") }) else { return }
+                try? await Task.sleep(for: .seconds(2))
+                if !NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }) {
+                    FileHandle.standardError.write(Data("harness: window missing after launch, forcing open\n".utf8))
+                    openWindow(id: "main")
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+            }
     }
 }
 

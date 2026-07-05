@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Davit — a native macOS UI for Apple containers</title>
+<meta name="description" content="Davit is a free, open-source, fully native macOS app for Apple's container platform — containers, images, volumes and networks with live stats, logs and one-click setup.">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<meta property="og:title" content="Davit — a native macOS UI for Apple containers">
+<meta property="og:description" content="Free, open-source, fully native. Run Linux containers on Apple silicon with Apple's container platform — no Docker Desktop required.">
+<meta property="og:image" content="img/dashboard.png">
+<style>
+  :root {
+    --bg: #fbfbfd;
+    --fg: #1d1d1f;
+    --muted: #6e6e73;
+    --card: #ffffff;
+    --border: rgba(0,0,0,.08);
+    --accent: #3b5bdb;
+    --accent2: #6b3bdb;
+    --shadow: 0 20px 60px rgba(30,40,90,.14);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d0d10;
+      --fg: #f5f5f7;
+      --muted: #9b9ba1;
+      --card: #17171c;
+      --border: rgba(255,255,255,.1);
+      --shadow: 0 20px 60px rgba(0,0,0,.55);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--fg);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 0 24px; }
+
+  header.hero { text-align: center; padding: 88px 0 56px; }
+  .hero img.icon { width: 128px; height: 128px; filter: drop-shadow(0 12px 28px rgba(59,91,219,.35)); }
+  .hero h1 { font-size: clamp(40px, 7vw, 64px); letter-spacing: -.02em; margin-top: 20px; }
+  .hero p.tag { font-size: clamp(18px, 2.6vw, 24px); color: var(--muted); margin: 14px auto 0; max-width: 640px; }
+  .hero p.sub { font-size: 15px; color: var(--muted); margin-top: 10px; }
+  .cta { margin-top: 34px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-block; padding: 14px 28px; border-radius: 14px;
+    font-size: 17px; font-weight: 600; text-decoration: none;
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn.primary {
+    color: #fff;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    box-shadow: 0 8px 24px rgba(59,91,219,.35);
+  }
+  .btn.secondary { color: var(--fg); background: var(--card); border: 1px solid var(--border); }
+  .hero .req { margin-top: 14px; font-size: 13px; color: var(--muted); }
+
+  .shot { margin: 26px auto 0; max-width: 980px; }
+  .shot img {
+    width: 100%; height: auto; display: block;
+    border-radius: 14px; border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  .shot figcaption { text-align: center; font-size: 13px; color: var(--muted); margin-top: 10px; }
+
+  section { padding: 64px 0; }
+  section h2 { font-size: 32px; letter-spacing: -.01em; text-align: center; margin-bottom: 10px; }
+  section p.lead { text-align: center; color: var(--muted); max-width: 640px; margin: 0 auto 42px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; padding: 22px;
+  }
+  .card .emoji { font-size: 26px; }
+  .card h3 { font-size: 17px; margin: 10px 0 6px; }
+  .card p { font-size: 14.5px; color: var(--muted); }
+  .card code { font-size: 13px; background: rgba(125,125,140,.12); padding: 1px 5px; border-radius: 5px; }
+
+  .shots-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 8px; }
+  @media (max-width: 760px) { .shots-2 { grid-template-columns: 1fr; } }
+  .shots-2 figure img { width: 100%; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow); }
+  .shots-2 figcaption { font-size: 13px; color: var(--muted); text-align: center; margin-top: 8px; }
+
+  .how { max-width: 680px; margin: 0 auto; }
+  .how li { margin: 12px 0 12px 8px; color: var(--muted); }
+  .how li strong { color: var(--fg); }
+
+  footer { border-top: 1px solid var(--border); padding: 36px 0 48px; text-align: center; font-size: 14px; color: var(--muted); }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header class="hero wrap">
+  <img class="icon" src="img/icon-256.png" alt="Davit app icon" width="128" height="128">
+  <h1>Davit</h1>
+  <p class="tag">A fully native macOS app for Apple's container platform — run Linux containers on Apple silicon, no Docker Desktop required.</p>
+  <p class="sub">Free &amp; open source · MIT licensed · Signed &amp; notarized</p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/wouterdebie/davit/releases/latest">Download for macOS</a>
+    <a class="btn secondary" href="https://github.com/wouterdebie/davit">View on GitHub</a>
+  </div>
+  <p class="req">Requires an Apple silicon Mac running macOS 15 or later.</p>
+
+  <figure class="shot">
+    <img src="img/dashboard.png" alt="Davit dashboard showing service status, resource counts, disk usage and a live CPU chart">
+    <figcaption>The dashboard: services, disk usage and live CPU across all running containers.</figcaption>
+  </figure>
+</header>
+
+<section class="wrap">
+  <h2>Everything you'd expect. Nothing you don't.</h2>
+  <p class="lead">Davit talks directly to Apple's open-source <a href="https://github.com/apple/container" style="color:var(--accent);text-decoration:none">container</a> daemon over XPC — the same wire path the CLI uses. No Electron, no web views, no background agents of its own.</p>
+  <div class="grid">
+    <div class="card"><div class="emoji">📦</div><h3>Containers</h3>
+      <p>Start, stop, restart and delete with live CPU, memory and IP on every row. Streaming logs with follow &amp; boot mode, live stat charts, and raw config inspection.</p></div>
+    <div class="card"><div class="emoji">🖥️</div><h3>One-click terminal</h3>
+      <p>Open an interactive shell in any running container, straight into Terminal or iTerm — over the native API, no CLI needed.</p></div>
+    <div class="card"><div class="emoji">🪄</div><h3>Edit &amp; Recreate</h3>
+      <p>Containers are immutable — so Davit prefills a new one from the old config with the image's entrypoint and env subtracted, letting you change ports, env vars, mounts or resources in seconds.</p></div>
+    <div class="card"><div class="emoji">💿</div><h3>Images, volumes, networks</h3>
+      <p>Pull with live progress, run from any image, tag, prune. Create sized volumes and custom subnets. See what's in use before you delete it.</p></div>
+    <div class="card"><div class="emoji">⚙️</div><h3>Platform settings, editable</h3>
+      <p>Default CPU/memory for new containers, registry, DNS, builder resources — edited in the app, validated by the platform's own config loader, saved as clean TOML overrides.</p></div>
+    <div class="card"><div class="emoji">⬇️</div><h3>Installs the platform for you</h3>
+      <p>No container platform installed? Davit downloads Apple's signed installer, verifies it, and sets everything up in your user Library — <em>no administrator rights needed</em>. It can add the <code>container</code> CLI to your shell, too.</p></div>
+  </div>
+</section>
+
+<section class="wrap">
+  <h2>Native, down to the pixels.</h2>
+  <p class="lead">Built entirely in SwiftUI. Menu bar quick actions, a Dock icon only when you want one, and live charts that don't spin up a browser to render.</p>
+  <div class="shots-2">
+    <figure><img src="img/containers.png" alt="Container list with live per-container CPU, memory and IP"><figcaption>Containers with live stats and port badges.</figcaption></figure>
+    <figure><img src="img/container-stats.png" alt="Live CPU and memory charts for a container"><figcaption>Per-container CPU &amp; memory, sampled every 2 seconds.</figcaption></figure>
+    <figure><img src="img/container-overview.png" alt="Container detail overview with network, ports, mounts and environment"><figcaption>Network, ports, mounts and environment at a glance.</figcaption></figure>
+    <figure><img src="img/images.png" alt="Image list with platform variants, sizes and in-use badges"><figcaption>Images with sizes, platforms and in-use badges.</figcaption></figure>
+  </div>
+</section>
+
+<section class="wrap">
+  <h2>How is this different from Docker Desktop?</h2>
+  <ul class="how">
+    <li><strong>It's Apple's engine.</strong> Each container runs in its own lightweight VM via Apple's Virtualization framework — sub-second boots, per-container IP addresses, optimized for Apple silicon.</li>
+    <li><strong>OCI all the way.</strong> Pulls from Docker Hub, ghcr.io, quay.io or any registry. Your existing images just work.</li>
+    <li><strong>Nothing between you and the daemon.</strong> Davit links Apple's own client library and speaks XPC directly — no socket shims, no license agreements, no accounts.</li>
+    <li><strong>Tiny.</strong> A single ~17 MB app.</li>
+  </ul>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>Davit is free software, <a href="https://github.com/wouterdebie/davit/blob/main/LICENSE">MIT licensed</a>.
+    Built on <a href="https://github.com/apple/container">apple/container</a>.</p>
+    <p style="margin-top:8px"><a href="https://github.com/wouterdebie/davit">GitHub</a> ·
+    <a href="https://github.com/wouterdebie/davit/releases/latest">Download</a> ·
+    <a href="https://github.com/wouterdebie/davit/issues">Issues</a></p>
+    <p style="margin-top:8px">© 2026 Wouter de Bie</p>
+  </div>
+</footer>
+
+</body>
+</html>

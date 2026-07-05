@@ -9,9 +9,19 @@ import Foundation
 /// CLI is needed anywhere.
 @main
 enum Main {
+    /// Held for the process lifetime in harness modes to block App Nap, which
+    /// otherwise defers scene materialization for bundled apps launched from a
+    /// background shell (the window never appears, the harness never runs).
+    nonisolated(unsafe) static var activityToken: NSObjectProtocol?
+
     static func main() {
         ContainerBinary.bootstrapEnvironment()
         let args = CommandLine.arguments
+        if args.contains(where: { $0.hasPrefix("--snapshot") || $0.hasPrefix("--probe") }) {
+            activityToken = ProcessInfo.processInfo.beginActivity(
+                options: [.userInitiated, .idleSystemSleepDisabled],
+                reason: "headless UI harness")
+        }
         if args.count >= 3, args[1] == "exec" {
             ExecMode.runBlocking(containerID: args[2])
             return
