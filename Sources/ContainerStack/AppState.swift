@@ -11,6 +11,7 @@ final class AppState: ObservableObject {
     @Published var diskUsage: DiskUsage?
     @Published var systemState: SystemState = .unknown
     @Published var cliMissing = false
+    @Published var availableUpdate: UpdateInfo?
     @Published var resolvedBinary: ResolvedBinary?
 
     // Live stats: history per container id
@@ -33,7 +34,20 @@ final class AppState: ObservableObject {
 
     // MARK: Lifecycle
 
+    func checkForUpdates(force: Bool = false) {
+        let defaults = UserDefaults.standard
+        let last = defaults.object(forKey: UpdateChecker.lastCheckKey) as? Date ?? .distantPast
+        guard force || Date().timeIntervalSince(last) > 86_400 else { return }
+        defaults.set(Date(), forKey: UpdateChecker.lastCheckKey)
+        Task {
+            guard let update = try? await UpdateChecker.fetchAvailableUpdate() else { return }
+            if !force, defaults.string(forKey: UpdateChecker.skippedVersionKey) == update.version { return }
+            availableUpdate = update
+        }
+    }
+
     func startPolling() {
+        checkForUpdates()
         pollTask?.cancel()
         statsTask?.cancel()
         pollTask = Task { [weak self] in

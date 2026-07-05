@@ -923,7 +923,7 @@ enum PlatformInstaller {
     }
 
     /// Streams a download to disk, reporting (fraction?, receivedMB, totalMB?) as it goes.
-    private static func downloadWithProgress(
+    static func downloadWithProgress(
         from url: URL,
         to destination: URL,
         report: @escaping @Sendable (Double?, Double, Double?) -> Void

@@ -139,6 +139,14 @@ struct MenuBarContent: View {
 
             Divider()
 
+            if let update = state.availableUpdate {
+                Button("Update to Davit \(update.version)…") {
+                    NSApp.setActivationPolicy(.regular)
+                    openWindow(id: "main")
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+                Divider()
+            }
             Button("Open Davit") {
                 NSApp.setActivationPolicy(.regular)
                 openWindow(id: "main")

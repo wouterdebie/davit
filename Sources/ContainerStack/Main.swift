@@ -62,6 +62,32 @@ enum Main {
             semaphore.wait()
             return
         }
+        if args.count >= 3, args[1] == "update", args[2] == "check" || args[2] == "install" {
+            let action = args[2]
+            let semaphore = DispatchSemaphore(value: 0)
+            Task.detached {
+                do {
+                    print("current version: \(UpdateChecker.currentVersion)")
+                    guard let update = try await UpdateChecker.fetchAvailableUpdate() else {
+                        print("up to date")
+                        exit(0)
+                    }
+                    print("available: \(update.version) — \(update.downloadURL)")
+                    if action == "install" {
+                        try await UpdateInstaller.performInstall(update, relaunch: false) { stage, _ in
+                            print(stage)
+                        }
+                        print("update install: ok")
+                    }
+                    exit(0)
+                } catch {
+                    FileHandle.standardError.write(Data("update \(action) failed: \(error)\n".utf8))
+                    exit(1)
+                }
+            }
+            semaphore.wait()
+            return
+        }
         if args.count >= 3, args[1] == "system", args[2] == "start" || args[2] == "stop" {
             let action = args[2]
             let semaphore = DispatchSemaphore(value: 0)

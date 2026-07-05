@@ -19,6 +19,9 @@ struct DashboardView: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 16) {
+            if let update = state.availableUpdate {
+                UpdateBanner(update: update)
+            }
             systemCard
 
             if state.systemState.isRunning {
@@ -233,6 +236,51 @@ struct DiskUsageContent: View {
             }
             .fixedSize()
         }
+    }
+}
+
+/// "Update available" banner with in-place download/install progress.
+struct UpdateBanner: View {
+    @EnvironmentObject var state: AppState
+    @StateObject private var installer = UpdateInstaller()
+    let update: UpdateInfo
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 26))
+                .foregroundStyle(.tint)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Davit \(update.version) is available")
+                    .font(.headline)
+                if let stage = installer.stage {
+                    Text(stage).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                } else if let error = installer.errorText {
+                    Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+                } else {
+                    Text("You're running \(UpdateChecker.currentVersion). The update installs and relaunches in place.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if let fraction = installer.fraction, installer.installing {
+                    ProgressView(value: fraction).frame(maxWidth: 320)
+                }
+            }
+            Spacer()
+            if !installer.installing {
+                Button("Release Notes") { NSWorkspace.shared.open(update.releasePageURL) }
+                Button("Skip") {
+                    UserDefaults.standard.set(update.version, forKey: UpdateChecker.skippedVersionKey)
+                    state.availableUpdate = nil
+                }
+                Button("Install & Relaunch") { installer.install(update) }
+                    .buttonStyle(.borderedProminent)
+            } else if installer.fraction == nil {
+                ProgressView().controlSize(.small)
+            }
+        }
+        .padding(16)
+        .background(.tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(.tint.opacity(0.25)))
     }
 }
 

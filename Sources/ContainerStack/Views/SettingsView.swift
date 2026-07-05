@@ -426,8 +426,22 @@ struct AboutSettings: View {
             if case .running(let version) = state.systemState, let version {
                 Text(version).font(.caption).foregroundStyle(.tertiary)
             }
+            Text("Version \(UpdateChecker.currentVersion)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Button("Check for Updates…") {
+                UserDefaults.standard.removeObject(forKey: UpdateChecker.skippedVersionKey)
+                state.checkForUpdates(force: true)
+            }
+            if let update = state.availableUpdate {
+                Text("Davit \(update.version) is available — see the Dashboard to install.")
+                    .font(.caption)
+                    .foregroundStyle(.tint)
+            }
             Divider().frame(width: 200)
             Link("apple/container on GitHub", destination: URL(string: "https://github.com/apple/container")!)
+                .font(.callout)
+            Link("davit.app", destination: URL(string: "https://davit.app")!)
                 .font(.callout)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
