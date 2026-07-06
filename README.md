@@ -51,6 +51,15 @@ runtime) and notarized, so they open like any other app:
 Without the secrets, builds fall back to ad-hoc signing and the release notes
 include the `xattr -dr com.apple.quarantine` workaround.
 
+## Install
+
+```sh
+brew install wouterdebie/tap/davit
+```
+
+(Homebrew 6 asks you to trust third-party taps on first use: `brew trust wouterdebie/tap`.)
+Or download the signed zip from [Releases](https://github.com/wouterdebie/davit/releases/latest) / [davit.app](https://davit.app).
+
 ## Build & run
 
 ```sh

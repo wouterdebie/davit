@@ -12,6 +12,8 @@ env:
   # Presence of the cert secret switches the whole pipeline to Developer ID
   # signing + notarization; without it, builds are ad-hoc signed.
   MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+  # Presence of this token enables the Homebrew tap bump after release.
+  TAP_PUSH_TOKEN: ${{ secrets.TAP_PUSH_TOKEN }}
 
 jobs:
   release:
@@ -151,3 +153,17 @@ jobs:
             Davit-*.zip.sha256
           generate_release_notes: true
           body_path: RELEASE_NOTES.md
+
+      - name: Bump Homebrew tap
+        if: env.TAP_PUSH_TOKEN != ''
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          SHA=$(cut -d' ' -f1 "Davit-${VERSION}.zip.sha256")
+          git clone "https://x-access-token:${TAP_PUSH_TOKEN}@github.com/wouterdebie/homebrew-tap.git" tap
+          cd tap
+          sed -i '' -E "s/version \"[0-9.]+\"/version \"${VERSION}\"/" Casks/davit.rb
+          sed -i '' -E "s/sha256 \"[0-9a-f]+\"/sha256 \"${SHA}\"/" Casks/davit.rb
+          git config user.name "davit-release"
+          git config user.email "noreply@davit.app"
+          git commit -am "davit ${VERSION}"
+          git push
