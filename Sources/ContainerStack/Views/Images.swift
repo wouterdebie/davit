@@ -209,21 +209,24 @@ struct ImageDetailView: View {
     }
 
     private func header(_ img: ImageRecord) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: "square.stack.3d.down.forward.fill")
-                .font(.title)
-                .foregroundStyle(.tint)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(img.shortNameTag).font(.title2.weight(.semibold))
-                Text("\(formatBytes(img.totalSize)) · \(img.platforms.count) platform variant\(img.platforms.count == 1 ? "" : "s")")
-                    .foregroundStyle(.secondary)
+        VStack(spacing: 12) {
+            HStack(spacing: 14) {
+                Image(systemName: "square.stack.3d.down.forward.fill")
+                    .font(.title)
+                    .foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(img.shortNameTag).font(.title2.weight(.semibold))
+                    Text("\(formatBytes(img.totalSize)) · \(img.platforms.count) platform variant\(img.platforms.count == 1 ? "" : "s")")
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
             }
-            Spacer()
             Picker("", selection: $tab) {
                 ForEach(Tab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
-            .frame(width: 200)
+            .labelsHidden()
+            .frame(width: 240)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)

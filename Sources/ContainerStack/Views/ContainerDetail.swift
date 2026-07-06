@@ -75,21 +75,24 @@ struct ContainerDetailView: View {
     }
 
     private func header(_ c: ContainerRecord) -> some View {
-        HStack(spacing: 14) {
-            StatusDot(color: c.state.color, pulsing: c.isRunning)
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 10) {
-                    Text(c.id).font(.title2.weight(.semibold))
-                    StateChip(state: c.state)
+        VStack(spacing: 12) {
+            HStack(spacing: 14) {
+                StatusDot(color: c.state.color, pulsing: c.isRunning)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 10) {
+                        Text(c.id).font(.title2.weight(.semibold))
+                        StateChip(state: c.state)
+                    }
+                    Text(c.shortImage).foregroundStyle(.secondary)
                 }
-                Text(c.shortImage).foregroundStyle(.secondary)
+                Spacer()
             }
-            Spacer()
             Picker("", selection: $tab) {
                 ForEach(Tab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
-            .frame(width: 340)
+            .labelsHidden()
+            .frame(width: 400)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
