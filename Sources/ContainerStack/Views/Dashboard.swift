@@ -152,12 +152,16 @@ struct DashboardView: View {
 
     private var aggregateChart: some View {
         DetailCard(title: "All Running Containers", icon: "chart.xyaxis.line") {
-            Picker("", selection: $aggMetric) {
-                ForEach(AggregateMetric.allCases) { Text($0.rawValue).tag($0) }
+            HStack {
+                Spacer()
+                Picker("", selection: $aggMetric) {
+                    ForEach(AggregateMetric.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 320)
+                Spacer()
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(maxWidth: 320)
             .padding(.bottom, 4)
 
             let series: [(id: String, samples: [StatsSample])] = state.runningContainers.compactMap { c in
