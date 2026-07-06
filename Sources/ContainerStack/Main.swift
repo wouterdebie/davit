@@ -30,6 +30,20 @@ enum Main {
             SelfTest.runBlocking()
             return
         }
+        if args.count >= 3, args[1] == "login-item" {
+            do {
+                switch args[2] {
+                case "enable": try LoginItem.setEnabled(true)
+                case "disable": try LoginItem.setEnabled(false)
+                default: break
+                }
+                print("login-item enabled: \(LoginItem.isEnabled)")
+                exit(0)
+            } catch {
+                FileHandle.standardError.write(Data("login-item \(args[2]) failed: \(error)\n".utf8))
+                exit(1)
+            }
+        }
         if args.count >= 3, args[1] == "platform", args[2] == "install" || args[2] == "remove" {
             let action = args[2]
             let semaphore = DispatchSemaphore(value: 0)

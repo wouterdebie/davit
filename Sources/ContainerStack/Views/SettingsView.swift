@@ -48,6 +48,9 @@ struct GeneralSettings: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Section("Startup") {
+                LoginItemToggle()
+            }
             Section("Refresh") {
                 Slider(value: $refreshInterval, in: 2...15, step: 1) {
                     Text("Refresh every \(Int(refreshInterval))s")
@@ -61,6 +64,41 @@ struct GeneralSettings: View {
         .padding()
         .onChange(of: binaryPath) {
             Task { await state.refreshAll() }
+        }
+    }
+}
+
+/// "Open at Login" via SMAppService — the app registers itself as a macOS
+/// login item. Reflects the live system state so it stays correct if the user
+/// toggles it in System Settings > General > Login Items.
+struct LoginItemToggle: View {
+    @State private var enabled = LoginItem.isEnabled
+    @State private var errorText: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle("Open Davit at login", isOn: Binding(
+                get: { enabled },
+                set: { newValue in
+                    do {
+                        try LoginItem.setEnabled(newValue)
+                        enabled = LoginItem.isEnabled
+                        errorText = nil
+                    } catch {
+                        errorText = error.localizedDescription
+                        enabled = LoginItem.isEnabled
+                    }
+                }
+            ))
+            Text("Launches Davit to the menu bar when you log in, so container services are ready.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if let errorText {
+                Text(errorText).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            enabled = LoginItem.isEnabled
         }
     }
 }
