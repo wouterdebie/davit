@@ -31,3 +31,4 @@ Icon?
 # Misc
 *.log
 *.tmp
+.notes/

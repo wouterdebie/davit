@@ -90,6 +90,38 @@
   .how li { margin: 12px 0 12px 8px; color: var(--muted); }
   .how li strong { color: var(--fg); }
 
+  .steps { max-width: 720px; margin: 0 auto; counter-reset: step; list-style: none; }
+  .steps li { position: relative; padding: 0 0 20px 52px; }
+  .steps li:not(:last-child)::before {
+    content: ""; position: absolute; left: 17px; top: 34px; bottom: -2px; width: 2px;
+    background: var(--border);
+  }
+  .steps li > .num {
+    counter-increment: step; position: absolute; left: 0; top: 0;
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px;
+  }
+  .steps li > .num::before { content: counter(step); }
+  .steps h3 { font-size: 17px; margin: 5px 0 4px; }
+  .steps p { color: var(--muted); font-size: 15px; }
+  .code {
+    display: block; margin: 8px 0 0; padding: 10px 14px; border-radius: 10px;
+    background: rgba(125,125,140,.12); font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 13px; overflow-x: auto; white-space: pre;
+  }
+  .faq { max-width: 720px; margin: 0 auto; }
+  .faq details {
+    border: 1px solid var(--border); border-radius: 12px; padding: 4px 18px; margin-bottom: 12px;
+    background: var(--card);
+  }
+  .faq summary { cursor: pointer; padding: 14px 0; font-weight: 600; font-size: 16px; list-style: none; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after { content: "+"; float: right; color: var(--muted); font-weight: 400; }
+  .faq details[open] summary::after { content: "\2013"; }
+  .faq p { color: var(--muted); font-size: 15px; padding: 0 0 14px; }
+  .faq code { font-size: 13px; background: rgba(125,125,140,.12); padding: 1px 5px; border-radius: 5px; }
+
   footer { border-top: 1px solid var(--border); padding: 36px 0 48px; text-align: center; font-size: 14px; color: var(--muted); }
   footer a { color: var(--accent); text-decoration: none; }
   footer a:hover { text-decoration: underline; }
@@ -146,6 +178,34 @@
 </section>
 
 <section class="wrap spaced">
+  <h2>Get started in two minutes</h2>
+  <p class="lead">From a fresh install to a running container you can open in your browser.</p>
+  <ol class="steps">
+    <li><span class="num"></span>
+      <h3>Install &amp; open Davit</h3>
+      <p>Grab it from <a href="https://github.com/wouterdebie/davit/releases/latest" style="color:var(--accent);text-decoration:none">Releases</a> or <code style="background:rgba(125,125,140,.12);padding:1px 6px;border-radius:5px">brew install wouterdebie/tap/davit</code>. On first launch, if Apple's container platform isn't installed, Davit sets it up for you — no admin password needed.</p>
+    </li>
+    <li><span class="num"></span>
+      <h3>Pull a demo image</h3>
+      <p>Click <strong>Images → Pull Image</strong> and enter a small image that shows something in the browser:</p>
+      <span class="code">nginxdemos/hello</span>
+    </li>
+    <li><span class="num"></span>
+      <h3>Run it with a published port</h3>
+      <p>Hit <strong>Run</strong> on the image (or <strong>Containers → Run Container</strong>). Set a port mapping — host <code style="background:rgba(125,125,140,.12);padding:1px 6px;border-radius:5px">8088</code> → container <code style="background:rgba(125,125,140,.12);padding:1px 6px;border-radius:5px">80</code> — and run.</p>
+    </li>
+    <li><span class="num"></span>
+      <h3>Open it</h3>
+      <p>From the container's <strong>Ports</strong> row, click <strong>Open in Browser</strong> (or visit <code style="background:rgba(125,125,140,.12);padding:1px 6px;border-radius:5px">localhost:8088</code>). You'll see a page served from inside the container, showing its own hostname and address.</p>
+    </li>
+    <li><span class="num"></span>
+      <h3>Explore</h3>
+      <p>Open the container to watch live <strong>CPU, memory and disk</strong>, stream <strong>logs</strong>, drop into a <strong>terminal</strong>, or <strong>Edit &amp; Recreate</strong> to change ports, env or resources.</p>
+    </li>
+  </ol>
+</section>
+
+<section class="wrap spaced">
   <h2>How is this different from Docker Desktop?</h2>
   <ul class="how">
     <li><strong>It's Apple's engine.</strong> Each container runs in its own lightweight VM via Apple's Virtualization framework — sub-second boots, per-container IP addresses, optimized for Apple silicon.</li>
@@ -153,6 +213,32 @@
     <li><strong>Nothing between you and the daemon.</strong> Davit links Apple's own client library and speaks XPC directly — no socket shims, no license agreements, no accounts.</li>
     <li><strong>Tiny.</strong> A single ~17 MB app.</li>
   </ul>
+</section>
+
+<section class="wrap spaced">
+  <h2>FAQ</h2>
+  <div class="faq">
+    <details>
+      <summary>How much memory does it use?</summary>
+      <p>The honest answer is architectural: there's <strong>no always-on multi-gigabyte Linux VM</strong>. Docker Desktop keeps one big VM running whether or not you have containers; Apple's platform instead boots a <em>separate lightweight VM per container</em>, sized to that container, and tears it down when the container stops. With nothing running, the platform's background services idle at roughly <strong>25&nbsp;MB</strong>. Davit itself is a native SwiftUI app (no Electron) — its footprint is mostly shared macOS framework memory. So the more containers you're <em>not</em> running, the less it costs you.</p>
+    </details>
+    <details>
+      <summary>How does it compare to OrbStack?</summary>
+      <p>OrbStack is a polished commercial app with its own Docker-compatible virtualization layer. Davit is free and open source, and is a UI on top of <a href="https://github.com/apple/container">Apple's own container platform</a> — so the engine is Apple's, not a third party's. Both run standard OCI images. If you specifically want Apple's Containerization stack (per-container VMs, Apple-silicon-native), Davit gives you a native front-end for it; if you want a drop-in Docker daemon replacement with broad tooling compatibility, OrbStack is the more mature choice today.</p>
+    </details>
+    <details>
+      <summary>Can I reach a container by name from my Mac?</summary>
+      <p>Each container gets its own IP (shown in the container's Network section), so you can always hit it directly. For name-based access, a common trick is to run <a href="https://en.wikipedia.org/wiki/Avahi_(software)">Avahi</a> inside the guest to broadcast a <code>.local</code> alias over mDNS/zeroconf — see <a href="https://gist.github.com/tomslominski/9d507acd4036952d65b2364">this gist</a>. Built-in name resolution is on the roadmap.</p>
+    </details>
+    <details>
+      <summary>Is it signed and safe to run?</summary>
+      <p>Yes — every release is Developer ID signed and notarized by Apple, so it opens without Gatekeeper warnings. It's open source (MIT); you can read or build it yourself. It talks only to your local container daemon and to GitHub for update checks.</p>
+    </details>
+    <details>
+      <summary>Do I need the <code>container</code> CLI installed?</summary>
+      <p>No. Davit talks to the platform directly over XPC. If the platform isn't present, Davit can download and install Apple's signed package for you on first launch — no admin password required. It can optionally add the <code>container</code> CLI to your shell from Settings if you want it.</p>
+    </details>
+  </div>
 </section>
 
 <footer>

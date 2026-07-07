@@ -287,7 +287,7 @@ struct PullImageSheet: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(reference.isEmpty || model.isRunning)
                 }
-                Text("Popular: alpine, ubuntu, nginx, redis, postgres, node, python")
+                Text("Try: nginxdemos/hello (open it in your browser) · alpine · postgres · redis · node")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
 

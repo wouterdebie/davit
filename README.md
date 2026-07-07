@@ -61,6 +61,16 @@ brew install wouterdebie/tap/davit
 (Homebrew 6 asks you to trust third-party taps on first use: `brew trust wouterdebie/tap`.)
 Or download the signed zip from [Releases](https://github.com/wouterdebie/davit/releases/latest) / [davit.app](https://davit.app).
 
+## Getting started
+
+From a fresh install to something running in your browser:
+
+1. **Open Davit.** On first launch, if Apple's container platform isn't installed, Davit downloads and installs it for you — no admin password needed.
+2. **Pull a demo image** — Images → Pull Image → `nginxdemos/hello` (small, and it serves a visible page).
+3. **Run it with a port** — Run the image, map host `8088` → container `80`.
+4. **Open it** — the container's Ports row has *Open in Browser*, or visit `localhost:8088`. You'll see a page served from inside the container, showing its own hostname and IP.
+5. **Explore** — live CPU/memory/disk, streaming logs, a one-click terminal, and Edit & Recreate to change ports/env/resources.
+
 ## Build & run
 
 ```sh
