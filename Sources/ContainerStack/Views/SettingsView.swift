@@ -33,6 +33,7 @@ struct GeneralSettings: View {
     @AppStorage(ContainerBinary.defaultsKey) private var binaryPath = ""
     @AppStorage("refreshInterval") private var refreshInterval = 4.0
     @AppStorage("keepInDock") private var keepInDock = false
+    @AppStorage(TerminalApp.defaultsKey) private var preferredTerminal = TerminalApp.systemDefault.rawValue
 
     var body: some View {
         Form {
@@ -57,6 +58,16 @@ struct GeneralSettings: View {
             Section("Appearance") {
                 Toggle("Keep in Dock when the window is closed", isOn: $keepInDock)
                 Text("Off: closing the window leaves Davit only in the menu bar, like other menu bar utilities.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section("Terminal") {
+                Picker("Open shells in", selection: $preferredTerminal) {
+                    ForEach(TerminalApp.installed) { app in
+                        Text(app.displayName).tag(app.rawValue)
+                    }
+                }
+                Text("Used by \u{201C}Open Terminal\u{201D} on containers. Only installed terminals are listed.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -405,7 +416,9 @@ struct LabeledField: View {
             TextField("", text: $text)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: width)
-                .multilineTextAlignment(.trailing)
+                // Leading, not trailing: trailing-aligned fields read as if they
+                // "type from the right" (HN: lelandfe) and macOS inputs are LTR.
+                .multilineTextAlignment(.leading)
         } label: {
             FieldLabel(label: label, hint: hint)
         }

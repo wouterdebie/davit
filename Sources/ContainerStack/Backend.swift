@@ -560,10 +560,56 @@ enum SystemController {
 
 // MARK: - Terminal integration (self-exec: no CLI involved)
 
+/// Terminal apps Davit can open shells in. Which are shown in Settings depends
+/// on what's installed; "System Default" opens the .command through LaunchServices
+/// (whatever the user's .command handler is — the pre-picker behavior).
+enum TerminalApp: String, CaseIterable, Identifiable {
+    case systemDefault = "default"
+    case terminal = "com.apple.Terminal"
+    case iterm = "com.googlecode.iterm2"
+    case ghostty = "com.mitchellh.ghostty"
+    case wezterm = "com.github.wez.wezterm"
+    case kitty = "net.kovidgoyal.kitty"
+    case alacritty = "org.alacritty"
+    case warp = "dev.warp.Warp-Stable"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .systemDefault: return "System Default"
+        case .terminal: return "Terminal"
+        case .iterm: return "iTerm2"
+        case .ghostty: return "Ghostty"
+        case .wezterm: return "WezTerm"
+        case .kitty: return "kitty"
+        case .alacritty: return "Alacritty"
+        case .warp: return "Warp"
+        }
+    }
+
+    var appURL: URL? {
+        guard self != .systemDefault else { return nil }
+        return NSWorkspace.shared.urlForApplication(withBundleIdentifier: rawValue)
+    }
+
+    var isInstalled: Bool { self == .systemDefault || appURL != nil }
+
+    static var installed: [TerminalApp] { allCases.filter(\.isInstalled) }
+
+    static let defaultsKey = "preferredTerminal"
+    static var preferred: TerminalApp {
+        let raw = UserDefaults.standard.string(forKey: defaultsKey) ?? ""
+        let choice = TerminalApp(rawValue: raw) ?? .systemDefault
+        return choice.isInstalled ? choice : .systemDefault
+    }
+}
+
 enum TerminalLauncher {
-    /// Opens an interactive shell into a container in the user's default terminal.
-    /// The generated .command re-invokes the Davit binary in `exec` mode, which
-    /// attaches a TTY through the XPC API (see ExecMode in Main.swift).
+    /// Opens an interactive shell into a container in the user's preferred
+    /// terminal (Settings → General). The generated .command re-invokes the
+    /// Davit binary in `exec` mode, which attaches a TTY through the XPC API
+    /// (see ExecMode in Main.swift).
     static func openShell(containerID: String) {
         let selfPath = Bundle.main.executablePath ?? CommandLine.arguments[0]
         let escaped = containerID.replacingOccurrences(of: "'", with: "'\\''")
@@ -578,7 +624,39 @@ enum TerminalLauncher {
         let url = dir.appendingPathComponent("shell-\(containerID).command")
         try? script.write(to: url, atomically: true, encoding: .utf8)
         try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
-        NSWorkspace.shared.open(url)
+        open(commandFile: url, in: TerminalApp.preferred)
+    }
+
+    private static func open(commandFile url: URL, in terminal: TerminalApp) {
+        switch terminal {
+        case .systemDefault:
+            NSWorkspace.shared.open(url)
+        case .terminal, .iterm, .warp:
+            // These register as .command handlers — open the file with the app.
+            guard let appURL = terminal.appURL else { NSWorkspace.shared.open(url); return }
+            NSWorkspace.shared.open([url], withApplicationAt: appURL, configuration: NSWorkspace.OpenConfiguration())
+        case .ghostty, .wezterm, .kitty, .alacritty:
+            // No .command association; exec their bundled CLI so it works whether
+            // or not the app is already running (OpenConfiguration.arguments are
+            // ignored for running apps).
+            guard let appURL = terminal.appURL else { NSWorkspace.shared.open(url); return }
+            let binDir = appURL.appendingPathComponent("Contents/MacOS")
+            let invocation: [String]
+            switch terminal {
+            case .ghostty: invocation = [binDir.appendingPathComponent("ghostty").path, "-e", url.path]
+            case .wezterm: invocation = [binDir.appendingPathComponent("wezterm-gui").path, "start", "--", url.path]
+            case .kitty: invocation = [binDir.appendingPathComponent("kitty").path, url.path]
+            case .alacritty: invocation = [binDir.appendingPathComponent("alacritty").path, "-e", url.path]
+            default: invocation = []
+            }
+            guard let exe = invocation.first, FileManager.default.isExecutableFile(atPath: exe) else {
+                NSWorkspace.shared.open(url); return
+            }
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: exe)
+            process.arguments = Array(invocation.dropFirst())
+            try? process.run()
+        }
     }
 }
 
