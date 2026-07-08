@@ -27,8 +27,21 @@ extension ContainerService {
         var stdoutString: String { String(decoding: stdout, as: UTF8.self) }
     }
 
+    /// `exec` exceeded its caller-supplied timeout. The process keeps running:
+    /// apple/container 1.0.0's `ClientProcess.kill` encodes the signal as Int64
+    /// where the apiserver expects a string (ClientProcess.swift), so a timed-out
+    /// process cannot be signalled — it is abandoned and exits on its own or when
+    /// the container stops.
+    struct ExecTimeout: Swift.Error, LocalizedError {
+        let argv: [String]
+        let timeout: Duration
+        var errorDescription: String? { "exec timed out after \(timeout): \(argv.joined(separator: " "))" }
+    }
+
     /// Runs a command inside the container and captures stdout/stderr. Not a TTY.
-    static func exec(_ id: String, _ argv: [String]) async throws -> ExecResult {
+    /// With `timeout`, throws `ExecTimeout` once it elapses (see there — the
+    /// process is abandoned, not killed).
+    static func exec(_ id: String, _ argv: [String], timeout: Duration? = nil) async throws -> ExecResult {
         let client = ContainerClient()
         let container = try await client.get(id: id)
         var config = container.configuration.initProcess
@@ -50,11 +63,30 @@ extension ContainerService {
         try? outPipe.fileHandleForWriting.close()
         try? errPipe.fileHandleForWriting.close()
 
-        async let out = readToEnd(outPipe.fileHandleForReading)
-        async let err = readToEnd(errPipe.fileHandleForReading)
-        let code = try await process.wait()
-        let outData = await out
-        let errData = await err
+        // Unstructured drains (not async let): they only see EOF once the process
+        // exits, so on timeout they must not block the throw at scope exit.
+        let outTask = Task { await readToEnd(outPipe.fileHandleForReading) }
+        let errTask = Task { await readToEnd(errPipe.fileHandleForReading) }
+
+        let code: Int32
+        if let timeout {
+            // XPC requests ignore task cancellation, so wait() can't be raced inside
+            // a task group (the group would block on the wait child); instead the
+            // wait cancels a cancellation-responsive timer when the process exits.
+            let timer = Task { try await Task.sleep(for: timeout) }
+            let waited = Task {
+                defer { timer.cancel() }
+                return try await process.wait()
+            }
+            let expired: Bool
+            do { try await timer.value; expired = true } catch { expired = false }
+            if expired { throw ExecTimeout(argv: argv, timeout: timeout) }
+            code = try await waited.value
+        } else {
+            code = try await process.wait()
+        }
+        let outData = await outTask.value
+        let errData = await errTask.value
         return ExecResult(stdout: outData, stderr: String(decoding: errData, as: UTF8.self), exitCode: code)
     }
 

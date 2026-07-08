@@ -113,7 +113,7 @@ follow-up; do not creep.
   profile filtering incl. auto-activation rule, closure selection + pruning,
   noSuchService + missingHealthcheck + inactiveProfile errors. Done when: build +
   full selftest OK. Commit: `compose: parse profiles, healthchecks, depends_on conditions + service selection`.
-- [ ] **E2 — Backend exit codes + probe timeout.** `start(_ id:retainExitCode:)` +
+- [x] **E2 — Backend exit codes + probe timeout.** `start(_ id:retainExitCode:)` +
   `runContainer(retainExitCode:)` (defaulted, existing callers untouched) registering
   the bootstrap handle in `actor ComposeExitCodes` (lives in Compose.swift; static
   shared; register + exitCode(for:) with await). `ContainerService.exec` gains

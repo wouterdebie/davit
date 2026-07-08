@@ -1,3 +1,4 @@
+import ContainerAPIClient
 import Foundation
 import Yams
 
@@ -495,6 +496,35 @@ extension Compose.Plan {
             networks: networks.filter(networkRefs.contains),
             services: kept,
             warnings: warnings)
+    }
+}
+
+// MARK: - Exit codes
+
+/// In-process registry of init-process exit codes. Snapshots carry no exit code,
+/// so `service_completed_successfully` needs the bootstrap handle captured at
+/// start time: `ContainerService.start(_:retainExitCode:)` registers it here and
+/// `Compose.up` awaits the code. Only covers containers started by this process.
+actor ComposeExitCodes {
+    static let shared = ComposeExitCodes()
+
+    private var waits: [String: Task<Int32?, Never>] = [:]
+    private var order: [String] = []  // registration order, for eviction
+
+    /// Watches the process until it exits. Entries are capped (oldest dropped)
+    /// so a long-lived GUI session doesn't accumulate handles.
+    func register(id: String, process: ClientProcess) {
+        waits[id] = Task { try? await process.wait() }
+        order.removeAll { $0 == id }
+        order.append(id)
+        if order.count > 64 { waits[order.removeFirst()] = nil }
+    }
+
+    /// Blocks until the process exits. nil when the id was never registered
+    /// (started outside this process, or evicted) or the wait itself failed.
+    func exitCode(for id: String) async -> Int32? {
+        guard let wait = waits[id] else { return nil }
+        return await wait.value
     }
 }
 

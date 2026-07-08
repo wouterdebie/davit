@@ -195,7 +195,9 @@ enum ContainerService {
 
     // MARK: Container lifecycle
 
-    static func start(_ id: String) async throws {
+    /// `retainExitCode` hands the bootstrap process to `ComposeExitCodes` so the
+    /// init exit code can be awaited later (snapshots don't carry it).
+    static func start(_ id: String, retainExitCode: Bool = false) async throws {
         let client = ContainerClient()
         let container = try await client.get(id: id)
         guard container.status != .running else { return }
@@ -204,6 +206,7 @@ enum ContainerService {
             let process = try await client.bootstrap(id: id, stdio: io.stdio, dynamicEnv: [:])
             try await process.start()
             try io.closeAfterStart()
+            if retainExitCode { await ComposeExitCodes.shared.register(id: id, process: process) }
         } catch {
             try? io.close()
             try? await client.stop(id: id)
@@ -250,7 +253,8 @@ enum ContainerService {
         processArgs: [String],
         managementArgs: [String],
         resourceArgs: [String],
-        commandArgs: [String]
+        commandArgs: [String],
+        retainExitCode: Bool = false
     ) async throws {
         do {
             // The run path auto-pulls missing images; stage helper credentials first.
@@ -286,7 +290,7 @@ enum ContainerService {
                 kernel: kernel,
                 initImage: initImage
             )
-            try await start(id)
+            try await start(id, retainExitCode: retainExitCode)
         } catch let e as CLIError {
             throw e
         } catch {
