@@ -261,6 +261,10 @@ struct ContainerActions: View {
             Button("Start") { state.startContainer(container) }
         }
         Button("Edit & Recreate…") { state.recreateTarget = container }
+        Toggle("Start when Davit Opens", isOn: Binding(
+            get: { state.isAutoStart(container.id) },
+            set: { _ in state.toggleAutoStart(container.id) }
+        ))
         Divider()
         Button("Copy ID") {
             NSPasteboard.general.clearContents()

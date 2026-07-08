@@ -33,6 +33,14 @@ final class AppState: ObservableObject {
 
     @AppStorage("refreshInterval") var refreshInterval: Double = 4.0
 
+    /// Containers to start when Davit launches (app feature; the platform has
+    /// no restart policies). With "Open Davit at login" this gives
+    /// containers-at-login.
+    @Published var autoStartContainers: Set<String> =
+        Set(UserDefaults.standard.stringArray(forKey: AppState.autoStartKey) ?? [])
+    static let autoStartKey = "autoStartContainers"
+    private var autoStartDone = false
+
     private var pollTask: Task<Void, Never>?
     private var statsTask: Task<Void, Never>?
 
@@ -59,6 +67,7 @@ final class AppState: ObservableObject {
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.refreshAll()
+                await self?.performAutoStartIfNeeded()
                 let interval = self?.refreshInterval ?? 4.0
                 try? await Task.sleep(for: .seconds(interval))
             }
@@ -74,6 +83,50 @@ final class AppState: ObservableObject {
     func stopPolling() {
         pollTask?.cancel()
         statsTask?.cancel()
+    }
+
+    // MARK: Auto-start
+
+    func isAutoStart(_ id: String) -> Bool { autoStartContainers.contains(id) }
+
+    func toggleAutoStart(_ id: String) {
+        if autoStartContainers.contains(id) {
+            autoStartContainers.remove(id)
+        } else {
+            autoStartContainers.insert(id)
+        }
+        UserDefaults.standard.set(Array(autoStartContainers).sorted(), forKey: Self.autoStartKey)
+    }
+
+    /// Once per app launch, after the first refresh: bring the services up if
+    /// needed and start every marked container that isn't running. Stale IDs
+    /// (containers since deleted) are pruned from the set.
+    private func performAutoStartIfNeeded() async {
+        guard !autoStartDone else { return }
+        autoStartDone = true
+        guard !autoStartContainers.isEmpty else { return }
+
+        if !systemState.isRunning {
+            try? await ContainerService.systemStart()
+            await refreshAll()
+            guard systemState.isRunning else { return }
+        }
+
+        let existing = Set(containers.map(\.id))
+        let stale = autoStartContainers.subtracting(existing)
+        if !stale.isEmpty {
+            autoStartContainers.subtract(stale)
+            UserDefaults.standard.set(Array(autoStartContainers).sorted(), forKey: Self.autoStartKey)
+        }
+
+        let toStart = containers.filter { autoStartContainers.contains($0.id) && !$0.isRunning }
+        guard !toStart.isEmpty else { return }
+        await withTaskGroup(of: Void.self) { group in
+            for container in toStart {
+                group.addTask { try? await ContainerService.start(container.id) }
+            }
+        }
+        await refreshAll()
     }
 
     // MARK: Refresh
