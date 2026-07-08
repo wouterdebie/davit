@@ -533,6 +533,111 @@ enum SelfTest {
                 throw CLIError(command: "selftest", message: "cycle not rejected")
             } catch Compose.Error.dependencyCycle { /* expected */ }
         }
+        await step("compose: profiles + healthchecks + depends_on conditions + selection") {
+            let yaml = """
+            name: sel
+            services:
+              web:
+                image: nginx
+                depends_on:
+                  db: { condition: service_healthy }
+                  init: { condition: service_completed_successfully }
+                volumes: [webdata:/data]
+                networks: [front]
+              db:
+                image: postgres
+                healthcheck:
+                  test: ["CMD", "pg_isready", "-q"]
+                  interval: 1m30s
+                  timeout: 500ms
+                  retries: 5
+                  start_period: 10s
+                volumes: [dbdata:/var/lib/db]
+                networks: [back]
+              init:
+                image: alpine
+                healthcheck: { disable: true }
+              cache:
+                image: redis
+                healthcheck: { test: [NONE] }
+                depends_on:
+                  db: { condition: service_wobbly }
+              debug:
+                image: busybox
+                profiles: [debugging]
+                depends_on: [cache]
+            volumes: { webdata: , dbdata: , unused: }
+            networks: { front: , back: , spare: }
+            """
+            let plan = try Compose.parse(text: yaml, projectName: "ignored")
+            guard plan.services.map(\.service) == ["db", "init", "cache", "web", "debug"] else {
+                throw CLIError(command: "selftest", message: "topo order wrong: \(plan.services.map(\.service))")
+            }
+            let db = plan.services[0], cache = plan.services[2], web = plan.services[3], debug = plan.services[4]
+            guard web.dependsOn == ["db": .healthy, "init": .completedSuccessfully] else {
+                throw CLIError(command: "selftest", message: "conditions wrong: \(web.dependsOn)")
+            }
+            guard cache.dependsOn == ["db": .started],
+                  plan.warnings.contains(where: { $0.contains("service_wobbly") })
+            else { throw CLIError(command: "selftest", message: "unknown condition not downgraded: \(cache.dependsOn) \(plan.warnings)") }
+            guard let hc = db.healthcheck, hc.argv == ["pg_isready", "-q"], !hc.shellForm,
+                  hc.interval == 90, hc.timeout == 0.5, hc.retries == 5, hc.startPeriod == 10
+            else { throw CLIError(command: "selftest", message: "healthcheck wrong: \(String(describing: db.healthcheck))") }
+            guard plan.services[1].healthcheck == nil, cache.healthcheck == nil,
+                  !plan.warnings.contains(where: { $0.contains("healthcheck") })
+            else { throw CLIError(command: "selftest", message: "disable/NONE should be nil and silent: \(plan.warnings)") }
+            guard debug.profiles == ["debugging"] else {
+                throw CLIError(command: "selftest", message: "profiles wrong: \(debug.profiles)")
+            }
+
+            // string test → shell form; docker defaults; bad duration falls back with a warning
+            let defaulted = try Compose.parse(
+                text: "services: {a: {image: x, healthcheck: {test: echo ok, interval: nope}}}", projectName: "d")
+            guard let ahc = defaulted.services[0].healthcheck, ahc.shellForm,
+                  ahc.argv == ["/bin/sh", "-c", "echo ok"],
+                  ahc.interval == 30, ahc.timeout == 30, ahc.retries == 3, ahc.startPeriod == 0,
+                  defaulted.warnings.contains(where: { $0.contains("not a duration") })
+            else { throw CLIError(command: "selftest", message: "healthcheck defaults wrong: \(String(describing: defaulted.services[0].healthcheck)) \(defaulted.warnings)") }
+
+            // selection: dependency closure in start order, volumes/networks pruned
+            let sel = try plan.selecting(services: ["web"], activeProfiles: [])
+            guard sel.services.map(\.service) == ["db", "init", "web"],
+                  sel.volumes == ["dbdata", "webdata"], sel.networks == ["back", "front"]
+            else { throw CLIError(command: "selftest", message: "selection wrong: \(sel.services.map(\.service)) \(sel.volumes) \(sel.networks)") }
+            // empty selection = all enabled; profile-gated debug drops out, unreferenced volume pruned
+            let all = try plan.selecting(services: [], activeProfiles: [])
+            guard all.services.map(\.service) == ["db", "init", "cache", "web"], !all.volumes.contains("unused") else {
+                throw CLIError(command: "selftest", message: "profile filter wrong: \(all.services.map(\.service)) \(all.volumes)")
+            }
+            guard try plan.selecting(services: [], activeProfiles: ["debugging"]).services.count == 5 else {
+                throw CLIError(command: "selftest", message: "--profile debugging should enable debug")
+            }
+            // naming a gated service auto-activates its own profile
+            let named = try plan.selecting(services: ["debug"], activeProfiles: [])
+            guard named.services.map(\.service) == ["db", "cache", "debug"] else {
+                throw CLIError(command: "selftest", message: "auto-activation wrong: \(named.services.map(\.service))")
+            }
+
+            do {
+                _ = try plan.selecting(services: ["nope"], activeProfiles: [])
+                throw CLIError(command: "selftest", message: "unknown service not rejected")
+            } catch Compose.Error.noSuchService("nope") { /* expected */ }
+            do {
+                _ = try Compose.parse(
+                    text: "services: {a: {image: x, depends_on: {b: {condition: service_healthy}}}, b: {image: y}}",
+                    projectName: "m")
+                throw CLIError(command: "selftest", message: "missing healthcheck not rejected")
+            } catch Compose.Error.missingHealthcheck(service: "a", dependency: "b") { /* expected */ }
+            let gated = try Compose.parse(
+                text: "services: {a: {image: x, depends_on: [g]}, g: {image: y, profiles: [p]}}", projectName: "g")
+            do {
+                _ = try gated.selecting(services: ["a"], activeProfiles: [])
+                throw CLIError(command: "selftest", message: "inactive-profile dependency not rejected")
+            } catch Compose.Error.inactiveProfile(service: "g", profile: "p") { /* expected */ }
+            guard try gated.selecting(services: ["a"], activeProfiles: ["p"]).services.map(\.service) == ["g", "a"] else {
+                throw CLIError(command: "selftest", message: "--profile p should unlock the gated dependency")
+            }
+        }
         await step("registry: list + reject bad credentials") {
             _ = RegistryService.listLogins()  // must not throw
             do {

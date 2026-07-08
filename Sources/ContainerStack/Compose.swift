@@ -16,6 +16,9 @@ enum Compose {
         var managementArgs: [String]
         var resourceArgs: [String]
         var commandArgs: [String]
+        var profiles: [String]       // empty = always enabled
+        var healthcheck: Healthcheck?
+        var dependsOn: [String: DependsCondition]
         var id: String { service }
 
         /// Equivalent `container run …` (what Davit performs over XPC).
@@ -37,12 +40,34 @@ enum Compose {
         var warnings: [String]
     }
 
+    /// Parsed healthcheck with docker defaults applied at parse time.
+    struct Healthcheck: Hashable {
+        let test: [String]           // probe command without the CMD/CMD-SHELL head
+        let shellForm: Bool          // string or CMD-SHELL test — runs via /bin/sh -c
+        let interval: Double         // seconds (docker default 30)
+        let timeout: Double          // seconds (docker default 30)
+        let retries: Int             // consecutive failures until unhealthy (default 3)
+        let startPeriod: Double      // seconds; failures inside don't count (default 0)
+
+        /// Concrete probe argv for `ContainerService.exec`.
+        var argv: [String] { shellForm ? ["/bin/sh", "-c", test.joined(separator: " ")] : test }
+    }
+
+    enum DependsCondition: String, Hashable {
+        case started = "service_started"
+        case healthy = "service_healthy"
+        case completedSuccessfully = "service_completed_successfully"
+    }
+
     enum Error: Swift.Error, LocalizedError {
         case notAMapping
         case noServices
         case missingImage(service: String)
         case dependencyCycle([String])
         case unknownDependency(service: String, dependsOn: String)
+        case missingHealthcheck(service: String, dependency: String)
+        case noSuchService(String)
+        case inactiveProfile(service: String, profile: String)
 
         var errorDescription: String? {
             switch self {
@@ -51,6 +76,9 @@ enum Compose {
             case .missingImage(let s): return "service \"\(s)\" has no image — build: is not supported yet"
             case .dependencyCycle(let names): return "depends_on cycle: \(names.joined(separator: " → "))"
             case .unknownDependency(let s, let d): return "service \"\(s)\" depends on unknown service \"\(d)\""
+            case .missingHealthcheck(let s, let d): return "service \"\(s)\" needs \"\(d)\" healthy, but \"\(d)\" has no healthcheck"
+            case .noSuchService(let s): return "no such service: \(s)"
+            case .inactiveProfile(let s, let p): return "service \"\(s)\" requires profile \"\(p)\" — activate it with --profile \(p)"
             }
         }
     }
@@ -72,22 +100,30 @@ enum Compose {
         let topNetworks = (root["networks"] as? [String: Any]).map { Array($0.keys) } ?? []
 
         var plans: [String: ServicePlan] = [:]
-        var dependsOn: [String: [String]] = [:]
         for (svcName, svcAny) in services {
             guard let svc = svcAny as? [String: Any] else {
                 warnings.append("service \"\(svcName)\" is not a mapping — skipped")
                 continue
             }
-            let (plan, deps, svcWarnings) = try parseService(
+            let (plan, svcWarnings) = try parseService(
                 key: svcName, svc: svc, project: project, declaredNetworks: topNetworks, baseDir: baseDir)
             plans[svcName] = plan
-            dependsOn[svcName] = deps
             warnings += svcWarnings
         }
         guard !plans.isEmpty else { throw Error.noServices }
 
-        // depends_on → start order (topological). Order only; no health waiting.
-        let ordered = try topoSort(services: plans.keys.sorted(), dependsOn: dependsOn)
+        // depends_on → start order (topological). Conditions are honored at up time.
+        let ordered = try topoSort(
+            services: plans.keys.sorted(),
+            dependsOn: plans.mapValues { $0.dependsOn.keys.sorted() })
+
+        // service_healthy requires the dependency to define a healthcheck (docker parity).
+        for svcName in ordered {
+            for (dep, condition) in (plans[svcName]?.dependsOn ?? [:]).sorted(by: { $0.key < $1.key })
+            where condition == .healthy && plans[dep]?.healthcheck == nil {
+                throw Error.missingHealthcheck(service: svcName, dependency: dep)
+            }
+        }
 
         return Plan(
             project: project,
@@ -102,7 +138,7 @@ enum Compose {
 
     private static func parseService(
         key: String, svc: [String: Any], project: String, declaredNetworks: [String], baseDir: String?
-    ) throws -> (ServicePlan, deps: [String], warnings: [String]) {
+    ) throws -> (ServicePlan, warnings: [String]) {
         var warnings: [String] = []
 
         guard let image = svc["image"] as? String, !image.isEmpty else {
@@ -221,21 +257,47 @@ enum Compose {
         default: warnings.append("\(key): unrecognized command format — ignored")
         }
 
-        // depends_on: list or map (condition ignored — order only)
-        var deps: [String] = []
+        // depends_on: list form (→ started) or map with condition
+        var deps: [String: DependsCondition] = [:]
         switch svc["depends_on"] {
-        case let list as [Any]: deps = list.map { scalarString($0) }
+        case let list as [Any]:
+            for entry in list { deps[scalarString(entry)] = .started }
         case let map as [String: Any]:
-            deps = map.keys.sorted()
-            warnings.append("\(key): depends_on conditions are ignored — start order only, no health waiting")
+            for (dep, spec) in map.sorted(by: { $0.key < $1.key }) {
+                var condition = DependsCondition.started
+                if let m = spec as? [String: Any], let raw = m["condition"] as? String {
+                    if let parsed = DependsCondition(rawValue: raw) {
+                        condition = parsed
+                    } else {
+                        warnings.append("\(key): depends_on \(dep) condition \"\(raw)\" is unknown — treating as service_started")
+                    }
+                }
+                deps[dep] = condition
+            }
         case nil: break
         default: break
+        }
+
+        // profiles: list of strings; filtering happens in Plan.selecting
+        var profiles: [String] = []
+        switch svc["profiles"] {
+        case let list as [Any]: profiles = list.map { scalarString($0) }
+        case nil: break
+        default: warnings.append("\(key): unrecognized profiles format — ignored")
+        }
+
+        var healthcheck: Healthcheck? = nil
+        switch svc["healthcheck"] {
+        case let hc as [String: Any]: healthcheck = parseHealthcheck(key: key, hc: hc, warnings: &warnings)
+        case nil: break
+        default: warnings.append("\(key): unrecognized healthcheck format — ignored")
         }
 
         // Everything we understand is handled above; name the rest honestly.
         let handled: Set<String> = [
             "image", "container_name", "environment", "user", "working_dir", "ports",
             "volumes", "networks", "cpus", "mem_limit", "deploy", "command", "depends_on",
+            "profiles", "healthcheck",
         ]
         for k in svc.keys.sorted() where !handled.contains(k) {
             warnings.append("\(key): \"\(k)\" is not supported — ignored")
@@ -244,8 +306,49 @@ enum Compose {
         let plan = ServicePlan(
             service: key, name: name, image: image,
             processArgs: process, managementArgs: management,
-            resourceArgs: resource, commandArgs: command)
-        return (plan, deps, warnings)
+            resourceArgs: resource, commandArgs: command,
+            profiles: profiles, healthcheck: healthcheck, dependsOn: deps)
+        return (plan, warnings)
+    }
+
+    /// nil (no probe) for `disable: true`, `test: NONE`, or an unusable test.
+    private static func parseHealthcheck(key: String, hc: [String: Any], warnings: inout [String]) -> Healthcheck? {
+        if (hc["disable"] as? Bool) == true { return nil }
+        var test: [String] = []
+        var shellForm = false
+        switch hc["test"] {
+        case let s as String:
+            test = [s]; shellForm = true
+        case let list as [Any]:
+            let parts = list.map { scalarString($0) }
+            switch parts.first {
+            case "NONE": return nil
+            case "CMD": test = Array(parts.dropFirst())
+            case "CMD-SHELL": test = Array(parts.dropFirst()); shellForm = true
+            default:
+                warnings.append("\(key): healthcheck test must start with CMD, CMD-SHELL or NONE — ignored")
+                return nil
+            }
+        default:
+            warnings.append("\(key): healthcheck has no test — ignored")
+            return nil
+        }
+        if test.isEmpty {
+            warnings.append("\(key): healthcheck test is empty — ignored")
+            return nil
+        }
+        func duration(_ field: String, default def: Double) -> Double {
+            guard let raw = hc[field] else { return def }
+            if let seconds = parseDuration(scalarString(raw)) { return seconds }
+            warnings.append("\(key): healthcheck \(field) \"\(scalarString(raw))\" is not a duration — using default")
+            return def
+        }
+        return Healthcheck(
+            test: test, shellForm: shellForm,
+            interval: duration("interval", default: 30),
+            timeout: duration("timeout", default: 30),
+            retries: (hc["retries"] as? Int) ?? 3,
+            startPeriod: duration("start_period", default: 0))
     }
 
     // MARK: helpers
@@ -288,6 +391,30 @@ enum Compose {
         return String(describing: v)
     }
 
+    /// Go-style duration ("300ms", "5s", "1m30s", "2h") → seconds.
+    static func parseDuration(_ s: String) -> Double? {
+        let multipliers: [String: Double] = ["ms": 0.001, "s": 1, "m": 60, "h": 3600]
+        var total = 0.0
+        var number = ""
+        var unit = ""
+        for ch in s {
+            if ch.isNumber || ch == "." {
+                if !unit.isEmpty {
+                    guard let n = Double(number), let m = multipliers[unit] else { return nil }
+                    total += n * m
+                    number = ""; unit = ""
+                }
+                number.append(ch)
+            } else if !number.isEmpty {
+                unit.append(ch)
+            } else {
+                return nil
+            }
+        }
+        guard let n = Double(number), let m = multipliers[unit] else { return nil }
+        return total + n * m
+    }
+
     /// Minimal shell-style splitter for compose string commands (quotes honored).
     static func shellSplit(_ s: String) -> [String] {
         var out: [String] = []
@@ -313,6 +440,61 @@ enum Compose {
         if s.isEmpty { return "''" }
         if s.range(of: "^[A-Za-z0-9._:/=@,+-]+$", options: .regularExpression) != nil { return s }
         return "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+}
+
+// MARK: - Selection
+
+extension Compose.Plan {
+    /// Docker-style service selection: the named services plus their transitive
+    /// depends_on closure, kept in start order. Profiles filter first (a service
+    /// without profiles is always enabled); naming a service explicitly activates
+    /// its own profiles (docker v2), but a dependency pulled in by closure whose
+    /// profiles all stay inactive is an error. Created volumes/networks are pruned
+    /// to what the selected services reference. Empty `services` = every enabled one.
+    func selecting(services requested: [String], activeProfiles: [String]) throws -> Compose.Plan {
+        let byName = Dictionary(uniqueKeysWithValues: services.map { ($0.service, $0) })
+        for name in requested where byName[name] == nil {
+            throw Compose.Error.noSuchService(name)
+        }
+        var active = Set(activeProfiles)
+        for name in requested { active.formUnion(byName[name]?.profiles ?? []) }
+        func enabled(_ svc: Compose.ServicePlan) -> Bool {
+            svc.profiles.isEmpty || svc.profiles.contains(where: active.contains)
+        }
+
+        var selected = Set<String>()
+        var queue = requested.isEmpty ? services.filter(enabled).map(\.service) : requested
+        while let name = queue.popLast() {
+            guard !selected.contains(name), let svc = byName[name] else { continue }
+            if !enabled(svc) {
+                throw Compose.Error.inactiveProfile(service: name, profile: svc.profiles.first ?? "?")
+            }
+            selected.insert(name)
+            queue += svc.dependsOn.keys.sorted()
+        }
+
+        let kept = services.filter { selected.contains($0.service) }
+        var volumeRefs = Set<String>()
+        var networkRefs = Set<String>()
+        for svc in kept {
+            for i in svc.managementArgs.indices where i + 1 < svc.managementArgs.count {
+                let value = svc.managementArgs[i + 1]
+                if svc.managementArgs[i] == "--mount", value.hasPrefix("type=volume,") {
+                    for part in value.split(separator: ",") where part.hasPrefix("source=") {
+                        volumeRefs.insert(String(part.dropFirst("source=".count)))
+                    }
+                } else if svc.managementArgs[i] == "--network" {
+                    networkRefs.insert(value)
+                }
+            }
+        }
+        return Compose.Plan(
+            project: project,
+            volumes: volumes.filter(volumeRefs.contains),
+            networks: networks.filter(networkRefs.contains),
+            services: kept,
+            warnings: warnings)
     }
 }
 

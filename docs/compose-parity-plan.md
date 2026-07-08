@@ -97,7 +97,7 @@ follow-up; do not creep.
 
 ## Tasks
 
-- [ ] **E1 — Parse layer (Compose.swift + selftest).** ServicePlan gains `profiles:
+- [x] **E1 — Parse layer (Compose.swift + selftest).** ServicePlan gains `profiles:
   [String]`, `healthcheck: Healthcheck?`, `dependsOn: [String: DependsCondition]`
   (list form → .started). New `Compose.Healthcheck` struct + Go-duration parser; new
   `DependsCondition` enum (started/healthy/completedSuccessfully; unknown condition
