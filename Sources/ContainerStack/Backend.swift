@@ -118,7 +118,11 @@ enum ContainerService {
 
     static func listContainers() async throws -> [ContainerRecord] {
         let snapshots = try await ContainerClient().list()
-        return snapshots.map(ContainerRecord.init(snapshot:))
+        return snapshots
+            .map(ContainerRecord.init(snapshot:))
+            // Machine backing containers are infrastructure; they live in the
+            // Machines section (the CLI hides them from `container list` too).
+            .filter { $0.configuration.labels?["com.apple.container.plugin"] != "machine" }
     }
 
     static func listImages() async throws -> [ImageRecord] {

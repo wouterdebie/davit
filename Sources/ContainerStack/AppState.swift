@@ -179,7 +179,7 @@ final class AppState: ObservableObject {
         guard systemState.isRunning else { return }
         // Machines are backed by (hidden) containers — same stats API.
         let machineBackings = machines.filter(\.isRunning).compactMap(\.containerId)
-        let ids = runningContainers.map(\.id) + machineBackings
+        let ids = Array(Set(runningContainers.map(\.id) + machineBackings))
         guard !ids.isEmpty else { return }
         guard let raw = try? await ContainerService.stats(for: ids) else { return }
         let now = Date()

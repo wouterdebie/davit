@@ -417,6 +417,11 @@ struct ContainerStatsTab: View {
                         }
                         .chartForegroundStyleScale(["Read": Color.orange, "Write": Color.teal])
                         .chartYAxisLabel("KB/s")
+                        // Explicit floor so an idle container draws flat zero
+                        // lines instead of an empty-looking plot.
+                        .chartYScale(domain: 0...max(
+                            10,
+                            (history.map { max($0.diskReadRate, $0.diskWriteRate) }.max() ?? 0) / 1024 * 1.2))
                         .frame(height: 160)
                     }
                 }

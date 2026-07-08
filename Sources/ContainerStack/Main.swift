@@ -78,6 +78,24 @@ enum Main {
             semaphore.wait()
             return
         }
+        if args.count >= 3, args[1] == "stats" {
+            // debug: raw stats samples for any container id (incl. machine backings)
+            let id = args[2]
+            let semaphore = DispatchSemaphore(value: 0)
+            Task.detached {
+                for _ in 0..<3 {
+                    if let record = try? await ContainerService.stats(for: [id]).first {
+                        print("cpuUsec=\(record.cpuUsageUsec.map(String.init) ?? "nil") mem=\(record.memoryUsageBytes.map(String.init) ?? "nil") limit=\(record.memoryLimitBytes.map(String.init) ?? "nil") rx=\(record.networkRxBytes.map(String.init) ?? "nil") tx=\(record.networkTxBytes.map(String.init) ?? "nil") blockR=\(record.blockReadBytes.map(String.init) ?? "nil") blockW=\(record.blockWriteBytes.map(String.init) ?? "nil") pids=\(record.numProcesses.map(String.init) ?? "nil")")
+                    } else {
+                        print("no stats for \(id)")
+                    }
+                    try? await Task.sleep(for: .seconds(2))
+                }
+                exit(0)
+            }
+            semaphore.wait()
+            return
+        }
         if args.count >= 3, args[1] == "pull" {
             let reference = args[2]
             let semaphore = DispatchSemaphore(value: 0)
