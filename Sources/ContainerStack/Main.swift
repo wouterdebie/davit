@@ -78,6 +78,40 @@ enum Main {
             semaphore.wait()
             return
         }
+        if args.count >= 2, args[1] == "compose" {
+            // usage: compose plan <file>   (parse + print, no side effects)
+            //        compose up <file>     (create volumes/networks, run services)
+            guard args.count >= 4, args[2] == "plan" || args[2] == "up" else {
+                FileHandle.standardError.write(Data("usage: compose plan|up <file>\n".utf8)); exit(2)
+            }
+            let sub = args[2]
+            let path = (args[3] as NSString).expandingTildeInPath
+            let semaphore = DispatchSemaphore(value: 0)
+            Task.detached {
+                do {
+                    let text = try String(contentsOfFile: path, encoding: .utf8)
+                    let dir = URL(fileURLWithPath: path).deletingLastPathComponent()
+                    let plan = try Compose.parse(text: text, projectName: dir.lastPathComponent, baseDir: dir.path)
+                    print("project: \(plan.project)")
+                    for v in plan.volumes { print("volume: \(v)") }
+                    for n in plan.networks { print("network: \(n)") }
+                    for s in plan.services { print("service: \(s.service)\n  \(s.cliPreview)") }
+                    for w in plan.warnings { print("warning: \(w)") }
+                    if sub == "up" {
+                        try await Compose.up(plan: plan) { step, done in
+                            if done { print("up: \(step) done") }
+                        }
+                        print("compose up: ok")
+                    }
+                    exit(0)
+                } catch {
+                    let message = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+                    FileHandle.standardError.write(Data("compose \(sub) failed: \(message)\n".utf8)); exit(1)
+                }
+            }
+            semaphore.wait()
+            return
+        }
         if args.count >= 3, args[1] == "platform", args[2] == "install" || args[2] == "remove" {
             let action = args[2]
             let semaphore = DispatchSemaphore(value: 0)
@@ -301,6 +335,59 @@ enum SelfTest {
             guard final.effective["dns"]?["domain"] == nil || final.effective["dns"]?["domain"] is NSNull else {
                 throw CLIError(command: "selftest", message: "override not removed on revert")
             }
+        }
+        await step("compose: parse subset + ordering + cycle rejection") {
+            let yaml = """
+            name: davit-selftest
+            services:
+              web:
+                image: nginx:latest
+                ports: ["8081:80", "127.0.0.1:9090:90/udp"]
+                environment: [MODE=x]
+                depends_on: [db]
+                volumes: [data:/var/lib/web, ./local:/mnt/here:ro]
+                restart: always
+              db:
+                image: redis:alpine
+                container_name: my-db
+                environment: { A: "1", B: two }
+                command: redis-server --appendonly yes
+                mem_limit: 128m
+                cpus: 1
+            volumes: { data: }
+            """
+            let plan = try Compose.parse(text: yaml, projectName: "ignored", baseDir: "/base")
+            guard plan.project == "davit-selftest" else { throw CLIError(command: "selftest", message: "project name wrong: \(plan.project)") }
+            guard plan.services.map(\.service) == ["db", "web"] else {
+                throw CLIError(command: "selftest", message: "depends_on order wrong: \(plan.services.map(\.service))")
+            }
+            let db = plan.services[0], web = plan.services[1]
+            guard db.name == "my-db", web.name == "davit-selftest-web" else {
+                throw CLIError(command: "selftest", message: "names wrong: \(db.name), \(web.name)")
+            }
+            guard db.processArgs == ["--env", "A=1", "--env", "B=two"] else {
+                throw CLIError(command: "selftest", message: "env map wrong: \(db.processArgs)")
+            }
+            guard db.resourceArgs == ["--cpus", "1", "--memory", "128m"] else {
+                throw CLIError(command: "selftest", message: "resources wrong: \(db.resourceArgs)")
+            }
+            guard db.commandArgs == ["redis-server", "--appendonly", "yes"] else {
+                throw CLIError(command: "selftest", message: "command split wrong: \(db.commandArgs)")
+            }
+            guard web.managementArgs.contains("8081:80"),
+                  web.managementArgs.contains("9090:90"),
+                  web.managementArgs.contains("type=volume,source=data,target=/var/lib/web"),
+                  web.managementArgs.contains("type=bind,source=/base/local,target=/mnt/here,readonly")
+            else { throw CLIError(command: "selftest", message: "web management wrong: \(web.managementArgs)") }
+            guard plan.volumes == ["data"] else { throw CLIError(command: "selftest", message: "volumes wrong: \(plan.volumes)") }
+            guard plan.warnings.contains(where: { $0.contains("restart") }),
+                  plan.warnings.contains(where: { $0.contains("only tcp") })
+            else { throw CLIError(command: "selftest", message: "expected warnings missing: \(plan.warnings)") }
+
+            do {
+                _ = try Compose.parse(text: "services: {a: {image: x, depends_on: [b]}, b: {image: y, depends_on: [a]}}", projectName: "c")
+                throw CLIError(command: "selftest", message: "cycle not rejected")
+            } catch Compose.Error.dependencyCycle { /* expected */ }
         }
         await step("registry: list + reject bad credentials") {
             _ = RegistryService.listLogins()  // must not throw

@@ -52,8 +52,14 @@ remaining A item is #2 (file browsing), intentionally scheduled in Wave 2.
 
 **Wave 3 — bigger bets:**
 - ✅ Registry login management — Settings → Registries: add/list/remove logins, validated against the registry, stored in the login keychain (shared with the CLI). Headless: `Davit registry login|list|logout`.
-- Docker Compose import (most-requested class of feature in this space).
-- Image build from a Dockerfile.
+- ✅ Docker Compose import — Containers → ⋯ → Import Compose File: parse → preview
+  (services in depends_on order, volumes/networks, per-service CLI equivalents,
+  honest warnings for unsupported keys) → create & start. Supported subset: image,
+  container_name, environment (both forms), ports (host-ip/proto dropped w/ warning),
+  volumes (named/bind/tmpfs, ro), networks, cpus/mem_limit + deploy.resources.limits,
+  command, user, working_dir, depends_on (order only). `build:` not yet.
+  Headless: `Davit compose plan|up <file>`; parser covered by a selftest step.
+- Image build from a Dockerfile (would also unlock compose `build:`).
 
 ## Feasibility notes (grounded in the API)
 - File browsing: `ContainerClient.exec` + `copyIn`/`copyOut` exist — no new daemon capability needed.

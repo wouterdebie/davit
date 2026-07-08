@@ -24,6 +24,7 @@ in-terminal shell (`davit exec`), and even launchd service bootstrap all go thro
 - **Volumes** — create (with size), delete, prune, reveal backing image in Finder, in-use badges.
 - **Networks** — create (subnet / internal), delete, prune, attached-container counts.
 - **Run Container sheet** — image picker, name, command, ports, env vars, volume/bind mounts, CPU/memory limits, network selection.
+- **Compose import** — Containers → ⋯ → Import Compose File: parses a `docker-compose.yml`, previews exactly what will be created (services in `depends_on` order, named volumes, networks, the equivalent `container run` command per service, and warnings for anything unsupported), then creates and starts the stack. `Davit compose plan|up <file>` headless.
 - **Registries** — sign in to Docker Hub / ghcr.io / any registry to pull private images (Settings → Registries); credentials are verified against the registry and stored in the login keychain, shared with the `container` CLI.
 - **Menu bar extra** — service status, per-container quick actions from anywhere.
 - **Open at login** — optional launch-to-menu-bar at login (Settings → General), via `SMAppService`.
@@ -138,6 +139,8 @@ Davit exec <container-id>        # interactive TTY shell into a container (used 
 Davit selftest                   # end-to-end test of the XPC service layer against the live daemon
 Davit system start|stop          # bootstrap / tear down the container launchd services
 Davit platform install|remove    # download + verify Apple's signed pkg into an app-managed install root
+Davit registry login|list|logout # registry credentials (login reads the password from stdin)
+Davit compose plan|up <file>     # parse a compose file (plan: print only) / create & start the stack
 Davit --snapshot /tmp/shots      # render every screen to PNGs via ImageRenderer (no screen-recording permission)
 ```
 

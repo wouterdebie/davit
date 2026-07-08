@@ -6,6 +6,8 @@ struct ContainersView: View {
     @EnvironmentObject var state: AppState
     @State private var search = ""
     @State private var showRunSheet = false
+    @State private var composePlan: Compose.Plan?
+    @State private var composeError: CLIError?
     @State private var path: [String] = []
 
     private var filtered: [ContainerRecord] {
@@ -47,6 +49,14 @@ struct ContainersView: View {
                     .help("Run a new container")
 
                     Menu {
+                        Button("Import Compose File…") {
+                            switch ComposeImport.pickAndParse() {
+                            case .success(let plan): composePlan = plan
+                            case .failure(let error): composeError = error
+                            case nil: break
+                            }
+                        }
+                        Divider()
                         Button("Stop All Running") {
                             state.perform("all-containers") { try await ContainerService.stopAll() }
                         }
@@ -65,6 +75,17 @@ struct ContainersView: View {
             }
             .onChange(of: state.pendingContainerOpen) { consumePendingOpen() }
             .onAppear { consumePendingOpen() }
+        }
+        // Separate node from the run sheet — two .sheet on one node shadow each other.
+        .sheet(item: $composePlan) { plan in
+            ComposeImportSheet(plan: plan)
+        }
+        .alert("Can't import compose file", isPresented: .init(
+            get: { composeError != nil }, set: { if !$0 { composeError = nil } }
+        )) {
+            Button("OK") { composeError = nil }
+        } message: {
+            Text(composeError?.message ?? "")
         }
         .task {
             if ProcessInfo.processInfo.arguments.contains("--probe-recreate-detail")
