@@ -6,6 +6,7 @@ struct ImagesView: View {
     @State private var showPullSheet = false
     @State private var showBuildSheet = false
     @State private var runFromImage: ImageRecord?
+    @State private var pullLatestTarget: ImageRecord?
     @State private var path: [ImageRecord] = []
 
     private var filtered: [ImageRecord] {
@@ -65,12 +66,16 @@ struct ImagesView: View {
         .sheet(item: $runFromImage) { image in
             RunContainerSheet(prefilledImage: image.name)
         }
-        // Third anchor node for the same reason.
+        // Third and fourth anchor nodes for the same reason.
         .background(EmptyView().sheet(isPresented: $showBuildSheet) { BuildImageSheet() })
+        .background(EmptyView().sheet(item: $pullLatestTarget) { image in
+            PullImageSheet(prefilledReference: image.name)
+        })
     }
 
     private var list: some View {
-        ImageListContent(images: filtered, open: { path.append($0) }, run: { runFromImage = $0 })
+        ImageListContent(images: filtered, open: { path.append($0) }, run: { runFromImage = $0 },
+                         pullLatest: { pullLatestTarget = $0 })
             .refreshIndicator(state.isRefreshing)
     }
 }
@@ -81,6 +86,7 @@ struct ImageListContent: View {
     var scrollable = true
     let open: (ImageRecord) -> Void
     let run: (ImageRecord) -> Void
+    var pullLatest: (ImageRecord) -> Void = { _ in }
 
     var body: some View {
         CardList(items: images, scrollable: scrollable) { image in
@@ -89,6 +95,7 @@ struct ImageListContent: View {
             }
             .contextMenu {
                 Button("Run…") { run(image) }
+                Button("Pull Latest") { pullLatest(image) }
                 Button("Copy Reference") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(image.name, forType: .string)
@@ -169,6 +176,7 @@ struct ImageDetailView: View {
     @State private var tab: Tab = .overview
     @State private var showRunSheet = false
     @State private var showTagSheet = false
+    @State private var showPullLatest = false
 
     private var image: ImageRecord? { state.images.first { $0.id == imageID } }
 
@@ -199,6 +207,7 @@ struct ImageDetailView: View {
                     }
                     .help("Run a container from this image")
                     Menu {
+                        Button("Pull Latest") { showPullLatest = true }
                         Button("Tag…") { showTagSheet = true }
                         Divider()
                         Button("Delete Image", role: .destructive) {
@@ -213,6 +222,9 @@ struct ImageDetailView: View {
         .sheet(isPresented: $showRunSheet) {
             RunContainerSheet(prefilledImage: image?.name ?? "")
         }
+        .background(EmptyView().sheet(isPresented: $showPullLatest) {
+            PullImageSheet(prefilledReference: image?.name)
+        })
         .sheet(isPresented: $showTagSheet) {
             if let image { TagImageSheet(source: image.name) }
         }

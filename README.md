@@ -20,7 +20,7 @@ in-terminal shell (`davit exec`), and even launchd service bootstrap all go thro
   - *Inspect*: pretty-printed raw JSON.
   - *Terminal*: opens an interactive shell in Terminal/iTerm (`davit exec` over XPC).
   - *Files*: browse the container filesystem — navigate, download, upload, delete (over `exec` + copy in/out).
-- **Images** — pull with streaming progress, run-from-image, tag, delete, prune; per-image platform variants, size, digest, "used by" containers.
+- **Images** — pull with streaming progress, **Pull Latest** to refresh any image's tag to the newest digest (context menu or image detail), run-from-image, tag, delete, prune; per-image platform variants, size, digest, "used by" containers.
 - **Volumes** — create (with size), delete, prune, reveal backing image in Finder, in-use badges.
 - **Networks** — create (subnet / internal), delete, prune, attached-container counts.
 - **Run Container sheet** — image picker, name, command, ports, env vars, volume/bind mounts, CPU/memory limits, network selection.

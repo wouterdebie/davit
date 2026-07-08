@@ -309,6 +309,8 @@ struct PullImageSheet: View {
     @EnvironmentObject var state: AppState
     @Environment(\.dismiss) private var dismiss
     @StateObject private var model = PullProgressModel()
+    /// Set to re-pull an existing image's tag; the pull starts immediately.
+    var prefilledReference: String? = nil
     @State private var reference = ""
     @State private var started = false
 
@@ -368,6 +370,12 @@ struct PullImageSheet: View {
             .padding(16)
         }
         .frame(width: 560, height: started ? 480 : 220)
+        .task {
+            if let prefilledReference, !started {
+                reference = prefilledReference
+                pull()
+            }
+        }
         .onChange(of: model.succeeded) {
             if model.succeeded == true {
                 Task { await state.refreshAll() }
