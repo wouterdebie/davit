@@ -262,7 +262,9 @@ struct MachineDetailView: View {
         case inspect = "Inspect"
     }
     @State private var tab: Tab =
-        ProcessInfo.processInfo.arguments.contains("--pose-machine-tab-stats") ? .stats : .overview
+        ProcessInfo.processInfo.arguments.contains("--pose-machine-tab-stats") ? .stats
+        : ProcessInfo.processInfo.arguments.contains("--pose-machine-tab-inspect") ? .inspect
+        : .overview
 
     private var machine: MachineRecord? {
         state.machines.first { $0.id == machineID }

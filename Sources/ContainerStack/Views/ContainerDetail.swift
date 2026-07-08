@@ -464,12 +464,20 @@ struct InspectTab: View {
             if loading {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView([.vertical, .horizontal]) {
-                    Text(json)
-                        .font(.system(size: 11.5, design: .monospaced))
-                        .textSelection(.enabled)
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                // GeometryReader pins short JSON top-leading: a two-axis
+                // ScrollView otherwise centers content smaller than the
+                // viewport (machine inspects are short; containers never
+                // showed it because their JSON always fills the screen).
+                GeometryReader { geo in
+                    ScrollView([.vertical, .horizontal]) {
+                        Text(json)
+                            .font(.system(size: 11.5, design: .monospaced))
+                            .textSelection(.enabled)
+                            .padding(12)
+                            .frame(minWidth: geo.size.width,
+                                   minHeight: geo.size.height,
+                                   alignment: .topLeading)
+                    }
                 }
                 .background(Color(nsColor: .textBackgroundColor))
             }
