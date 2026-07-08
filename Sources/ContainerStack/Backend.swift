@@ -28,6 +28,9 @@ enum ContainerBinary {
         if !custom.isEmpty { candidates.append((custom, .userConfigured)) }
         candidates.append((PlatformInstaller.managedRoot, .managed))
         candidates.append(("/usr/local", .system))
+        // Homebrew keg (`brew install container`) — issue #2.
+        candidates.append(("/opt/homebrew/opt/container", .homebrew))
+        candidates.append(("/usr/local/opt/container", .homebrew))  // Intel brew prefix
         if let res = Bundle.main.resourceURL {
             candidates.append((res.appendingPathComponent("vendor").path, .bundled))
         }
@@ -55,6 +58,7 @@ struct ResolvedBinary: Equatable {
         case userConfigured = "custom path"
         case managed = "installed by Davit"
         case system = "system install"
+        case homebrew = "Homebrew"
         case bundled = "bundled"
     }
     let installRoot: String
