@@ -14,6 +14,10 @@ struct MachineRecord: Identifiable, Hashable {
     let memoryBytes: UInt64
     let diskSize: UInt64?
     let createdISO: String?
+    let startedISO: String?
+    let platform: String
+    let homeMount: String
+    let containerId: String?
     var isDefault: Bool
 
     var isRunning: Bool { statusRaw == "running" }
@@ -41,6 +45,10 @@ enum MachineService {
                     memoryBytes: snap.bootConfig.memory.toUInt64(unit: .bytes),
                     diskSize: snap.diskSize,
                     createdISO: snap.createdDate.map { iso.string(from: $0) },
+                    startedISO: snap.startedDate.map { iso.string(from: $0) },
+                    platform: "\(snap.platform.os)/\(snap.platform.architecture)",
+                    homeMount: snap.bootConfig.homeMount.rawValue,
+                    containerId: snap.containerId,
                     isDefault: snap.id == defaultID
                 )
             }
@@ -108,6 +116,16 @@ enum MachineService {
 
     static func delete(_ id: String) async throws {
         do { try await MachineClient().delete(id: id) } catch { throw CLIError.wrap("machine delete \(id)", error) }
+    }
+
+    /// Raw snapshot JSON for the Inspect tab.
+    static func inspectJSON(_ id: String) async throws -> String {
+        do {
+            let snapshot = try await MachineClient().inspect(id: id)
+            return Backend.prettyJSON(snapshot)
+        } catch {
+            throw CLIError.wrap("machine inspect \(id)", error)
+        }
     }
 
     static func setDefault(_ id: String) async throws {

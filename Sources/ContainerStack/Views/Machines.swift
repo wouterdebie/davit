@@ -5,8 +5,13 @@ import SwiftUI
 struct MachinesView: View {
     @EnvironmentObject var state: AppState
     @State private var showCreateSheet = false
+    @State private var path: [String] = []
 
     var body: some View {
+        NavigationStack(path: $path) { content }
+    }
+
+    private var content: some View {
         Group {
             if !state.systemState.isRunning && state.initialLoadDone {
                 ServicesStoppedState()
@@ -22,6 +27,9 @@ struct MachinesView: View {
             }
         }
         .navigationTitle("Machines")
+        .navigationDestination(for: String.self) { id in
+            MachineDetailView(machineID: id)
+        }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
@@ -37,7 +45,9 @@ struct MachinesView: View {
 
     private var list: some View {
         CardList(items: state.machines, scrollable: true) { machine in
-            MachineRow(machine: machine)
+            HoverRow(action: { path.append(machine.id) }) {
+                MachineRow(machine: machine)
+            }
                 .contextMenu {
                     if machine.isRunning {
                         Button("Stop") {
@@ -219,6 +229,160 @@ struct CreateMachineSheet: View {
                 errorText = error.localizedDescription
             }
             working = false
+        }
+    }
+}
+// MARK: - Machine detail
+
+/// Detail view for a machine: configuration overview, streamed logs (the
+/// machine's VM shares the container log plumbing), and raw inspect JSON.
+struct MachineDetailView: View {
+    @EnvironmentObject var state: AppState
+    let machineID: String
+
+    private enum Tab: String, CaseIterable {
+        case overview = "Overview"
+        case logs = "Logs"
+        case inspect = "Inspect"
+    }
+    @State private var tab: Tab = .overview
+
+    private var machine: MachineRecord? {
+        state.machines.first { $0.id == machineID }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+            Divider()
+            content
+        }
+        .navigationTitle(machineID)
+    }
+
+    private var header: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(machine?.isRunning == true ? Color.green : Color.secondary.opacity(0.4))
+                    .frame(width: 10, height: 10)
+                Text(machineID).font(.title3.weight(.semibold))
+                Text(machine?.isRunning == true ? "Running" : "Stopped")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 8).padding(.vertical, 2)
+                    .background((machine?.isRunning == true ? Color.green : Color.secondary).opacity(0.15), in: Capsule())
+                    .foregroundStyle(machine?.isRunning == true ? Color.green : Color.secondary)
+                if machine?.isDefault == true {
+                    Text("default")
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 8).padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.15), in: Capsule())
+                        .foregroundStyle(Color.accentColor)
+                }
+                Spacer()
+                if let machine {
+                    if state.busyIDs.contains(machine.id) {
+                        ProgressView().controlSize(.small)
+                    } else if machine.isRunning {
+                        Button("Stop") {
+                            state.perform(machine.id) { try await MachineService.stop(machine.id) }
+                        }
+                    } else {
+                        Button("Boot") {
+                            state.perform(machine.id) { try await MachineService.boot(machine.id) }
+                        }
+                    }
+                }
+            }
+            HStack {
+                Spacer()
+                Picker("", selection: $tab) {
+                    ForEach(Tab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 300)
+                Spacer()
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch tab {
+        case .overview: overview
+        case .logs: ContainerLogsTab(containerID: machineID, machine: true)
+        case .inspect: MachineInspectTab(machineID: machineID)
+        }
+    }
+
+    private var overview: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                if let m = machine {
+                    DetailCard(title: "Machine") {
+                        InfoRow(label: "Image", value: m.imageReference, copyable: true)
+                        InfoRow(label: "Platform", value: m.platform)
+                        InfoRow(label: "Status", value: m.statusRaw)
+                        if let created = m.created {
+                            InfoRow(label: "Created", value: created.formatted(date: .abbreviated, time: .shortened))
+                        }
+                    }
+                    DetailCard(title: "Resources") {
+                        InfoRow(label: "CPUs", value: "\(m.cpus)")
+                        InfoRow(label: "Memory", value: formatBytes(Int64(m.memoryBytes)))
+                        if let disk = m.diskSize {
+                            InfoRow(label: "Disk used", value: formatBytes(Int64(disk)))
+                        }
+                        InfoRow(label: "Home mount", value: m.homeMount == "none" ? "not mounted" : "~/ mounted \(m.homeMount)")
+                    }
+                    DetailCard(title: "Network") {
+                        if let ip = m.ipAddress {
+                            InfoRow(label: "IP", value: ip, monospaced: true, copyable: true)
+                        }
+                        InfoRow(label: "DNS name", value: m.dnsName, monospaced: true, copyable: true)
+                    }
+                    DetailCard(title: "Shell") {
+                        InfoRow(label: "Open a shell", value: "container machine run -n \(m.id)", monospaced: true, copyable: true)
+                        if let backing = m.containerId {
+                            InfoRow(label: "Backing container", value: backing, monospaced: true, copyable: true)
+                        }
+                    }
+                } else {
+                    EmptyState(icon: "desktopcomputer", title: "Machine not found",
+                               message: "It may have been deleted.")
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+struct MachineInspectTab: View {
+    let machineID: String
+    @State private var json = ""
+    @State private var error: String?
+
+    var body: some View {
+        Group {
+            if let error {
+                EmptyState(icon: "exclamationmark.triangle", title: "Inspect failed", message: error)
+            } else {
+                ScrollView([.vertical, .horizontal]) {
+                    Text(json)
+                        .font(.system(.caption, design: .monospaced))
+                        .textSelection(.enabled)
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .task {
+            do { json = try await MachineService.inspectJSON(machineID) }
+            catch { self.error = (error as? CLIError)?.message ?? error.localizedDescription }
         }
     }
 }

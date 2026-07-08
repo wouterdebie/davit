@@ -8,6 +8,7 @@ import ContainerResource
 import ContainerizationExtras
 import Foundation
 import Logging
+import MachineAPIClient
 import SystemPackage
 import TerminalProgress
 
@@ -681,14 +682,29 @@ final class LogStreamer: ObservableObject, @unchecked Sendable {
         self.maxLines = maxLines
     }
 
+    /// What to stream logs from — containers and machines expose the same
+    /// [stdio, boot] FileHandle pair.
+    enum Source {
+        case container(String)
+        case machine(String)
+    }
+
     func start(containerID: String, boot: Bool, follow: Bool, tail: Int) {
+        start(source: .container(containerID), boot: boot, follow: follow, tail: tail)
+    }
+
+    func start(source: Source, boot: Bool, follow: Bool, tail: Int) {
         stop()
         lines = []
         isRunning = true
         task = Task { [weak self] in
             guard let self else { return }
             do {
-                let handles = try await ContainerClient().logs(id: containerID)
+                let handles: [FileHandle]
+                switch source {
+                case .container(let id): handles = try await ContainerClient().logs(id: id)
+                case .machine(let id): handles = try await MachineClient().logs(id: id)
+                }
                 guard handles.count > (boot ? 1 : 0) else {
                     await self.finish(error: "no log stream available")
                     return

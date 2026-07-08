@@ -236,6 +236,7 @@ struct ContainerOverviewTab: View {
 
 struct ContainerLogsTab: View {
     let containerID: String
+    var machine = false
     @StateObject private var streamer = LogStreamer()
     @State private var follow = true
     @State private var bootLogs = false
@@ -283,7 +284,7 @@ struct ContainerLogsTab: View {
 
             if streamer.lines.isEmpty && !streamer.isRunning {
                 EmptyState(icon: "text.alignleft", title: "No log output",
-                           message: "This container hasn't produced any output yet.")
+                           message: "Nothing in the log yet.")
             } else {
                 ConsoleView(lines: streamer.lines, autoScroll: follow)
             }
@@ -296,7 +297,8 @@ struct ContainerLogsTab: View {
     }
 
     private func restart() {
-        streamer.start(containerID: containerID, boot: bootLogs, follow: follow, tail: tailCount)
+        streamer.start(source: machine ? .machine(containerID) : .container(containerID),
+                       boot: bootLogs, follow: follow, tail: tailCount)
     }
 }
 
