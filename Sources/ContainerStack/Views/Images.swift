@@ -38,7 +38,7 @@ struct ImagesView: View {
                     Button {
                         showPullSheet = true
                     } label: {
-                        Label("Pull Image", systemImage: "square.and.arrow.down")
+                        Label("Pull Image", systemImage: "arrow.down.circle")
                     }
                     .help("Pull an image from a registry")
 
