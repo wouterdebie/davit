@@ -230,6 +230,14 @@
   <h2>FAQ</h2>
   <div class="faq">
     <details>
+      <summary>Can it replace Docker Desktop for me?</summary>
+      <p>Honest answer: it depends on how you use Docker. Davit is a UI for Apple's container platform, not a Docker daemon; there is no docker socket and no <code>docker</code> CLI/API compatibility. If your workflow is "docker run, a compose file, the occasional build", Davit covers it today: pull and run with ports/env/mounts/limits, import a <code>docker-compose.yml</code>, build from a Dockerfile, sign in to private registries, browse files, stream logs. If your workflow is scripted against the docker API (testcontainers, tools that expect <code>/var/run/docker.sock</code>, CI scripts shelling out to <code>docker</code>), it can't replace that yet. Your images all work either way; OCI is OCI.</p>
+    </details>
+    <details>
+      <summary>Can I run images I build locally?</summary>
+      <p>Yes. Build them right in the app (<strong>Images &rarr; Build Image</strong>, since 0.1.8), or with the platform's <code>container build</code>; both land in the same image store Davit shows. Images built with <em>Docker</em> live in Docker's separate store; move one over with <code>docker save</code> and <code>container image load</code>.</p>
+    </details>
+    <details>
       <summary>How much memory does it use?</summary>
       <p>The honest answer is architectural: there's <strong>no always-on multi-gigabyte Linux VM</strong>. Docker Desktop keeps one big VM running whether or not you have containers; Apple's platform instead boots a <em>separate lightweight VM per container</em>, sized to that container, and tears it down when the container stops. With nothing running, the platform's background services idle at roughly <strong>25&nbsp;MB</strong>. Davit itself is a native SwiftUI app (no Electron); its footprint is mostly shared macOS framework memory. So the more containers you're <em>not</em> running, the less it costs you.</p>
     </details>
