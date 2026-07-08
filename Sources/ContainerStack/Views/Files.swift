@@ -97,9 +97,10 @@ struct ContainerFilesTab: View {
             ScrollView {
                 LazyVStack(spacing: 1) {
                     ForEach(entries) { entry in
-                        FileRow(entry: entry)
-                            .contentShape(Rectangle())
-                            .onTapGesture(count: 2) { open(entry) }
+                        FileRow(
+                            entry: entry,
+                            onOpen: { open(entry) },
+                            onDownload: { Task { await download(entry) } })
                             .contextMenu { rowMenu(entry) }
                     }
                 }
@@ -210,6 +211,11 @@ struct ContainerFilesTab: View {
 
 private struct FileRow: View {
     let entry: FileEntry
+    let onOpen: () -> Void
+    let onDownload: () -> Void
+    @State private var hovering = false
+
+    private var isNavigable: Bool { entry.isDirectory || entry.isSymlink }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -217,9 +223,10 @@ private struct FileRow: View {
                 .foregroundStyle(entry.isDirectory ? Color.accentColor : (entry.isSymlink ? .teal : .secondary))
                 .frame(width: 20)
             Text(entry.name)
+                .fontWeight(entry.isDirectory ? .medium : .regular)
                 .lineLimit(1)
                 .truncationMode(.middle)
-            Spacer()
+            Spacer(minLength: 12)
             if !entry.isDirectory && entry.size > 0 {
                 Text(formatBytes(entry.size))
                     .font(.system(.caption, design: .monospaced))
@@ -231,13 +238,44 @@ private struct FileRow: View {
                     .foregroundStyle(.tertiary)
                     .frame(width: 84, alignment: .trailing)
             }
+            trailingAffordance
+                .frame(width: 22)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 5)
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
+        .background(
+            hovering ? AnyShapeStyle(.primary.opacity(0.06)) : AnyShapeStyle(.clear),
+            in: RoundedRectangle(cornerRadius: 7))
+        .onHover { hovering = $0 }
+        // Directories open on double-click; files download on double-click.
+        .onTapGesture(count: 2) { isNavigable ? onOpen() : onDownload() }
+        .help(isNavigable ? "Open \(entry.name)" : "Double-click to download")
+    }
+
+    @ViewBuilder
+    private var trailingAffordance: some View {
+        if isNavigable {
+            // Chevron signals "you can go in here"; also opens on a single click.
+            Button(action: onOpen) {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .buttonStyle(.plain)
+        } else {
+            // Always-visible download so it's discoverable; brightens on hover.
+            Button(action: onDownload) {
+                Image(systemName: "arrow.down.circle")
+                    .foregroundStyle(hovering ? Color.accentColor : .secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Download")
+        }
     }
 
     private var icon: String {
-        if entry.isSymlink { return "arrowshape.turn.up.right" }
-        return entry.isDirectory ? "folder.fill" : "doc"
+        if entry.isSymlink { return "arrowshape.turn.up.right.fill" }
+        return entry.isDirectory ? "folder.fill" : "doc.text"
     }
 }
