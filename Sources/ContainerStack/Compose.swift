@@ -69,6 +69,8 @@ enum Compose {
         case missingHealthcheck(service: String, dependency: String)
         case noSuchService(String)
         case inactiveProfile(service: String, profile: String)
+        case unhealthy(service: String, failures: Int)
+        case didNotComplete(service: String, exitCode: Int32?)
 
         var errorDescription: String? {
             switch self {
@@ -80,6 +82,10 @@ enum Compose {
             case .missingHealthcheck(let s, let d): return "service \"\(s)\" needs \"\(d)\" healthy, but \"\(d)\" has no healthcheck"
             case .noSuchService(let s): return "no such service: \(s)"
             case .inactiveProfile(let s, let p): return "service \"\(s)\" requires profile \"\(p)\" — activate it with --profile \(p)"
+            case .unhealthy(let s, let n): return "service \"\(s)\" is unhealthy after \(n) failed probes"
+            case .didNotComplete(let s, let code):
+                return code.map { "service \"\(s)\" didn't complete successfully: exit \($0)" }
+                    ?? "service \"\(s)\" wasn't started by this compose up, so its exit code is unknown"
             }
         }
     }
@@ -531,11 +537,27 @@ actor ComposeExitCodes {
 // MARK: - Execution
 
 extension Compose {
-    enum StepKind: Hashable { case volume(String), network(String), service(String) }
+    enum StepKind: Hashable {
+        case volume(String), network(String), service(String)
+        case waiting(service: String, condition: String)
+
+        /// Human-readable form for CLI progress lines.
+        var label: String {
+            switch self {
+            case .volume(let v): return "volume \(v)"
+            case .network(let n): return "network \(n)"
+            case .service(let s): return "service \(s)"
+            case .waiting(let s, let c): return "waiting \(s) (\(c))"
+            }
+        }
+    }
 
     /// Bring the plan up: create missing named volumes and networks, then create
-    /// and start each service in dependency order. Reports each step; stops at
-    /// the first failure (already-completed steps stay up, like compose does).
+    /// and start each service in dependency order, honoring depends_on conditions
+    /// before each start (service_healthy probes the dependency's healthcheck,
+    /// service_completed_successfully awaits its retained exit code). Reports each
+    /// step; stops at the first failure (already-completed steps stay up, like
+    /// compose does).
     static func up(
         plan: Plan,
         progress: @escaping @Sendable (StepKind, _ done: Bool) async -> Void
@@ -566,7 +588,34 @@ extension Compose {
             await progress(.network(network), true)
         }
 
+        // Only services something waits on with service_completed_successfully
+        // need their init exit code retained (registration happens at start time).
+        let needsExitCode = Set(plan.services.flatMap { svc in
+            svc.dependsOn.compactMap { $0.value == .completedSuccessfully ? $0.key : nil }
+        })
+        let byService = Dictionary(uniqueKeysWithValues: plan.services.map { ($0.service, $0) })
+
         for svc in plan.services {
+            for (dep, condition) in svc.dependsOn.sorted(by: { $0.key < $1.key }) where condition != .started {
+                guard let depPlan = byService[dep] else { continue }  // parse rejects unknown deps
+                await progress(.waiting(service: dep, condition: condition.rawValue), false)
+                switch condition {
+                case .healthy:
+                    guard let hc = depPlan.healthcheck else {
+                        throw Error.missingHealthcheck(service: svc.service, dependency: dep)
+                    }
+                    try await waitHealthy(service: dep, container: depPlan.name, healthcheck: hc)
+                case .completedSuccessfully:
+                    // The registry only knows containers started by this process,
+                    // i.e. earlier in this same up (snapshots carry no exit code).
+                    let code = await ComposeExitCodes.shared.exitCode(for: depPlan.name)
+                    guard code == 0 else { throw Error.didNotComplete(service: dep, exitCode: code) }
+                case .started:
+                    break
+                }
+                await progress(.waiting(service: dep, condition: condition.rawValue), true)
+            }
+
             await progress(.service(svc.service), false)
             try await ContainerService.runContainer(
                 image: svc.image,
@@ -574,9 +623,31 @@ extension Compose {
                 processArgs: svc.processArgs,
                 managementArgs: svc.managementArgs,
                 resourceArgs: svc.resourceArgs,
-                commandArgs: svc.commandArgs
+                commandArgs: svc.commandArgs,
+                retainExitCode: needsExitCode.contains(svc.service)
             )
             await progress(.service(svc.service), true)
+        }
+    }
+
+    /// Probes `container` with its healthcheck until healthy — the first exit-0
+    /// probe, even inside start_period — or unhealthy after `retries` consecutive
+    /// countable failures (failures before start_period has elapsed don't count).
+    /// Bounded by start_period + retries × (interval + timeout).
+    static func waitHealthy(service: String, container: String, healthcheck hc: Healthcheck) async throws {
+        let started = ContinuousClock.now
+        var failures = 0
+        while true {
+            // A probe exceeding its timeout counts as failed but keeps running in
+            // the container: apple/container 1.0.0 can't signal exec processes
+            // (see ContainerService.ExecTimeout), so it's abandoned, not killed.
+            let result = try? await ContainerService.exec(container, hc.argv, timeout: .seconds(hc.timeout))
+            if result?.exitCode == 0 { return }
+            if started.duration(to: .now) >= .seconds(hc.startPeriod) {
+                failures += 1
+                if failures >= hc.retries { throw Error.unhealthy(service: service, failures: failures) }
+            }
+            try await Task.sleep(for: .seconds(hc.interval))
         }
     }
 }

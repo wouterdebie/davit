@@ -243,7 +243,7 @@ enum Main {
                     for w in plan.warnings { print("warning: \(w)") }
                     if sub == "up" {
                         try await Compose.up(plan: plan) { step, done in
-                            if done { print("up: \(step) done") }
+                            if done { print("up: \(step.label) done") }
                         }
                         print("compose up: ok")
                     }
@@ -638,6 +638,88 @@ enum SelfTest {
                 throw CLIError(command: "selftest", message: "--profile p should unlock the gated dependency")
             }
         }
+        await step("compose: up with depends_on conditions") {
+            let containers = ["davit-selftest-compose-db", "davit-selftest-compose-init",
+                              "davit-selftest-compose-web", "davit-selftest-composef-bad",
+                              "davit-selftest-composef-waiter"]
+            for c in containers { try? await ContainerService.delete(c, force: true) }
+            try? await ContainerService.deleteVolume("davit-selftest-composevol")
+            defer {
+                Task {
+                    for c in containers { try? await ContainerService.delete(c, force: true) }
+                    try? await ContainerService.deleteVolume("davit-selftest-composevol")
+                }
+            }
+
+            let yaml = """
+            name: davit-selftest-compose
+            services:
+              db:
+                image: alpine:latest
+                command: ["sleep", "300"]
+                volumes: [davit-selftest-composevol:/data]
+                healthcheck: { test: [CMD-SHELL, test -f /ready], interval: 1s, retries: 20 }
+              init:
+                image: alpine:latest
+                command: ["true"]
+              web:
+                image: alpine:latest
+                command: ["sleep", "300"]
+                depends_on:
+                  db: { condition: service_healthy }
+                  init: { condition: service_completed_successfully }
+            volumes: { davit-selftest-composevol: }
+            """
+            let plan = try Compose.parse(text: yaml, projectName: "ignored")
+            let events = ProgressLog()
+            let upTask = Task { try await Compose.up(plan: plan) { events.append($0, $1) } }
+
+            // up blocks on db's healthcheck until /ready exists — create it from
+            // the outside once db is running (the fixture's readiness signal).
+            var dbRunning = false
+            for _ in 0..<120 {
+                if let db = try? await ContainerService.listContainers().first(where: { $0.id == "davit-selftest-compose-db" }),
+                   db.isRunning { dbRunning = true; break }
+                try await Task.sleep(for: .milliseconds(500))
+            }
+            guard dbRunning else {
+                upTask.cancel()
+                throw CLIError(command: "selftest", message: "db never started")
+            }
+            _ = try await ContainerService.exec("davit-selftest-compose-db", ["touch", "/ready"])
+            try await upTask.value
+
+            let web = try await ContainerService.listContainers().first { $0.id == "davit-selftest-compose-web" }
+            guard web?.isRunning == true else { throw CLIError(command: "selftest", message: "web not running after up") }
+            let seen = events.all
+            func index(_ step: Compose.StepKind, _ done: Bool) -> Int? {
+                seen.firstIndex { $0.0 == step && $0.1 == done }
+            }
+            guard let dbHealthy = index(.waiting(service: "db", condition: "service_healthy"), true),
+                  let initDone = index(.waiting(service: "init", condition: "service_completed_successfully"), true),
+                  let webStart = index(.service("web"), false),
+                  dbHealthy < webStart, initDone < webStart
+            else { throw CLIError(command: "selftest", message: "waiting steps missing or out of order: \(seen)") }
+
+            // Failure path: a probe that never succeeds must fail the dependent's up.
+            let failing = try Compose.parse(text: """
+            name: davit-selftest-composef
+            services:
+              bad:
+                image: alpine:latest
+                command: ["sleep", "300"]
+                healthcheck: { test: [CMD, "false"], interval: 1s, retries: 2 }
+              waiter:
+                image: alpine:latest
+                command: ["sleep", "300"]
+                depends_on:
+                  bad: { condition: service_healthy }
+            """, projectName: "ignored")
+            do {
+                try await Compose.up(plan: failing) { _, _ in }
+                throw CLIError(command: "selftest", message: "unhealthy dependency did not fail up")
+            } catch Compose.Error.unhealthy(service: "bad", failures: _) { /* expected */ }
+        }
         await step("registry: list + reject bad credentials") {
             _ = RegistryService.listLogins()  // must not throw
             do {
@@ -656,6 +738,16 @@ enum SelfTest {
         print(failures == 0 ? "SELFTEST OK" : "SELFTEST FAILED (\(failures))")
         exit(failures == 0 ? 0 : 1)
     }
+}
+
+/// Lock-protected accumulator of compose progress events for the selftest.
+/// (File scope on purpose: declaring it inside the step closure trips a bogus
+/// "will never be executed" SIL diagnostic elsewhere in the file.)
+final class ProgressLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var items: [(Compose.StepKind, Bool)] = []
+    func append(_ step: Compose.StepKind, _ done: Bool) { lock.lock(); items.append((step, done)); lock.unlock() }
+    var all: [(Compose.StepKind, Bool)] { lock.lock(); defer { lock.unlock() }; return items }
 }
 
 /// Tiny lock-protected box for progress dedup in headless installs.

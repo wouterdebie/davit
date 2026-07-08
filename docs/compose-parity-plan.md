@@ -120,7 +120,7 @@ follow-up; do not creep.
   `timeout: Duration? = nil` (race; on timeout throw a typed error; document abandoned
   probe). Done when: build + full selftest OK (live suite exercises start via existing
   steps). Commit: `compose: exit-code retention + exec timeout`.
-- [ ] **E3 — Conditions in up (Compose.swift + ComposeImport.swift + selftest).**
+- [x] **E3 — Conditions in up (Compose.swift + ComposeImport.swift + selftest).**
   Healthcheck prober (decision 5) + condition waits before each dependent service
   (decision 6) + `StepKind.waiting` + GUI handling + CLI progress line (the Main.swift
   print already prints any StepKind — verify formatting). Compose.up sets
