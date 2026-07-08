@@ -23,6 +23,7 @@ in-terminal shell (`davit exec`), and even launchd service bootstrap all go thro
 - **Images** — pull with streaming progress, **Pull Latest** to refresh any image's tag to the newest digest (context menu or image detail), run-from-image, tag, delete, prune; per-image platform variants, size, digest, "used by" containers.
 - **Volumes** — create (with size), delete, prune, reveal backing image in Finder, in-use badges.
 - **Networks** — create (subnet / internal), delete, prune, attached-container counts.
+- **Machines** — Apple's container machines (lightweight general-purpose VMs with your home directory mounted and a stable `.machine` DNS name): create from any image with CPU/memory sizing, boot/stop, set the default, delete. `Davit machine list|create|boot|stop|delete` headless.
 - **Run Container sheet** — image picker, name, command, ports, env vars, volume/bind mounts, CPU/memory limits, network selection.
 - **Build images** — Images → Build Image: pick a context folder and Dockerfile, set tag/build-args, and Davit drives the platform's BuildKit builder (starting it if needed), then loads and tags the result into the image store. `Davit build -t <tag> <context-dir>` headless.
 - **Compose import** — Containers → ⋯ → Import Compose File: parses a `docker-compose.yml`, previews exactly what will be created (services in `depends_on` order, named volumes, networks, the equivalent `container run` command per service, and warnings for anything unsupported), then creates and starts the stack. `Davit compose plan|up <file>` headless.
@@ -144,6 +145,7 @@ Davit platform install|remove    # download + verify Apple's signed pkg into an 
 Davit registry login|list|logout # registry credentials (login reads the password from stdin)
 Davit compose plan|up <file>     # parse a compose file (plan: print only) / create & start the stack
 Davit build -t <tag> <dir>       # build an image from <dir>/Dockerfile via the BuildKit shim
+Davit machine list|create|boot|stop|delete   # container machines (micro VMs)
 Davit --snapshot /tmp/shots      # render every screen to PNGs via ImageRenderer (no screen-recording permission)
 ```
 

@@ -32,6 +32,7 @@ let package = Package(
                 .product(name: "ContainerBuild", package: "container"),
                 .product(name: "ContainerCommands", package: "container"),
                 .product(name: "ContainerImagesService", package: "container"),
+                .product(name: "MachineAPIClient", package: "container"),
                 .product(name: "NIO", package: "swift-nio"),
             ],
             path: "Sources/ContainerStack",

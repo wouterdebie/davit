@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum SidebarSection: String, Hashable, CaseIterable {
-    case dashboard, containers, images, volumes, networks
+    case dashboard, containers, images, volumes, networks, machines
 
     var title: String {
         switch self {
@@ -10,6 +10,7 @@ enum SidebarSection: String, Hashable, CaseIterable {
         case .images: return "Images"
         case .volumes: return "Volumes"
         case .networks: return "Networks"
+        case .machines: return "Machines"
         }
     }
     var icon: String {
@@ -19,6 +20,7 @@ enum SidebarSection: String, Hashable, CaseIterable {
         case .images: return "square.stack.3d.down.forward"
         case .volumes: return "externaldrive"
         case .networks: return "network"
+        case .machines: return "desktopcomputer"
         }
     }
 }
@@ -112,6 +114,7 @@ struct MainWindow: View {
                     sidebarRow(.images, badge: state.images.count)
                     sidebarRow(.volumes, badge: state.volumes.count)
                     sidebarRow(.networks, badge: state.networks.count)
+                    sidebarRow(.machines, badge: state.machines.count)
                 }
             }
             .listStyle(.sidebar)
@@ -168,6 +171,7 @@ struct MainWindow: View {
         case .images: ImagesView()
         case .volumes: VolumesView()
         case .networks: NetworksView()
+        case .machines: MachinesView()
         }
     }
 }

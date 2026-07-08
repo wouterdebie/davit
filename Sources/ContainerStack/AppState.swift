@@ -8,6 +8,7 @@ final class AppState: ObservableObject {
     @Published var images: [ImageRecord] = []
     @Published var volumes: [VolumeRecord] = []
     @Published var networks: [NetworkRecord] = []
+    @Published var machines: [MachineRecord] = []
     @Published var diskUsage: DiskUsage?
     @Published var systemState: SystemState = .unknown
     @Published var cliMissing = false
@@ -159,8 +160,10 @@ final class AppState: ObservableObject {
         async let v = try? ContainerService.listVolumes()
         async let n = try? ContainerService.listNetworks()
         async let d = try? ContainerService.diskUsage()
+        async let m = try? MachineService.list()
 
         let (cs, imgs, vols, nets, df) = await (c, i, v, n, d)
+        machines = (await m) ?? []
         if let cs { containers = cs.sorted { sortKey($0) < sortKey($1) } }
         if let imgs { images = imgs.sorted { $0.shortNameTag < $1.shortNameTag } }
         if let vols { volumes = vols.sorted { $0.name < $1.name } }

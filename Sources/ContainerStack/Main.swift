@@ -78,6 +78,47 @@ enum Main {
             semaphore.wait()
             return
         }
+        if args.count >= 2, args[1] == "machine" {
+            // usage: machine list | machine create <image> <name> | machine stop|boot|delete <name>
+            let sub = args.count >= 3 ? args[2] : "list"
+            let semaphore = DispatchSemaphore(value: 0)
+            Task.detached {
+                do {
+                    switch sub {
+                    case "list":
+                        for m in try await MachineService.list() {
+                            print("\(m.id)\t\(m.statusRaw)\t\(m.imageReference)\t\(m.ipAddress ?? "-")\t\(m.cpus)cpu\t\(m.isDefault ? "default" : "")")
+                        }
+                    case "create":
+                        guard args.count >= 5 else {
+                            FileHandle.standardError.write(Data("usage: machine create <image> <name>\n".utf8)); exit(2)
+                        }
+                        try await MachineService.create(
+                            image: args[3], name: args[4], cpus: nil, memory: nil,
+                            setDefault: false, progress: { print($0) })
+                        print("machine create: ok")
+                    case "boot", "stop", "delete":
+                        guard args.count >= 4 else {
+                            FileHandle.standardError.write(Data("usage: machine \(sub) <name>\n".utf8)); exit(2)
+                        }
+                        switch sub {
+                        case "boot": try await MachineService.boot(args[3])
+                        case "stop": try await MachineService.stop(args[3])
+                        default: try await MachineService.delete(args[3])
+                        }
+                        print("machine \(sub): ok")
+                    default:
+                        FileHandle.standardError.write(Data("unknown machine subcommand: \(sub)\n".utf8)); exit(2)
+                    }
+                    exit(0)
+                } catch {
+                    let message = (error as? CLIError)?.message ?? String(describing: error)
+                    FileHandle.standardError.write(Data("machine \(sub) failed: \(message)\n".utf8)); exit(1)
+                }
+            }
+            semaphore.wait()
+            return
+        }
         if args.count >= 2, args[1] == "build" {
             // usage: build -t <tag> [-f <dockerfile>] [--no-cache] <context-dir>
             var tag: String?, file: String?, noCache = false, context: String?
