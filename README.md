@@ -36,7 +36,7 @@ in-terminal shell (`davit exec`), and even launchd service bootstrap all go thro
 
 ## Requirements
 
-- Apple silicon Mac, macOS 15+ (macOS 26 recommended — matches `container` 1.0)
+- Apple silicon Mac, macOS 15+ (macOS 26 recommended — matches `container` 1.1)
 - [apple/container](https://github.com/apple/container/releases) installed (or vendored, see below)
 
 ## Releases

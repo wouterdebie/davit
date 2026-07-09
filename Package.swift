@@ -7,8 +7,8 @@ let package = Package(
     dependencies: [
         // Pinned to the exact release matching the installed container-apiserver.
         // Client and daemon ship in lockstep; do not use `from:` here.
-        .package(url: "https://github.com/apple/container.git", exact: "1.0.0"),
-        .package(url: "https://github.com/apple/containerization.git", exact: "0.33.3"),
+        .package(url: "https://github.com/apple/container.git", exact: "1.1.0"),
+        .package(url: "https://github.com/apple/containerization.git", exact: "0.35.0"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.0.0"),
         .package(url: "https://github.com/jpsim/Yams.git", from: "6.2.1"),

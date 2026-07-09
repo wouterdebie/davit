@@ -28,7 +28,7 @@ extension ContainerService {
     }
 
     /// `exec` exceeded its caller-supplied timeout. The process keeps running:
-    /// apple/container 1.0.0's `ClientProcess.kill` encodes the signal as Int64
+    /// apple/container 1.0.0 and 1.1.0's `ClientProcess.kill` encode the signal as Int64
     /// where the apiserver expects a string (ClientProcess.swift), so a timed-out
     /// process cannot be signalled — it is abandoned and exits on its own or when
     /// the container stops.

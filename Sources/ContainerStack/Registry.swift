@@ -93,7 +93,10 @@ enum RegistryService {
         let helpers = [
             "bin/container",
             "bin/container-apiserver",
+            // Plugin layout: 1.0.0 used libexec/container/plugins, 1.1.0 (and
+            // the brew keg) use libexec/container-plugins. Probe both.
             "libexec/container/plugins/container-core-images/bin/container-core-images",
+            "libexec/container-plugins/container-core-images/bin/container-core-images",
         ]
         for root in roots {
             for helper in helpers {

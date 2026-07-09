@@ -1490,7 +1490,7 @@ extension Compose {
         var abandoned = 0
         while true {
             // A probe exceeding its timeout counts as failed but keeps running in
-            // the container: apple/container 1.0.0 can't signal exec processes
+            // the container: apple/container (1.0.0 and 1.1.0) can't signal exec processes
             // (see ContainerService.ExecTimeout), so it's abandoned, not killed.
             // Cap the abandoned pile: each one pins a process in the guest and
             // pipe FDs in the app, so a hung probe command must fail the wait
