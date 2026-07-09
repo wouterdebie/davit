@@ -955,6 +955,44 @@ enum SelfTest {
                       == nested.appendingPathComponent("custom.yaml").path
             else { throw CLIError(command: "selftest", message: "COMPOSE_FILE override not honored") }
         }
+        await step("compose: interpolation edge cases (nested braces, :+, CRLF .env)") {
+            // Nested default with the outer variable SET: must close at the
+            // matching brace, no trailing "}" corruption.
+            var warned: [String] = []
+            func interp(_ text: String, env: [String: String]) throws -> String {
+                let plan = try Compose.parse(
+                    text: "services: {a: {image: alpine, environment: {V: \"\(text)\"}}}",
+                    projectName: "t", environment: env)
+                let arg = plan.services[0].processArgs
+                guard let i = arg.firstIndex(of: "--env"), i + 1 < arg.count else {
+                    throw CLIError(command: "selftest", message: "no env arg for \(text)")
+                }
+                warned = plan.warnings
+                return String(arg[i + 1].dropFirst(2))  // strip "V="
+            }
+            guard try interp("${VAR:-${OTHER}}", env: ["VAR": "x"]) == "x" else {
+                throw CLIError(command: "selftest", message: "nested default corrupted a set value")
+            }
+            guard try interp("${VAR:-${OTHER}}", env: ["OTHER": "o"]) == "${OTHER}" else {
+                throw CLIError(command: "selftest", message: "unset nested default should stay literal")
+            }
+            guard try interp("${D:+--verbose}", env: ["D": "1"]) == "--verbose",
+                  try interp("${D:+--verbose}", env: [:]) == ""
+            else { throw CLIError(command: "selftest", message: ":+ operator wrong") }
+            _ = warned  // reserved for future warning assertions
+
+            // CRLF .env: values must not keep a trailing \r; quotes must strip.
+            let fm = FileManager.default
+            let crlfDir = fm.temporaryDirectory.appendingPathComponent("davit-selftest-crlf-\(UUID().uuidString)")
+            try fm.createDirectory(at: crlfDir, withIntermediateDirectories: true)
+            defer { try? fm.removeItem(at: crlfDir) }
+            try "A=plain\r\nB=\"quoted\"\r\n".write(
+                to: crlfDir.appendingPathComponent(".env"), atomically: true, encoding: .utf8)
+            let env = try Compose.effectiveEnvironment(composeDir: crlfDir.path, processEnvironment: [:])
+            guard env["A"] == "plain", env["B"] == "quoted" else {
+                throw CLIError(command: "selftest", message: "CRLF .env parsed wrong: \(env)")
+            }
+        }
         await step("compose: .env + interpolation") {
             let fm = FileManager.default
             let dir = fm.temporaryDirectory.appendingPathComponent("davit-selftest-env-\(UUID().uuidString)")
@@ -1124,14 +1162,24 @@ enum SelfTest {
               el: {image: x, entrypoint: []}
             """, projectName: "entry")
             let byName = Dictionary(uniqueKeysWithValues: entry.services.map { ($0.service, $0) })
-            guard byName["s"]?.managementArgs == ["--entrypoint", "/entry.sh"], byName["s"]?.commandArgs == [],
-                  byName["multi"]?.managementArgs == ["--entrypoint", "/entry.sh"], byName["multi"]?.commandArgs == ["--flag"],
-                  byName["l"]?.managementArgs == ["--entrypoint", "/bin/sh"], byName["l"]?.commandArgs == ["-c", "echo hi", "more"]
+            // Every service also carries the ownership label; compare with it
+            // stripped so this step stays about entrypoint mapping.
+            func flags(_ svc: Compose.ServicePlan?) -> [String] {
+                var args = svc?.managementArgs ?? []
+                while let i = args.firstIndex(of: "--label"), i + 1 < args.count,
+                      args[i + 1].hasPrefix(Compose.projectLabel + "=") {
+                    args.removeSubrange(i...(i + 1))
+                }
+                return args
+            }
+            guard flags(byName["s"]) == ["--entrypoint", "/entry.sh"], byName["s"]?.commandArgs == [],
+                  flags(byName["multi"]) == ["--entrypoint", "/entry.sh"], byName["multi"]?.commandArgs == ["--flag"],
+                  flags(byName["l"]) == ["--entrypoint", "/bin/sh"], byName["l"]?.commandArgs == ["-c", "echo hi", "more"]
             else { throw CLIError(command: "selftest", message: "entrypoint mapping wrong: \(entry.services)") }
-            guard byName["s"]?.cliPreview == "container run --detach --name entry-s --entrypoint /entry.sh x",
-                  byName["l"]?.cliPreview == "container run --detach --name entry-l --entrypoint /bin/sh x -c 'echo hi' more"
+            guard byName["s"]?.cliPreview == "container run --detach --name entry-s --entrypoint /entry.sh --label com.davit.compose.project=entry x",
+                  byName["l"]?.cliPreview == "container run --detach --name entry-l --entrypoint /bin/sh --label com.davit.compose.project=entry x -c 'echo hi' more"
             else { throw CLIError(command: "selftest", message: "entrypoint cliPreview wrong: \(byName["l"]?.cliPreview ?? "")") }
-            guard byName["e"]?.managementArgs == [], byName["el"]?.managementArgs == [],
+            guard flags(byName["e"]) == [], flags(byName["el"]) == [],
                   entry.warnings.filter({ $0.contains("entrypoint is empty") }).count == 2,
                   !entry.warnings.contains(where: { $0.contains("not supported") })
             else { throw CLIError(command: "selftest", message: "empty entrypoint warnings wrong: \(entry.warnings)") }
@@ -1335,8 +1383,8 @@ enum SelfTest {
                     throw CLIError(command: "selftest", message: "stopped service was not recreated")
                 }
 
-                // A stopped name-colliding container compose never created is
-                // recreated cleanly too (identity is the name; no labels to check).
+                // A name-colliding container compose never created (no project
+                // label) is the user's: up must REFUSE, not delete or adopt it.
                 await cleanup()
                 try await ContainerService.runContainer(
                     image: "alpine:latest", name: "davit-selftest-idem-a",
@@ -1344,12 +1392,25 @@ enum SelfTest {
                     commandArgs: ["sleep", "300"])
                 try await ContainerService.stop("davit-selftest-idem-a")
                 let pre = try await record("davit-selftest-idem-a")
-                try await Task.sleep(for: .seconds(1))
-                _ = try await Compose.up(plan: plan) { _, _ in }
-                let a4 = try await record("davit-selftest-idem-a")
-                guard a4.isRunning, a4.configuration.creationDate != pre.configuration.creationDate else {
-                    throw CLIError(command: "selftest", message: "colliding stopped container was not recreated")
+                do {
+                    _ = try await Compose.up(plan: plan) { _, _ in }
+                    throw CLIError(command: "selftest", message: "up did not refuse a foreign stopped container")
+                } catch Compose.Error.foreignContainer(let n) {
+                    guard n == "davit-selftest-idem-a" else {
+                        throw CLIError(command: "selftest", message: "foreign refusal named wrong container: \(n)")
+                    }
                 }
+                let a4 = try await record("davit-selftest-idem-a")
+                guard !a4.isRunning, a4.configuration.creationDate == pre.configuration.creationDate else {
+                    throw CLIError(command: "selftest", message: "foreign container was touched by refused up")
+                }
+
+                // Same for a RUNNING foreign container: refused, not adopted.
+                try await ContainerService.start("davit-selftest-idem-a")
+                do {
+                    _ = try await Compose.up(plan: plan) { _, _ in }
+                    throw CLIError(command: "selftest", message: "up did not refuse a foreign running container")
+                } catch Compose.Error.foreignContainer { /* expected */ }
             } catch {
                 await cleanup()
                 throw error

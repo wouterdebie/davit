@@ -9,6 +9,11 @@ import Yams
 /// native compose, so this is pure app-side orchestration. The supported subset
 /// is deliberate; everything else surfaces as a warning, never silently.
 enum Compose {
+    /// Ownership label stamped on every container this compose path creates.
+    /// Identity by name alone is not enough: without this, `up` would delete
+    /// or adopt a user's unrelated container that happens to share a name.
+    static let projectLabel = "com.davit.compose.project"
+
 
     struct ServicePlan: Identifiable, Hashable {
         let service: String          // compose service key
@@ -100,6 +105,7 @@ enum Compose {
         case unhealthy(service: String, failures: Int)
         case dependencyExited(service: String)
         case didNotComplete(service: String, exitCode: Int32?)
+        case foreignContainer(name: String)
 
         var errorDescription: String? {
             switch self {
@@ -108,6 +114,8 @@ enum Compose {
             case .invalidServiceName(let s):
                 return "service name \(s.debugDescription) is invalid — only [a-zA-Z0-9._-] is allowed"
             case .missingImage(let s): return "service \"\(s)\" has no image — build: is not supported yet"
+            case .foreignContainer(let n):
+                return "container \"\(n)\" exists but was not created by this compose project (missing \(Compose.projectLabel) label) — delete or rename it, then run up again"
             case .dependencyCycle(let names): return "depends_on cycle: \(names.joined(separator: " → "))"
             case .unknownDependency(let s, let d): return "service \"\(s)\" depends on unknown service \"\(d)\""
             case .missingHealthcheck(let s, let d): return "service \"\(s)\" needs \"\(d)\" healthy, but \"\(d)\" has no healthcheck"
@@ -167,14 +175,16 @@ enum Compose {
     /// double quotes stripped from the value — no escape processing beyond that.
     private static func parseDotEnv(text: String) -> [String: String] {
         var out: [String: String] = [:]
-        for line in text.split(separator: "\n") {
-            var entry = line.trimmingCharacters(in: .whitespaces)
+        for line in text.split(whereSeparator: \.isNewline) {
+            // .whitespacesAndNewlines: CRLF files otherwise leave a trailing
+            // \r in every value and defeat the quote stripping below.
+            var entry = line.trimmingCharacters(in: .whitespacesAndNewlines)
             if entry.isEmpty || entry.hasPrefix("#") { continue }
             if entry.hasPrefix("export ") { entry = String(entry.dropFirst("export ".count)) }
             guard let eq = entry.firstIndex(of: "=") else { continue }
             let key = entry[..<eq].trimmingCharacters(in: .whitespaces)
             guard !key.isEmpty else { continue }
-            var value = entry[entry.index(after: eq)...].trimmingCharacters(in: .whitespaces)
+            var value = entry[entry.index(after: eq)...].trimmingCharacters(in: .whitespacesAndNewlines)
             if value.count >= 2,
                (value.hasPrefix("\"") && value.hasSuffix("\"")) || (value.hasPrefix("'") && value.hasSuffix("'")) {
                 value = String(value.dropFirst().dropLast())
@@ -249,7 +259,21 @@ enum Compose {
                 out.append("$")
                 i = s.index(after: next)
             } else if s[next] == "{" {
-                guard let close = s[s.index(after: next)...].firstIndex(of: "}") else {
+                // Depth-aware close scan: "${VAR:-${OTHER}}" must close at the
+                // matching brace, not the first one, or set-case values grow a
+                // stray "}" (nested defaults inside are still taken literally).
+                var depth = 1
+                var scan = s.index(after: next)
+                var closeFound: String.Index?
+                while scan < s.endIndex {
+                    if s[scan] == "{" { depth += 1 }
+                    if s[scan] == "}" {
+                        depth -= 1
+                        if depth == 0 { closeFound = scan; break }
+                    }
+                    scan = s.index(after: scan)
+                }
+                guard let close = closeFound else {
                     out += s[i...]                                 // unterminated ${… — literal
                     break
                 }
@@ -272,6 +296,8 @@ enum Compose {
                         throw Error.requiredVariable(name: name, message: String(op.dropFirst()))
                     }
                     out += value
+                } else if op.hasPrefix("+") {                      // ${VAR+alt} / ${VAR:+alt}
+                    out += value != nil ? String(op.dropFirst()) : ""
                 } else {
                     warnings.append("\"${\(body)}\" is not a supported substitution — left as-is")
                     out += s[i...close]
@@ -312,6 +338,11 @@ enum Compose {
             warnings.append("top-level \"\(key)\" is ignored")
         }
         let project = (root["name"] as? String) ?? projectName
+        // Same charset rule as service keys: the project name is written into
+        // the managed /etc/hosts block and used in container names.
+        guard project.range(of: "^[A-Za-z0-9._-]+$", options: .regularExpression) != nil else {
+            throw Error.invalidServiceName(project)
+        }
 
         // Top-level declarations; `external: true` marks a resource someone else
         // manages — down never deletes those (up still creates missing ones, a
@@ -384,6 +415,11 @@ enum Compose {
             throw Error.missingImage(service: key)
         }
         let name = (svc["container_name"] as? String) ?? "\(project)-\(key)"
+        // container_name reaches the same /etc/hosts lines as service keys;
+        // docker rejects these charsets too.
+        guard name.range(of: "^[A-Za-z0-9._-]+$", options: .regularExpression) != nil else {
+            throw Error.invalidServiceName(name)
+        }
 
         var process: [String] = []
         var management: [String] = []
@@ -488,7 +524,13 @@ enum Compose {
                       let target = m["target"] {
                 if let published = m["published"] {
                     var spec = "\(scalarString(published)):\(scalarString(target))"
-                    if let ip = m["host_ip"] { spec = "\(scalarString(ip)):\(spec)" }
+                    if let ip = m["host_ip"] {
+                        let host = scalarString(ip)
+                        // IPv6 host addresses need brackets or the platform's
+                        // publish parser rejects the whole spec.
+                        let bracketed = host.contains(":") && !host.hasPrefix("[") ? "[\(host)]" : host
+                        spec = "\(bracketed):\(spec)"
+                    }
                     management += ["--publish", spec]
                 } else {
                     warnings.append("\(key): port target \(scalarString(target)) has no published port — ignored")
@@ -648,6 +690,8 @@ enum Compose {
         for k in svc.keys.sorted() where !handled.contains(k) {
             warnings.append("\(key): \"\(k)\" is not supported — ignored")
         }
+
+        management += ["--label", "\(Compose.projectLabel)=\(project)"]
 
         let plan = ServicePlan(
             service: key, name: name, image: image,
@@ -960,17 +1004,24 @@ extension Compose {
         })
         let byService = Dictionary(uniqueKeysWithValues: plan.services.map { ($0.service, $0) })
 
-        // Container names present before this up (name → running). One snapshot
-        // is enough: each service is visited once, and a container this up just
-        // created is never looked up again. A failed list = nothing preexists.
+        // Containers present before this up. One snapshot is enough: each
+        // service is visited once, and a container this up just created is
+        // never looked up again. A failed list = nothing preexists.
         let preexisting = Dictionary(uniqueKeysWithValues:
-            ((try? await ContainerService.listContainers()) ?? []).map { ($0.id, $0.isRunning) })
+            ((try? await ContainerService.listContainers()) ?? []).map { ($0.id, $0) })
 
         var reused = Set<String>()
         for svc in plan.services {
-            // Already running under the target name → reuse as-is; its own
-            // dependencies were satisfied when it started, so skip the waits too.
-            if preexisting[svc.name] == true {
+            // Ownership gate: a preexisting container is only compose's to
+            // reuse or replace when it carries this project's label. Anything
+            // else under the target name is the user's — refuse loudly rather
+            // than delete it (stopped) or adopt and root-patch it (running).
+            if let record = preexisting[svc.name], !owns(record, project: plan.project) {
+                throw Error.foreignContainer(name: svc.name)
+            }
+            // Already running under the target name (and ours) → reuse as-is;
+            // its dependencies were satisfied when it started, so skip the waits.
+            if preexisting[svc.name]?.isRunning == true {
                 reused.insert(svc.service)
                 await progress(.service(svc.service), false)
                 await progress(.service(svc.service), true)
@@ -998,8 +1049,8 @@ extension Compose {
             }
 
             await progress(.service(svc.service), false)
-            if preexisting[svc.name] == false {
-                // Exists but not running (stopped, or created-but-start-failed) —
+            if let record = preexisting[svc.name], !record.isRunning {
+                // Ours, but not running (stopped, or created-but-start-failed) —
                 // recreate from the current plan rather than diffing config.
                 try await ContainerService.delete(svc.name, force: true)
             }
@@ -1036,11 +1087,18 @@ extension Compose {
     /// A container that can't be patched (no usable /bin/sh, read-only
     /// /etc/hosts) yields a warning, never a failure. Containers recreated
     /// behind compose's back keep stale entries until the next up/start.
+    /// True when the record was created by THIS compose project.
+    static func owns(_ record: ContainerRecord, project: String) -> Bool {
+        record.configuration.labels?[projectLabel] == project
+    }
+
     static func syncProjectHosts(plan: Plan) async -> [String] {
         let records = Dictionary(uniqueKeysWithValues:
             ((try? await ContainerService.listContainers()) ?? []).map { ($0.id, $0) })
         let entries: [(service: String, name: String, ip: String)] = plan.allServices.compactMap { svc in
-            guard let record = records[svc.name], record.isRunning, let ip = record.primaryIPv4 else { return nil }
+            guard let record = records[svc.name], record.isRunning, let ip = record.primaryIPv4,
+                  owns(record, project: plan.project)  // never root-patch a container we don't own
+            else { return nil }
             return (svc.service, svc.name, ip)
         }
         guard !entries.isEmpty else { return [] }
@@ -1050,8 +1108,7 @@ extension Compose {
         // in as $1 so no hosts content is ever shell-interpolated.
         let script = """
         keep=$(grep -v ' # davit-compose$' /etc/hosts); [ $? -le 1 ] || exit 9
-        printf '%s\\n' "$keep" > /etc/hosts
-        printf '%s\\n' "$1" >> /etc/hosts
+        printf '%s\\n' "$keep" "$1" > /etc/hosts
         """
         var warnings: [String] = []
         for entry in entries {
@@ -1093,10 +1150,15 @@ extension Compose {
         let selected = requested.isEmpty ? known : Set(requested)
         var warnings: [String] = []
 
-        let existing = Dictionary(uniqueKeysWithValues:
-            try await ContainerService.listContainers().map { ($0.id, $0.isRunning) })
+        let records = Dictionary(uniqueKeysWithValues:
+            try await ContainerService.listContainers().map { ($0.id, $0) })
         for svc in plan.services.reversed() where selected.contains(svc.service) {
-            guard let running = existing[svc.name] else { continue }  // never created
+            guard let record = records[svc.name] else { continue }  // never created
+            guard owns(record, project: plan.project) else {
+                warnings.append("service \(svc.service): container \"\(svc.name)\" was not created by this project — left alone")
+                continue
+            }
+            let running = record.isRunning
             await progress(.service(svc.service), false)
             if running {
                 // A stop that fails must not abort the teardown — the force-
@@ -1373,9 +1435,22 @@ extension Compose {
                 printer.emit(prefix: stream.prefix, key: stream.name, data: data)
             }
         }
-        // Nothing left to do in-process: block until Ctrl-C ends the process —
-        // in the CLI the semaphore wait never returns, which is the point.
-        while true { try await Task.sleep(for: .seconds(86_400)) }
+        // Follow until Ctrl-C — or until every followed container has exited,
+        // matching docker compose (a stack of one-shot jobs must not hang a
+        // script forever after the jobs finish). Poll cheaply; log FDs keep
+        // delivering the tail while we wait, and one final grace tick lets the
+        // readability handlers drain buffered output before returning.
+        let names = Set(streams.map(\.name))
+        while true {
+            try await Task.sleep(for: .seconds(2))
+            let records = (try? await ContainerService.listContainers()) ?? []
+            let anyRunning = records.contains { names.contains($0.id) && $0.isRunning }
+            if !anyRunning {
+                try await Task.sleep(for: .seconds(1))
+                for stream in streams { stream.handle.readabilityHandler = nil; try? stream.handle.close() }
+                return
+            }
+        }
     }
 
     /// Serializes prefixed log writes from the per-container readability
@@ -1412,11 +1487,21 @@ extension Compose {
     static func waitHealthy(service: String, container: String, healthcheck hc: Healthcheck) async throws {
         let started = ContinuousClock.now
         var failures = 0
+        var abandoned = 0
         while true {
             // A probe exceeding its timeout counts as failed but keeps running in
             // the container: apple/container 1.0.0 can't signal exec processes
             // (see ContainerService.ExecTimeout), so it's abandoned, not killed.
+            // Cap the abandoned pile: each one pins a process in the guest and
+            // pipe FDs in the app, so a hung probe command must fail the wait
+            // rather than accumulate an unbounded backlog.
             let result = try? await ContainerService.exec(container, hc.argv, timeout: .seconds(hc.timeout))
+            if result == nil {  // timed out (abandoned in-guest) or exec failed outright
+                abandoned += 1
+                if abandoned >= 3 {
+                    throw Error.unhealthy(service: service, failures: max(failures, abandoned))
+                }
+            }
             if result?.exitCode == 0 { return }
             if let records = try? await ContainerService.listContainers(),
                records.first(where: { $0.id == container })?.isRunning != true {
