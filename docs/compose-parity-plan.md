@@ -148,7 +148,7 @@ follow-up tasks F1/F2 below on user request, 2026-07-09.)
   list entry resolution + omission warning, --env-file override. Done when: build +
   full selftest OK + CLI round-trip with a temp .env. Commit:
   `compose: .env files + variable interpolation`.
-- [ ] **F3 — Up idempotency / recreate.** Implement decision 11 in Compose.swift up
+- [x] **F3 — Up idempotency / recreate.** Implement decision 11 in Compose.swift up
   (container list snapshot at up start; per-service reuse-running /
   recreate-not-running / create-missing). Extend the live selftest step (or add
   "compose: up recreate + reuse"): up fixture → second up succeeds reusing both

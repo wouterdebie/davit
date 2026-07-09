@@ -777,9 +777,11 @@ extension Compose {
     /// Bring the plan up: create missing named volumes and networks, then create
     /// and start each service in dependency order, honoring depends_on conditions
     /// before each start (service_healthy probes the dependency's healthcheck,
-    /// service_completed_successfully awaits its retained exit code). Reports each
-    /// step; stops at the first failure (already-completed steps stay up, like
-    /// compose does).
+    /// service_completed_successfully awaits its retained exit code). A same-named
+    /// container that is already running is reused untouched (docker "Running");
+    /// a stopped one is force-deleted and recreated from the plan — the file wins.
+    /// Reports each step; stops at the first failure (already-completed steps stay
+    /// up, like compose does).
     static func up(
         plan: Plan,
         progress: @escaping @Sendable (StepKind, _ done: Bool) async -> Void
@@ -812,7 +814,21 @@ extension Compose {
         })
         let byService = Dictionary(uniqueKeysWithValues: plan.services.map { ($0.service, $0) })
 
+        // Container names present before this up (name → running). One snapshot
+        // is enough: each service is visited once, and a container this up just
+        // created is never looked up again. A failed list = nothing preexists.
+        let preexisting = Dictionary(uniqueKeysWithValues:
+            ((try? await ContainerService.listContainers()) ?? []).map { ($0.id, $0.isRunning) })
+
         for svc in plan.services {
+            // Already running under the target name → reuse as-is; its own
+            // dependencies were satisfied when it started, so skip the waits too.
+            if preexisting[svc.name] == true {
+                await progress(.service(svc.service), false)
+                await progress(.service(svc.service), true)
+                continue
+            }
+
             for (dep, condition) in svc.dependsOn.sorted(by: { $0.key < $1.key }) where condition != .started {
                 guard let depPlan = byService[dep] else { continue }  // parse rejects unknown deps
                 await progress(.waiting(service: dep, condition: condition.rawValue), false)
@@ -834,6 +850,11 @@ extension Compose {
             }
 
             await progress(.service(svc.service), false)
+            if preexisting[svc.name] == false {
+                // Exists but not running (stopped, or created-but-start-failed) —
+                // recreate from the current plan rather than diffing config.
+                try await ContainerService.delete(svc.name, force: true)
+            }
             try await ContainerService.runContainer(
                 image: svc.image,
                 name: svc.name,

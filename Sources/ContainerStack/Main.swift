@@ -972,6 +972,89 @@ enum SelfTest {
             }
             await cleanup()
         }
+        await step("compose: up recreate + reuse") {
+            let names = ["davit-selftest-idem-a", "davit-selftest-idem-b"]
+            func cleanup() async {
+                for n in names { try? await ContainerService.delete(n, force: true) }
+            }
+            await cleanup()  // leftovers from a previous aborted run
+
+            let plan = try Compose.parse(text: """
+            name: davit-selftest-idem
+            services:
+              a:
+                image: alpine:latest
+                command: ["sleep", "300"]
+              b:
+                image: alpine:latest
+                command: ["sleep", "300"]
+                depends_on: [a]
+            """, projectName: "ignored")
+            func record(_ name: String) async throws -> ContainerRecord {
+                guard let r = try await ContainerService.listContainers().first(where: { $0.id == name }) else {
+                    throw CLIError(command: "selftest", message: "\(name) missing")
+                }
+                return r
+            }
+            do {
+                try await Compose.up(plan: plan) { _, _ in }
+                let a1 = try await record("davit-selftest-idem-a")
+                let b1 = try await record("davit-selftest-idem-b")
+                guard a1.isRunning, b1.isRunning else {
+                    throw CLIError(command: "selftest", message: "fixture not running after first up")
+                }
+
+                // Second up reuses both running containers: no error, both service
+                // steps reported done, and the creation dates prove no recreate.
+                let events = ProgressLog()
+                try await Compose.up(plan: plan) { events.append($0, $1) }
+                let a2 = try await record("davit-selftest-idem-a")
+                let b2 = try await record("davit-selftest-idem-b")
+                guard a2.isRunning, b2.isRunning,
+                      a2.configuration.creationDate == a1.configuration.creationDate,
+                      b2.configuration.creationDate == b1.configuration.creationDate
+                else { throw CLIError(command: "selftest", message: "second up did not reuse the running containers") }
+                let seen = events.all
+                guard seen.contains(where: { $0.0 == .service("a") && $0.1 }),
+                      seen.contains(where: { $0.0 == .service("b") && $0.1 })
+                else { throw CLIError(command: "selftest", message: "reusing up missing service steps: \(seen)") }
+
+                // Stopped service → recreated; the running one stays untouched.
+                // (creationDate has second resolution — sleep so a recreate can't
+                // land on the same timestamp.)
+                try await ContainerService.stop("davit-selftest-idem-b")
+                try await Task.sleep(for: .seconds(1))
+                try await Compose.up(plan: plan) { _, _ in }
+                let a3 = try await record("davit-selftest-idem-a")
+                let b3 = try await record("davit-selftest-idem-b")
+                guard a3.isRunning, a3.configuration.creationDate == a1.configuration.creationDate else {
+                    throw CLIError(command: "selftest", message: "running service was not left untouched")
+                }
+                guard b3.isRunning, b3.configuration.creationDate != b1.configuration.creationDate else {
+                    throw CLIError(command: "selftest", message: "stopped service was not recreated")
+                }
+
+                // A stopped name-colliding container compose never created is
+                // recreated cleanly too (identity is the name; no labels to check).
+                await cleanup()
+                try await ContainerService.runContainer(
+                    image: "alpine:latest", name: "davit-selftest-idem-a",
+                    processArgs: [], managementArgs: [], resourceArgs: [],
+                    commandArgs: ["sleep", "300"])
+                try await ContainerService.stop("davit-selftest-idem-a")
+                let pre = try await record("davit-selftest-idem-a")
+                try await Task.sleep(for: .seconds(1))
+                try await Compose.up(plan: plan) { _, _ in }
+                let a4 = try await record("davit-selftest-idem-a")
+                guard a4.isRunning, a4.configuration.creationDate != pre.configuration.creationDate else {
+                    throw CLIError(command: "selftest", message: "colliding stopped container was not recreated")
+                }
+            } catch {
+                await cleanup()
+                throw error
+            }
+            await cleanup()
+        }
         await step("registry: list + reject bad credentials") {
             _ = RegistryService.listLogins()  // must not throw
             do {
