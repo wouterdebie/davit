@@ -1200,11 +1200,24 @@ enum ShellCommandInstaller {
     }
 
     static func install(managedRoot: String) async throws {
+        // Version-agnostic: the managed root is versioned (platform/<x.y.z>),
+        // so a wrapper pinned to one version strands the CLI on every Davit
+        // platform upgrade. Resolve the newest installed version at exec time
+        // instead (numeric per-component sort; only roots with a CLI count).
+        let base = (managedRoot as NSString).deletingLastPathComponent
         let wrapper = """
         #!/bin/sh
-        # \(marker) — points the container CLI at the Davit-managed platform install
-        export CONTAINER_INSTALL_ROOT="\(managedRoot)"
-        exec "\(managedRoot)/bin/container" "$@"
+        # \(marker) — runs the container CLI from the newest Davit-managed platform install
+        base="\(base)"
+        v=$(ls "$base" 2>/dev/null | sort -t. -k1,1n -k2,2n -k3,3n | while read -r c; do
+          [ -x "$base/$c/bin/container" ] && echo "$c"
+        done | tail -1)
+        if [ -z "$v" ]; then
+          echo "davit wrapper: no managed container platform under $base — reinstall from Davit's settings" >&2
+          exit 1
+        fi
+        export CONTAINER_INSTALL_ROOT="$base/$v"
+        exec "$base/$v/bin/container" "$@"
         """
         let temp = FileManager.default.temporaryDirectory.appendingPathComponent("davit-container-wrapper")
         try wrapper.write(to: temp, atomically: true, encoding: .utf8)
