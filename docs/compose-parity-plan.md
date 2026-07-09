@@ -253,7 +253,7 @@ follow-up tasks F1/F2 below on user request, 2026-07-09.)
   ps shows stopped → start → running → restart → running; pull alpine:latest prints
   progress and exits 0. Done when: build + full selftest OK. Commit:
   `compose: stop/start/restart/pull subcommands`.
-- [ ] **G4 — exec + file keys.** Decisions 17/18 (env_file, entrypoint, exec).
+- [x] **G4 — exec + file keys.** Decisions 17/18 (env_file, entrypoint, exec).
   Pure selftest: env_file forms + precedence, entrypoint string/list mapping.
   Live: exec round-trip (`compose exec db /bin/echo hi` prints hi, exit 0; non-running
   service → clear error). Done when: build + full selftest OK. Commit:

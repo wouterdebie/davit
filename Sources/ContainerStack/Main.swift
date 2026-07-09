@@ -23,7 +23,10 @@ enum Main {
                 reason: "headless UI harness")
         }
         if args.count >= 3, args[1] == "exec" {
-            ExecMode.runBlocking(containerID: args[2])
+            // `exec <id>` opens a shell; `exec <id> <command...>` runs that.
+            ExecMode.runBlocking(
+                containerID: args[2],
+                argv: args.count > 3 ? Array(args.dropFirst(3)) : nil)
             return
         }
         if args.count >= 2, args[1] == "selftest" {
@@ -332,12 +335,11 @@ enum ComposeCLI {
         var flags: Set<String> = []      // canonical bool flags: "detach", "volumes", "follow"
         var counts: [String: Int] = [:]  // canonical int flags: "tail"
         var services: [String] = []
+        var command: [String] = []       // exec only: everything after the service
     }
 
-    /// Implemented subcommands; the remaining decision-12 ones land in later
-    /// rounds by adding their name here and a case in run().
     private static let subcommands: Set<String> = [
-        "plan", "up", "down", "ps", "logs", "stop", "start", "restart", "pull",
+        "plan", "up", "down", "ps", "logs", "stop", "start", "restart", "pull", "exec",
     ]
 
     /// Per-subcommand flags, token → canonical name. These shadow the shared
@@ -384,6 +386,14 @@ enum ComposeCLI {
                 inv.profiles.append(args[i + 1]); i += 1
             } else if arg.hasPrefix("-") {
                 FileHandle.standardError.write(Data("unknown flag: \(arg)\n\(usage)\n".utf8)); exit(2)
+            } else if sub == "exec" {
+                // exec grammar: the first positional is the service, everything
+                // after it is the command verbatim — a later `-f` belongs to
+                // the command, not to us (docker parity; no legacy file
+                // positional here, exec is new).
+                inv.services.append(arg)
+                inv.command = Array(args[(i + 1)...])
+                break
             } else {
                 // Legacy `compose <sub> <file>`: the first positional is the
                 // file iff no file flag was given and it looks like a path;
@@ -402,6 +412,7 @@ enum ComposeCLI {
             }
             i += 1
         }
+        if sub == "exec", inv.services.count != 1 || inv.command.isEmpty { usageExit() }
         // COMPOSE_PROFILES is the fallback when no --profile was given (docker v2).
         if inv.profiles.isEmpty, let env = ProcessInfo.processInfo.environment["COMPOSE_PROFILES"] {
             inv.profiles = env.split(separator: ",").map(String.init).filter { !$0.isEmpty }
@@ -480,6 +491,14 @@ enum ComposeCLI {
                     }
                     for w in warnings { print("warning: \(w)") }
                     print("compose \(sub): ok")
+                case "exec":
+                    // Whole-file plan like logs/down — an existing container of
+                    // a profile-gated service must stay reachable. Resolution
+                    // errors (unknown service, nothing running) exit 1 below;
+                    // then the interactive exec path takes over and exits with
+                    // the in-container status.
+                    let container = try await Compose.runningContainer(plan: parsed, service: inv.services[0])
+                    await ExecMode.run(containerID: container, argv: inv.command)
                 case "ps":
                     let plan = try parsed.selecting(services: inv.services, activeProfiles: inv.profiles)
                     let records = try await Compose.ps(plan: plan)
@@ -979,6 +998,90 @@ enum SelfTest {
                                     projectName: "q", environment: ["EMPTY": ""]).services[0].image == "xy"
             else { throw CLIError(command: "selftest", message: "? should accept a set-but-empty variable") }
         }
+        await step("compose: env_file + entrypoint") {
+            let fm = FileManager.default
+            let dir = fm.temporaryDirectory.appendingPathComponent("davit-selftest-envfile-\(UUID().uuidString)")
+            try fm.createDirectory(at: dir.appendingPathComponent("sub"), withIntermediateDirectories: true)
+            defer { try? fm.removeItem(at: dir) }
+            try """
+            BASE=one
+            SHARED=base
+            RAW=${NOT_INTERPOLATED}
+            """.write(to: dir.appendingPathComponent("base.env"), atomically: true, encoding: .utf8)
+            try """
+            SHARED=later
+            EXTRA=two
+            OVERLAP=file
+            FALLBACK=fromfile
+            """.write(to: dir.appendingPathComponent("sub/more.env"), atomically: true, encoding: .utf8)
+
+            // All three entry forms; precedence: earlier files < later files <
+            // environment:. File contents are NOT interpolated (RAW stays
+            // literal); a bare environment KEY unset in the effective env
+            // falls back to the env_file value without a warning.
+            let plan = try Compose.parse(text: """
+            services:
+              app:
+                image: alpine
+                env_file:
+                  - base.env
+                  - path: sub/more.env
+                  - { path: missing.env, required: false }
+                environment: [OVERLAP=explicit, FALLBACK]
+            """, projectName: "envfile", baseDir: dir.path)
+            guard plan.services[0].processArgs == [
+                "--env", "BASE=one", "--env", "EXTRA=two", "--env", "FALLBACK=fromfile",
+                "--env", "RAW=${NOT_INTERPOLATED}", "--env", "SHARED=later",
+                "--env", "OVERLAP=explicit",
+            ] else { throw CLIError(command: "selftest", message: "env_file merge wrong: \(plan.services[0].processArgs)") }
+            guard plan.warnings.isEmpty else {
+                throw CLIError(command: "selftest", message: "env_file should be warning-free: \(plan.warnings)")
+            }
+            // string form; missing file without required: false is an error
+            let single = try Compose.parse(
+                text: "services: {app: {image: alpine, env_file: base.env}}",
+                projectName: "envfile", baseDir: dir.path)
+            guard single.services[0].processArgs == [
+                "--env", "BASE=one", "--env", "RAW=${NOT_INTERPOLATED}", "--env", "SHARED=base",
+            ] else { throw CLIError(command: "selftest", message: "env_file string form wrong: \(single.services[0].processArgs)") }
+            do {
+                _ = try Compose.parse(
+                    text: "services: {app: {image: alpine, env_file: nope.env}}",
+                    projectName: "envfile", baseDir: dir.path)
+                throw CLIError(command: "selftest", message: "missing env_file not rejected")
+            } catch Compose.Error.envFileNotFound(let p) {
+                guard p.hasSuffix("/nope.env") else {
+                    throw CLIError(command: "selftest", message: "env_file path not resolved against the compose dir: \(p)")
+                }
+            }
+
+            // entrypoint: string → --entrypoint (shell-split, so a multi-word
+            // string behaves like the list form); list → head + argv prepend;
+            // empty → warning, ignored. cliPreview shows the exact flags.
+            let entry = try Compose.parse(text: """
+            services:
+              s: {image: x, entrypoint: /entry.sh}
+              multi: {image: x, entrypoint: /entry.sh --flag}
+              l:
+                image: x
+                entrypoint: [/bin/sh, -c, "echo hi"]
+                command: [more]
+              e: {image: x, entrypoint: ""}
+              el: {image: x, entrypoint: []}
+            """, projectName: "entry")
+            let byName = Dictionary(uniqueKeysWithValues: entry.services.map { ($0.service, $0) })
+            guard byName["s"]?.managementArgs == ["--entrypoint", "/entry.sh"], byName["s"]?.commandArgs == [],
+                  byName["multi"]?.managementArgs == ["--entrypoint", "/entry.sh"], byName["multi"]?.commandArgs == ["--flag"],
+                  byName["l"]?.managementArgs == ["--entrypoint", "/bin/sh"], byName["l"]?.commandArgs == ["-c", "echo hi", "more"]
+            else { throw CLIError(command: "selftest", message: "entrypoint mapping wrong: \(entry.services)") }
+            guard byName["s"]?.cliPreview == "container run --detach --name entry-s --entrypoint /entry.sh x",
+                  byName["l"]?.cliPreview == "container run --detach --name entry-l --entrypoint /bin/sh x -c 'echo hi' more"
+            else { throw CLIError(command: "selftest", message: "entrypoint cliPreview wrong: \(byName["l"]?.cliPreview ?? "")") }
+            guard byName["e"]?.managementArgs == [], byName["el"]?.managementArgs == [],
+                  entry.warnings.filter({ $0.contains("entrypoint is empty") }).count == 2,
+                  !entry.warnings.contains(where: { $0.contains("not supported") })
+            else { throw CLIError(command: "selftest", message: "empty entrypoint warnings wrong: \(entry.warnings)") }
+        }
         await step("compose: stop keys + external declarations") {
             let yaml = """
             services:
@@ -1359,6 +1462,17 @@ enum SelfTest {
             do {
                 try await Compose.up(plan: plan) { _, _ in }
 
+                // exec resolution: service → running container name; unknown
+                // services are clear errors (the exec round-trip itself is
+                // covered by the file-browser step's ContainerService.exec).
+                guard try await Compose.runningContainer(plan: plan, service: "one") == names[0] else {
+                    throw CLIError(command: "selftest", message: "exec resolution wrong")
+                }
+                do {
+                    _ = try await Compose.runningContainer(plan: plan, service: "nope")
+                    throw CLIError(command: "selftest", message: "exec with unknown service not rejected")
+                } catch Compose.Error.noSuchService("nope") { /* expected */ }
+
                 // stop: reverse dependency order; containers stay, ps shows stopped
                 let stopEvents = ProgressLog()
                 try await Compose.stop(plan: plan) { stopEvents.append($0, $1) }
@@ -1370,6 +1484,12 @@ enum SelfTest {
                 let stopped = try await Compose.ps(plan: plan)
                 guard stopped.map(\.service) == ["one", "two"], stopped.allSatisfy({ $0.state == "stopped" })
                 else { throw CLIError(command: "selftest", message: "ps after stop wrong: \(stopped)") }
+
+                // exec against a stopped (or never-created) service is a clear error
+                do {
+                    _ = try await Compose.runningContainer(plan: plan, service: "one")
+                    throw CLIError(command: "selftest", message: "exec on a stopped service not rejected")
+                } catch Compose.Error.serviceNotRunning("one") { /* expected */ }
 
                 // second stop: idempotent no-op on already-stopped containers
                 try await Compose.stop(plan: plan) { _, _ in }
@@ -1471,16 +1591,21 @@ final class Atomic: @unchecked Sendable {
 }
 
 enum ExecMode {
-    static func runBlocking(containerID: String) {
+    static func runBlocking(containerID: String, argv: [String]? = nil) {
         let semaphore = DispatchSemaphore(value: 0)
         Task.detached {
-            await run(containerID: containerID)
+            await run(containerID: containerID, argv: argv)
             semaphore.signal()
         }
         semaphore.wait()
     }
 
-    static func run(containerID: String) async {
+    /// Attaches an interactive exec to a running container: `argv` runs as
+    /// given, nil opens the default shell (bash when present, else sh). A TTY
+    /// is allocated only when stdin is one — raw mode on a pipe would fail,
+    /// and this way scripted invocations just stream (docker's -T behavior,
+    /// applied automatically).
+    static func run(containerID: String, argv: [String]? = nil) async {
         do {
             let client = ContainerClient()
             let container = try await client.get(id: containerID)
@@ -1491,13 +1616,19 @@ enum ExecMode {
 
             // Base the exec process on the container's init process (env, user, cwd),
             // the same way `container exec` does.
+            let tty = isatty(STDIN_FILENO) == 1
             var config = container.configuration.initProcess
-            config.executable = "/bin/sh"
-            config.arguments = ["-c", "command -v bash >/dev/null 2>&1 && exec bash || exec sh"]
-            config.terminal = true
-            config.environment.append("TERM=xterm-256color")
+            if let argv {
+                config.executable = argv[0]
+                config.arguments = Array(argv.dropFirst())
+            } else {
+                config.executable = "/bin/sh"
+                config.arguments = ["-c", "command -v bash >/dev/null 2>&1 && exec bash || exec sh"]
+            }
+            config.terminal = tty
+            if tty { config.environment.append("TERM=xterm-256color") }
 
-            let io = try ProcessIO.create(tty: true, interactive: true, detach: false)
+            let io = try ProcessIO.create(tty: tty, interactive: true, detach: false)
             defer { try? io.close() }
 
             let process = try await client.createProcess(

@@ -91,6 +91,7 @@ enum Compose {
         case unknownDependency(service: String, dependsOn: String)
         case missingHealthcheck(service: String, dependency: String)
         case noSuchService(String)
+        case serviceNotRunning(String)
         case inactiveProfile(service: String, profile: String)
         case envFileNotFound(String)
         case requiredVariable(name: String, message: String)
@@ -107,6 +108,7 @@ enum Compose {
             case .unknownDependency(let s, let d): return "service \"\(s)\" depends on unknown service \"\(d)\""
             case .missingHealthcheck(let s, let d): return "service \"\(s)\" needs \"\(d)\" healthy, but \"\(d)\" has no healthcheck"
             case .noSuchService(let s): return "no such service: \(s)"
+            case .serviceNotRunning(let s): return "service \"\(s)\" has no running container"
             case .inactiveProfile(let s, let p): return "service \"\(s)\" requires profile \"\(p)\" — activate it with --profile \(p)"
             case .envFileNotFound(let p): return "env file not found: \(p)"
             case .requiredVariable(let name, let message):
@@ -375,28 +377,80 @@ enum Compose {
         var management: [String] = []
         var resource: [String] = []
 
-        // environment: map or list form
+        // env_file: string, list, or {path, required} entries — paths resolve
+        // against the compose file's directory; contents load through the
+        // dotenv parser and are NOT interpolated (docker parity: only the
+        // compose file itself interpolates). Later files override earlier
+        // ones; environment: below overrides them all. A missing file is an
+        // error unless the entry says `required: false`.
+        var envFileSpecs: [(path: String, required: Bool)] = []
+        func envFileSpec(_ entry: Any) {
+            if let m = entry as? [String: Any] {
+                if let p = m["path"] as? String, !p.isEmpty {
+                    envFileSpecs.append((p, (m["required"] as? Bool) ?? true))
+                } else {
+                    warnings.append("\(key): env_file entry without a path — ignored")
+                }
+            } else {
+                let s = scalarString(entry)
+                if s.isEmpty {
+                    warnings.append("\(key): empty env_file entry — ignored")
+                } else {
+                    envFileSpecs.append((s, true))
+                }
+            }
+        }
+        switch svc["env_file"] {
+        case nil: break
+        case let list as [Any]: for entry in list { envFileSpec(entry) }
+        case let other?: envFileSpec(other)  // string or {path, required}
+        }
+        var fileEnv: [String: String] = [:]
+        for (path, required) in envFileSpecs {
+            let expanded = (path as NSString).expandingTildeInPath
+            let resolved = expanded.hasPrefix("/")
+                ? expanded
+                : URL(fileURLWithPath: baseDir ?? FileManager.default.currentDirectoryPath)
+                    .appendingPathComponent(expanded).standardizedFileURL.path
+            guard let text = try? String(contentsOfFile: resolved, encoding: .utf8) else {
+                if required { throw Error.envFileNotFound(resolved) }
+                continue
+            }
+            fileEnv.merge(parseDotEnv(text: text)) { _, later in later }
+        }
+
+        // environment: map or list form; its keys beat env_file entries
+        var explicitEnv: [String] = []
+        var explicitKeys = Set<String>()
         switch svc["environment"] {
         case let map as [String: Any]:
             for (k, v) in map.sorted(by: { $0.key < $1.key }) {
-                process += ["--env", "\(k)=\(scalarString(v))"]
+                explicitEnv += ["--env", "\(k)=\(scalarString(v))"]
+                explicitKeys.insert(k)
             }
         case let list as [Any]:
             // KEY=VALUE passes through; a bare KEY resolves from the effective
-            // environment (docker parity) or is omitted with a warning.
+            // environment (docker parity), falls back to an env_file value, or
+            // is omitted with a warning.
             for entry in list {
                 let s = scalarString(entry)
-                if s.contains("=") {
-                    process += ["--env", s]
+                if let eq = s.firstIndex(of: "=") {
+                    explicitEnv += ["--env", s]
+                    explicitKeys.insert(String(s[..<eq]))
                 } else if let value = environment[s] {
-                    process += ["--env", "\(s)=\(value)"]
-                } else {
+                    explicitEnv += ["--env", "\(s)=\(value)"]
+                    explicitKeys.insert(s)
+                } else if fileEnv[s] == nil {
                     warnings.append("\(key): environment variable \(s) is not set — omitted")
                 }
             }
         case nil: break
         default: warnings.append("\(key): unrecognized environment format — ignored")
         }
+        for k in fileEnv.keys.sorted() where !explicitKeys.contains(k) {
+            process += ["--env", "\(k)=\(fileEnv[k] ?? "")"]
+        }
+        process += explicitEnv
 
         if let user = svc["user"] as? String { process += ["--user", user] }
         if let workdir = svc["working_dir"] as? String { process += ["--workdir", workdir] }
@@ -494,6 +548,30 @@ enum Compose {
         default: warnings.append("\(key): unrecognized command format — ignored")
         }
 
+        // entrypoint: the platform takes a single executable string where
+        // docker takes a full argv — approximate the list form by passing the
+        // head as --entrypoint and PREPENDING the rest to the command argv;
+        // the resulting in-container argv matches docker's entrypoint +
+        // command (and, like docker, an entrypoint override suppresses the
+        // image CMD unless command: is set). A string form is shell-split
+        // first, so a single word maps to --entrypoint verbatim. Docker's
+        // empty "clear the image entrypoint" form can't be expressed.
+        var entrypoint: [String] = []
+        switch svc["entrypoint"] {
+        case let s as String:
+            entrypoint = shellSplit(s)
+            if entrypoint.isEmpty { warnings.append("\(key): entrypoint is empty — ignored") }
+        case let list as [Any]:
+            entrypoint = list.map { scalarString($0) }
+            if entrypoint.isEmpty { warnings.append("\(key): entrypoint is empty — ignored") }
+        case nil: break
+        default: warnings.append("\(key): unrecognized entrypoint format — ignored")
+        }
+        if let head = entrypoint.first {
+            management += ["--entrypoint", head]
+            command = Array(entrypoint.dropFirst()) + command
+        }
+
         // depends_on: list form (→ started) or map with condition
         var deps: [String: DependsCondition] = [:]
         switch svc["depends_on"] {
@@ -548,9 +626,10 @@ enum Compose {
 
         // Everything we understand is handled above; name the rest honestly.
         let handled: Set<String> = [
-            "image", "container_name", "environment", "user", "working_dir", "ports",
-            "volumes", "networks", "cpus", "mem_limit", "deploy", "command", "depends_on",
-            "profiles", "healthcheck", "stop_grace_period", "stop_signal",
+            "image", "container_name", "environment", "env_file", "user", "working_dir",
+            "ports", "volumes", "networks", "cpus", "mem_limit", "deploy", "command",
+            "entrypoint", "depends_on", "profiles", "healthcheck", "stop_grace_period",
+            "stop_signal",
         ]
         for k in svc.keys.sorted() where !handled.contains(k) {
             warnings.append("\(key): \"\(k)\" is not supported — ignored")
@@ -1104,6 +1183,21 @@ extension Compose {
                 service: svc.service, container: svc.name, state: record.state.rawValue,
                 ports: ports.isEmpty ? "-" : ports.joined(separator: ", "))
         }
+    }
+
+    /// Resolves a service to its container name for exec: the service must be
+    /// in the plan and its container must exist and be running — clear errors
+    /// otherwise. Callers pass the unselected plan (like logs/down) so an
+    /// existing container of a profile-gated service stays reachable.
+    static func runningContainer(plan: Plan, service: String) async throws -> String {
+        guard let svc = plan.services.first(where: { $0.service == service }) else {
+            throw Error.noSuchService(service)
+        }
+        let records = try await ContainerService.listContainers()
+        guard records.first(where: { $0.id == svc.name })?.isRunning == true else {
+            throw Error.serviceNotRunning(service)
+        }
+        return svc.name
     }
 
     /// Streams existing project containers' stdout logs, each line prefixed
