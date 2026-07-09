@@ -93,11 +93,45 @@ minimal style (manual arg loops, warnings list, Error enum, sequential up).
    warning ("service X requires profile Y — activate via CLI --profile"). No profile
    picker in v1.
 
-Out of scope (unchanged from main): `${VAR}` interpolation / `.env`, `down`/`ps`,
-labels, restart policies, network aliases, `build:` inside compose. Candidates for a
-follow-up; do not creep.
+Out of scope (unchanged from main): `down`/`ps`, labels, restart policies, network
+aliases, `env_file:` key, `build:` inside compose. Candidates for a follow-up; do not
+creep. (`.env` + `${VAR}` interpolation and host-IP port binding were promoted to
+follow-up tasks F1/F2 below on user request, 2026-07-09.)
+
+9. **.env + interpolation (F2):** default env file = `<composeDir>/.env` (docker
+   project-directory behavior), overridable via a new `--env-file <path>` CLI flag
+   (tilde-expanded, relative to cwd; missing explicit file → error, missing default →
+   silently absent). Effective env = process environment ∪ .env, process wins (docker
+   precedence). Interpolation applies to every string VALUE in the loaded YAML tree
+   (never keys), after Yams.load, before the existing per-key parsing: `${VAR}`,
+   `${VAR:-def}`, `${VAR-def}` (':' variants treat set-but-empty as unset),
+   `${VAR:?err}`/`${VAR?err}` → Compose.Error with the message, bare `$VAR`, `$$` →
+   literal `$`; unset plain substitution → empty string + warning (docker parity).
+   Single-level only (no nested defaults) — documented. Bare `KEY` entries in
+   environment list form resolve from the effective env; unset → omitted + warning.
+   GUI import loads the sibling `.env` automatically via the same helper.
+10. **Host-IP publish (F1):** short form `IP:host:container[/proto]` and long form
+   `host_ip` pass through as `--publish ip:host:container[/proto]` (Apple's Flags
+   accept it; Parser.swift:606-718 in the checkout validates incl. bracketed IPv6).
+   Remove the drop-warning; keep the tcp-only-protocol warning. Ports <1024 still fail
+   at runtime in the user launchd session — unchanged platform limit.
 
 ## Tasks
+
+- [ ] **F1 — Host-IP port binding.** Implement decision 10 in Compose.swift ports
+  parsing (short 3-part + long-form `host_ip`); update the pure selftest assertions
+  that currently expect the host IP to be dropped (Main.swift compose parse step) to
+  expect passthrough. Done when: build + full selftest OK. Commit:
+  `compose: publish host-IP bindings`.
+- [ ] **F2 — .env + ${VAR} interpolation.** Implement decision 9: dotenv parser
+  (KEY=VALUE, `#` comments, blank lines, optional `export `, single/double-quote
+  stripping), `Compose.effectiveEnvironment(composeDir:envFile:)` helper, interpolation
+  pass, bare-KEY resolution, `--env-file` flag + usage update, GUI wiring, README
+  mention. New pure selftest step covering: ${VAR} from .env, process-env precedence,
+  both default forms, `:?` error, `$$` escape, bare $VAR, unset→empty+warning, bare KEY
+  list entry resolution + omission warning, --env-file override. Done when: build +
+  full selftest OK + CLI round-trip with a temp .env. Commit:
+  `compose: .env files + variable interpolation`.
 
 - [x] **E1 — Parse layer (Compose.swift + selftest).** ServicePlan gains `profiles:
   [String]`, `healthcheck: Healthcheck?`, `dependsOn: [String: DependsCondition]`
