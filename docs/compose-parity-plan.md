@@ -182,7 +182,37 @@ follow-up tasks F1/F2 below on user request, 2026-07-09.)
    `images`/`ls`/`watch`/`kill`/`rm` (niche; `down`/`stop` cover teardown), `push`,
    `build` (user: not important).
 
+19. **Service-name resolution via managed /etc/hosts (H1; evidence 2026-07-09):** live
+   investigation confirmed NEITHER bare service names NOR full container names resolve
+   from inside compose containers, in combined AND selected up alike (gateway DNS →
+   macOS system resolver, NXDOMAIN; apiserver table empty without a configured domain
+   and loopback-only regardless; raw-IP connectivity fine; /etc/hosts contains only a
+   self entry). IPs change on recreate (observed .3→.4), so entries must be REFRESHED.
+   Mechanism: after every service container reaches running during `up` (created,
+   recreated, AND reused), and in `start`/`restart`, rewrite a MANAGED BLOCK in every
+   project container's /etc/hosts via in-guest shell (ContainerService.exec): each
+   managed line is `<ip> <service> <container-name> # davit-compose`; rewrite = filter
+   out previously-managed lines (grep -v suffix marker + cat-redirect back — never mv,
+   keep the same inode) then append current entries for ALL project containers incl.
+   self. Cross-patch BOTH directions (the user scenario: running db must learn the new
+   migrator IP and vice versa). Always on — no /etc/resolver detection gate: even
+   root-configured platform DNS can never resolve compose SERVICE names, and the
+   entries are harmless duplicates at worst. Image without /bin/sh → per-service
+   warning, not fatal. Document in README (service discovery note + caveat that
+   out-of-band recreates need an `up`/`start` to re-sync).
+
 ## Tasks
+
+- [ ] **H1 — Service-name resolution (hosts cross-patch).** Decision 19: shared
+  `syncProjectHosts(plan:)` helper in Compose.swift called at the end of up (after all
+  services), in start and restart; managed-block rewrite semantics; warnings for
+  unpatchable images. Live selftest reproducing the user scenario: up full fixture →
+  exec `getent hosts db` from migrator == db IP; down only migrator, `up migrator`
+  (selected, db REUSED) → both directions resolve with the NEW migrator IP (assert the
+  old IP's managed line is GONE from db's hosts); image-without-shell tolerance not
+  live-tested (code-reviewed). Done when: build + full selftest OK + CLI round-trip
+  (`compose up` fixture, exec getent both ways, `compose up <one-service>` after,
+  re-assert). Commit: `compose: service-name resolution via managed hosts entries`.
 
 - [x] **F1 — Host-IP port binding.** Implement decision 10 in Compose.swift ports
   parsing (short 3-part + long-form `host_ip`); update the pure selftest assertions
