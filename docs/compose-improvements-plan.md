@@ -101,7 +101,7 @@ level to .debug for the process unless DAVIT_LOG_LEVEL was explicitly set.
   remains (then clean); up WITH flag → error surfaced AND no project containers remain.
   CLI round-trip of the same. Done when: build + full selftest OK + round-trip.
   Commit: `compose: opt-in full teardown on up failure (--down-on-failure)`.
-- [ ] **I4 — log levels.** Per Design I4. Pure selftest: level-string parsing.
+- [x] **I4 — log levels.** Per Design I4. Pure selftest: level-string parsing.
   CLI round-trips (verifier): `DAVIT_LOG_LEVEL=debug compose plan` runs (no crash,
   bootstrap once); `compose up -d --verbose` prints diagnostics incl. equivalent
   command lines; `--quiet` prints nothing but errors on a warning-producing fixture;

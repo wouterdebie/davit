@@ -47,10 +47,60 @@ enum ContainerBinary {
     /// Must run before any ContainerAPIClient/ContainerPlugin API is touched:
     /// InstallRoot.defaultPath is computed relative to the executable, which is wrong
     /// inside an app bundle. Pin it (and let user config in app root win) via env.
+    /// Also the one place swift-log gets bootstrapped (see bootstrapLogging below) —
+    /// Main.main() calls this before dispatching to any subcommand or the app.
     static func bootstrapEnvironment() {
+        bootstrapLogging()
         guard ProcessInfo.processInfo.environment[InstallRoot.environmentName] == nil,
               let resolved = resolve() else { return }
         setenv(InstallRoot.environmentName, resolved.installRoot, 1)
+    }
+
+    /// `LoggingSystem.bootstrap` may run exactly once per process (a second call
+    /// traps), so it happens here, unconditionally, before anything can create a
+    /// `Logger`. `Backend.log` (below) is a `static let`, lazily initialized on
+    /// first access like all Swift globals — since this function runs first in
+    /// Main.main() and nothing above it touches `Backend.log`, that first access
+    /// always happens after the bootstrap and picks up LoggingConfig.level.
+    private static func bootstrapLogging() {
+        let raw = ProcessInfo.processInfo.environment["DAVIT_LOG_LEVEL"]
+        let (level, ok) = LoggingConfig.parseLevel(raw)
+        if !ok {
+            FileHandle.standardError.write(Data("DAVIT_LOG_LEVEL: unrecognized level \"\(raw ?? "")\" — using info\n".utf8))
+        }
+        LoggingConfig.level = level
+        LoggingConfig.explicitlySet = raw?.isEmpty == false
+        LoggingSystem.bootstrap { label in
+            var handler = StreamLogHandler.standardError(label: label)
+            handler.logLevel = LoggingConfig.level
+            return handler
+        }
+    }
+}
+
+/// DAVIT_LOG_LEVEL parsing + the mutable level `bootstrapLogging`'s handler
+/// factory reads from. `--verbose` (ComposeCLI) bumps `level` to `.debug` before
+/// `Backend.log` is ever created, unless the env var was explicit — factored out
+/// of ContainerBinary so it stays pure and selftest-able without re-bootstrapping
+/// swift-log (which would trap the process).
+enum LoggingConfig {
+    nonisolated(unsafe) static var level: Logger.Level = .info
+    nonisolated(unsafe) static var explicitlySet = false
+
+    /// nil/empty (unset) → `.info`, no warning; unrecognized → `.info` + `ok: false`
+    /// so the caller can warn once. Case-insensitive over swift-log's level names.
+    static func parseLevel(_ raw: String?) -> (level: Logger.Level, ok: Bool) {
+        guard let raw, !raw.isEmpty else { return (.info, true) }
+        switch raw.lowercased() {
+        case "trace": return (.trace, true)
+        case "debug": return (.debug, true)
+        case "info": return (.info, true)
+        case "notice": return (.notice, true)
+        case "warning": return (.warning, true)
+        case "error": return (.error, true)
+        case "critical": return (.critical, true)
+        default: return (.info, false)
+        }
     }
 }
 
@@ -261,7 +311,8 @@ enum ContainerService {
         managementArgs: [String],
         resourceArgs: [String],
         commandArgs: [String],
-        retainExitCode: Bool = false
+        retainExitCode: Bool = false,
+        progressUpdate: @escaping ProgressUpdateHandler = { _ in }
     ) async throws {
         do {
             // The run path auto-pulls missing images; stage helper credentials first.
@@ -286,7 +337,7 @@ enum ContainerService {
                 registry: registry,
                 imageFetch: imageFetch,
                 containerSystemConfig: config,
-                progressUpdate: { _ in },
+                progressUpdate: progressUpdate,
                 log: Backend.log
             )
 

@@ -985,6 +985,11 @@ extension Compose {
         }
     }
 
+    /// Verbose-only diagnostic sink threaded through up/down/start/restart —
+    /// CLI wires this to stdout under `--verbose`; the GUI and non-verbose CLI
+    /// paths use the default no-op, so this changes no observable behavior there.
+    typealias Diagnostic = @Sendable (String) -> Void
+
     /// Bring the plan up: create missing named volumes and networks, then create
     /// and start each service in dependency order, honoring depends_on conditions
     /// before each start (service_healthy probes the dependency's healthcheck,
@@ -999,6 +1004,7 @@ extension Compose {
     /// docker only replays history for containers the up actually created.
     static func up(
         plan: Plan,
+        diagnostic: @escaping Diagnostic = { _ in },
         progress: @escaping @Sendable (StepKind, _ done: Bool) async -> Void
     ) async throws -> (warnings: [String], reused: Set<String>) {
         let existingVolumes = Set((try? await ContainerService.listVolumes())?.map(\.name) ?? [])
@@ -1061,7 +1067,7 @@ extension Compose {
                     guard let hc = depPlan.healthcheck else {
                         throw Error.missingHealthcheck(service: svc.service, dependency: dep)
                     }
-                    try await waitHealthy(service: dep, container: depPlan.name, healthcheck: hc)
+                    try await waitHealthy(service: dep, container: depPlan.name, healthcheck: hc, diagnostic: diagnostic)
                 case .completedSuccessfully:
                     // The registry only knows containers started by this process,
                     // i.e. earlier in this same up (snapshots carry no exit code).
@@ -1074,11 +1080,15 @@ extension Compose {
             }
 
             await progress(.service(svc.service), false)
+            diagnostic("\(svc.service): \(svc.cliPreview)")
             if let record = preexisting[svc.name], !record.isRunning {
                 // Ours, but not running (stopped, or created-but-start-failed) —
                 // recreate from the current plan rather than diffing config.
                 try await ContainerService.delete(svc.name, force: true)
             }
+            // The run path auto-pulls a missing image; reuse pull's own tracker
+            // to turn that stream into the same coarse lines pull's output uses.
+            let tracker = PullTracker()
             try await ContainerService.runContainer(
                 image: svc.image,
                 name: svc.name,
@@ -1086,12 +1096,15 @@ extension Compose {
                 managementArgs: svc.managementArgs,
                 resourceArgs: svc.resourceArgs,
                 commandArgs: svc.commandArgs,
-                retainExitCode: needsExitCode.contains(svc.service)
+                retainExitCode: needsExitCode.contains(svc.service),
+                progressUpdate: { events in
+                    for line in tracker.consume(events) { diagnostic("\(svc.service): \(line)") }
+                }
             )
             await progress(.service(svc.service), true)
         }
 
-        return (await syncProjectHosts(plan: plan), reused)
+        return (await syncProjectHosts(plan: plan, diagnostic: diagnostic), reused)
     }
 
     /// Compose service names never resolve from inside containers on this
@@ -1117,7 +1130,7 @@ extension Compose {
         record.configuration.labels?[projectLabel] == project
     }
 
-    static func syncProjectHosts(plan: Plan) async -> [String] {
+    static func syncProjectHosts(plan: Plan, diagnostic: Diagnostic = { _ in }) async -> [String] {
         let records = Dictionary(uniqueKeysWithValues:
             ((try? await ContainerService.listContainers()) ?? []).map { ($0.id, $0) })
         let entries: [(service: String, name: String, ip: String)] = plan.allServices.compactMap { svc in
@@ -1126,7 +1139,11 @@ extension Compose {
             else { return nil }
             return (svc.service, svc.name, ip)
         }
-        guard !entries.isEmpty else { return [] }
+        guard !entries.isEmpty else {
+            diagnostic("hosts: no running \(plan.project) containers to sync")
+            return []
+        }
+        diagnostic("hosts: syncing \(entries.count) entr\(entries.count == 1 ? "y" : "ies") for \(plan.project)")
         let block = entries.map { "\($0.ip) \($0.service) \($0.name) # davit-compose" }.joined(separator: "\n")
         // grep exit 1 just means every line was managed; anything above means
         // grep itself failed and the file must be left alone. The block comes
@@ -1149,6 +1166,8 @@ extension Compose {
                 let live = (try? await ContainerService.listContainers()) ?? []
                 guard live.first(where: { $0.id == entry.name })?.isRunning == true else { continue }
                 warnings.append("service \(entry.service): could not update /etc/hosts (no /bin/sh in this image?) — service names won't resolve there")
+            } else {
+                diagnostic("hosts: \(entry.service) (\(entry.name)) -> \(entry.ip)")
             }
         }
         return warnings
@@ -1168,6 +1187,7 @@ extension Compose {
         plan: Plan,
         services requested: [String] = [],
         removeVolumes: Bool = false,
+        diagnostic: Diagnostic = { _ in },
         progress: @escaping @Sendable (StepKind, _ done: Bool) async -> Void
     ) async throws -> [String] {
         let known = Set(plan.services.map(\.service))
@@ -1186,6 +1206,8 @@ extension Compose {
             let running = record.isRunning
             await progress(.service(svc.service), false)
             if running {
+                let grace = Int(min(svc.stopGracePeriod ?? 5, 86_400).rounded())
+                diagnostic("\(svc.service): stopping \"\(svc.name)\" (grace \(grace)s\(svc.stopSignal.map { ", signal \($0)" } ?? ""))")
                 // A stop that fails must not abort the teardown — the force-
                 // delete below removes the container either way (docker keeps
                 // going too); the user just gets told it wasn't graceful.
@@ -1193,8 +1215,11 @@ extension Compose {
                     let detail = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
                     warnings.append("service \(svc.service): stop failed (\(detail)) — deleting by force")
                 }
+            } else {
+                diagnostic("\(svc.service): \"\(svc.name)\" not running — deleting only")
             }
             try await ContainerService.delete(svc.name, force: true)
+            diagnostic("\(svc.service): deleted \"\(svc.name)\"")
             await progress(.service(svc.service), true)
         }
 
@@ -1205,6 +1230,7 @@ extension Compose {
         let networks = Set((try? await ContainerService.listNetworks())?.map(\.name) ?? [])
         for network in plan.networks where !plan.externalNetworks.contains(network) && networks.contains(network) {
             await progress(.network(network), false)
+            diagnostic("network \(network): removing")
             do {
                 try await ContainerService.deleteNetwork(network)
                 await progress(.network(network), true)
@@ -1216,6 +1242,7 @@ extension Compose {
             let volumes = Set((try? await ContainerService.listVolumes())?.map(\.name) ?? [])
             for volume in plan.volumes where !plan.externalVolumes.contains(volume) && volumes.contains(volume) {
                 await progress(.volume(volume), false)
+                diagnostic("volume \(volume): removing")
                 do {
                     try await ContainerService.deleteVolume(volume)
                     await progress(.volume(volume), true)
@@ -1263,6 +1290,7 @@ extension Compose {
     /// can hand out fresh IPs). Returns the warnings.
     static func start(
         plan: Plan,
+        diagnostic: Diagnostic = { _ in },
         progress: @escaping @Sendable (StepKind, _ done: Bool) async -> Void
     ) async throws -> [String] {
         var warnings: [String] = []
@@ -1276,7 +1304,7 @@ extension Compose {
             try await ContainerService.start(svc.name)
             await progress(.service(svc.service), true)
         }
-        warnings += await syncProjectHosts(plan: plan)
+        warnings += await syncProjectHosts(plan: plan, diagnostic: diagnostic)
         return warnings
     }
 
@@ -1285,10 +1313,11 @@ extension Compose {
     /// one step pair — read as "restarted" — once it is running again.
     static func restart(
         plan: Plan,
+        diagnostic: Diagnostic = { _ in },
         progress: @escaping @Sendable (StepKind, _ done: Bool) async -> Void
     ) async throws -> [String] {
         try await stop(plan: plan) { _, _ in }
-        return try await start(plan: plan, progress: progress)
+        return try await start(plan: plan, diagnostic: diagnostic, progress: progress)
     }
 
     /// Pull each plan service's image, one after the other, writing a
@@ -1509,11 +1538,16 @@ extension Compose {
     /// countable failures (failures before start_period has elapsed don't count).
     /// Fails fast when the container stops (docker parity: no point probing a
     /// dead dependency). Bounded by start_period + retries × (interval + timeout).
-    static func waitHealthy(service: String, container: String, healthcheck hc: Healthcheck) async throws {
+    static func waitHealthy(
+        service: String, container: String, healthcheck hc: Healthcheck,
+        diagnostic: Diagnostic = { _ in }
+    ) async throws {
         let started = ContinuousClock.now
         var failures = 0
         var abandoned = 0
+        var attempt = 0
         while true {
+            attempt += 1
             // A probe exceeding its timeout counts as failed but keeps running in
             // the container: apple/container (1.0.0 and 1.1.0) can't signal exec processes
             // (see ContainerService.ExecTimeout), so it's abandoned, not killed.
@@ -1523,9 +1557,12 @@ extension Compose {
             let result = try? await ContainerService.exec(container, hc.argv, timeout: .seconds(hc.timeout))
             if result == nil {  // timed out (abandoned in-guest) or exec failed outright
                 abandoned += 1
+                diagnostic("\(service): health probe #\(attempt) — timed out (abandoned \(abandoned)/3)")
                 if abandoned >= 3 {
                     throw Error.unhealthy(service: service, failures: max(failures, abandoned))
                 }
+            } else {
+                diagnostic("\(service): health probe #\(attempt) — exit \(result!.exitCode)")
             }
             if result?.exitCode == 0 { return }
             if let records = try? await ContainerService.listContainers(),

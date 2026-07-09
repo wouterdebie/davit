@@ -2,6 +2,7 @@ import AppKit
 import ContainerAPIClient
 import ContainerResource
 import Foundation
+import Logging
 
 /// Entry point. Normally launches the SwiftUI app; `davit exec <container-id>`
 /// instead attaches an interactive TTY shell to a container over the XPC API —
@@ -321,18 +322,34 @@ enum Main {
 /// --env-file overrides. Usage problems exit 2, runtime failures exit 1.
 enum ComposeCLI {
     static let usage = """
-    usage: compose <subcommand> [-f <file>] [--env-file <path>] [--profile <name>]... [service...]
+    usage: compose <subcommand> [-f <file>] [--env-file <path>] [--profile <name>]... [--verbose|-q|--quiet] [service...]
       subcommands: plan | up [-d|--detach] [--down-on-failure] | down [-v|--volumes] | ps
                    logs [-f|--follow] [--tail <n>] | stop | start | restart | pull
                    exec <service> <command...>
     """
+
+    /// stdout verbosity for one invocation (decision 4 / plan I4b). `quiet`
+    /// suppresses warnings and step/progress lines but never the final stderr
+    /// error `run()` writes on failure; `verbose` adds diagnostics that are
+    /// otherwise silent. GUI code never touches this — it calls Compose's
+    /// functions directly with their default (no-op) diagnostic sinks.
+    enum OutputLevel { case quiet, normal, verbose }
+
+    struct Output {
+        let level: OutputLevel
+        func say(_ s: String) { if level != .quiet { print(s) } }
+        func warn(_ s: String) { if level != .quiet { print("warning: \(s)") } }
+        func verbose(_ s: String) { if level == .verbose { print(s) } }
+        /// Like `say` but without an added newline — pull's streamed lines carry their own.
+        func sayRaw(_ s: String) { if level != .quiet { print(s, terminator: "") } }
+    }
 
     struct Invocation {
         var subcommand: String
         var file: String? = nil
         var envFile: String? = nil
         var profiles: [String] = []
-        var flags: Set<String> = []      // canonical bool flags: "detach", "volumes", "follow"
+        var flags: Set<String> = []      // canonical bool flags: "detach", "volumes", "follow", "verbose", "quiet"
         var counts: [String: Int] = [:]  // canonical int flags: "tail"
         var services: [String] = []
         var command: [String] = []       // exec only: everything after the service
@@ -408,6 +425,12 @@ enum ComposeCLI {
                 inv.envFile = (value() as NSString).expandingTildeInPath
             } else if arg == "--profile" {
                 inv.profiles.append(value())
+            } else if arg == "--verbose" {
+                guard inline == nil else { usageExit("flag \(arg) takes no value") }
+                inv.flags.insert("verbose")
+            } else if arg == "-q" || arg == "--quiet" {
+                guard inline == nil else { usageExit("flag \(arg) takes no value") }
+                inv.flags.insert("quiet")
             } else if raw.hasPrefix("-") {
                 usageExit("unknown flag: \(raw)")
             } else if sub == "exec" {
@@ -439,6 +462,9 @@ enum ComposeCLI {
         if sub == "exec", inv.services.count != 1 || inv.command.isEmpty {
             usageExit("exec needs a service and a command")
         }
+        if inv.flags.contains("verbose"), inv.flags.contains("quiet") {
+            usageExit("--verbose and -q/--quiet are mutually exclusive")
+        }
         // COMPOSE_PROFILES is the fallback when no --profile was given (docker v2).
         if inv.profiles.isEmpty, let env = ProcessInfo.processInfo.environment["COMPOSE_PROFILES"] {
             inv.profiles = env.split(separator: ",").map(String.init).filter { !$0.isEmpty }
@@ -448,6 +474,11 @@ enum ComposeCLI {
 
     static func run(_ args: [String]) {
         let inv = parse(args)
+        let output = Output(level:
+            inv.flags.contains("verbose") ? .verbose : (inv.flags.contains("quiet") ? .quiet : .normal))
+        if output.level == .verbose, !LoggingConfig.explicitlySet {
+            LoggingConfig.level = .debug
+        }
         let discovered = inv.file == nil
             ? Compose.discoverFile(startingAt: FileManager.default.currentDirectoryPath) : nil
         guard let path = inv.file ?? discovered?.path else {
@@ -461,28 +492,44 @@ enum ComposeCLI {
                 let text = try String(contentsOfFile: path, encoding: .utf8)
                 let dir = URL(fileURLWithPath: path).deletingLastPathComponent()
                 let (environment, envWarnings) = try Compose.effectiveEnvironment(composeDir: dir.path, envFile: inv.envFile)
-                for w in envWarnings { print("warning: \(w)") }
+                for w in envWarnings { output.warn(w) }
                 let parsed = try Compose.parse(
                     text: text, projectName: dir.lastPathComponent, baseDir: dir.path, environment: environment)
+                // file/project for the subcommands that don't already show them
+                // as part of their own output (plan/up handle it inline below).
+                func verboseHeader() {
+                    output.verbose("file: \(path)")
+                    output.verbose("project: \(parsed.project)")
+                }
                 switch inv.subcommand {
                 case "plan", "up":
                     let plan = try parsed.selecting(services: inv.services, activeProfiles: inv.profiles)
-                    if autodiscovered { print("file: \(path)") }
-                    print("project: \(plan.project)")
-                    for v in plan.volumes { print("volume: \(v)") }
-                    for n in plan.networks { print("network: \(n)") }
-                    for s in plan.services { print("service: \(s.service)\n  \(s.cliPreview)") }
-                    if let w = discoveryWarning { print("warning: \(w)") }
-                    for w in plan.warnings { print("warning: \(w)") }
+                    // plan shows its listing at normal/verbose (that IS the command,
+                    // --quiet aside); up only echoes it under --verbose (design I4b:
+                    // "up echoes on verbose") — the equivalent `container run` lines
+                    // it's followed by are noisy on every routine `up` otherwise.
+                    let showPreview = inv.subcommand == "plan" || output.level == .verbose
+                    if showPreview {
+                        if autodiscovered || output.level == .verbose { output.say("file: \(path)") }
+                        output.say("project: \(plan.project)")
+                        for v in plan.volumes { output.say("volume: \(v)") }
+                        for n in plan.networks { output.say("network: \(n)") }
+                        for s in plan.services { output.say("service: \(s.service)\n  \(s.cliPreview)") }
+                    }
+                    if let w = discoveryWarning { output.warn(w) }
+                    for w in plan.warnings { output.warn(w) }
                     if inv.subcommand == "up" {
                         let up: (warnings: [String], reused: Set<String>)
                         do {
-                            up = try await Compose.up(plan: plan) { step, done in
-                                if done { print("up: \(step.label) done") }
+                            up = try await Compose.up(
+                                plan: plan,
+                                diagnostic: { output.verbose($0) }
+                            ) { step, done in
+                                if done { output.say("up: \(step.label) done") }
                             }
                         } catch {
                             if inv.flags.contains("down-on-failure") {
-                                print("up failed — tearing down (--down-on-failure)")
+                                output.say("up failed — tearing down (--down-on-failure)")
                                 // Scoped the same way the up itself was: a whole-
                                 // project up (no services named) tears the whole
                                 // project down (network/volumes per down's own
@@ -493,46 +540,51 @@ enum ComposeCLI {
                                 let teardown = inv.services.isEmpty ? [] : plan.services.map(\.service)
                                 do {
                                     let warnings = try await Compose.down(
-                                        plan: plan, services: teardown, removeVolumes: false
+                                        plan: plan, services: teardown, removeVolumes: false,
+                                        diagnostic: { output.verbose($0) }
                                     ) { _, _ in }
-                                    for w in warnings { print("warning: \(w)") }
+                                    for w in warnings { output.warn(w) }
                                 } catch let teardownError {
                                     let detail = (teardownError as? LocalizedError)?.errorDescription
                                         ?? String(describing: teardownError)
-                                    print("warning: teardown after failed up did not complete cleanly (\(detail))")
+                                    output.warn("teardown after failed up did not complete cleanly (\(detail))")
                                 }
                             }
                             throw error
                         }
-                        for w in up.warnings { print("warning: \(w)") }
-                        print("compose up: ok")
+                        for w in up.warnings { output.warn(w) }
+                        output.say("compose up: ok")
                         if !inv.flags.contains("detach") {
                             // docker-compose behavior: a non-detached up stays
                             // attached to the selected services' logs — reused
                             // containers from now on only, so old runs' output
                             // doesn't replay.
-                            print("Attaching to logs (Ctrl-C detaches; containers keep running)")
+                            output.say("Attaching to logs (Ctrl-C detaches; containers keep running)")
                             try await Compose.logs(plan: plan, skipBacklogFor: up.reused, follow: true)
                         }
                     }
                 case "down":
+                    verboseHeader()
                     // The whole file, every profile active: teardown must not
                     // strand profile-gated containers (decision 13).
                     let warnings = try await Compose.down(
                         plan: parsed, services: inv.services,
-                        removeVolumes: inv.flags.contains("volumes")
+                        removeVolumes: inv.flags.contains("volumes"),
+                        diagnostic: { output.verbose($0) }
                     ) { step, done in
-                        if done { print("down: \(step.label) done") }
+                        if done { output.say("down: \(step.label) done") }
                     }
-                    for w in warnings { print("warning: \(w)") }
-                    print("compose down: ok")
+                    for w in warnings { output.warn(w) }
+                    output.say("compose down: ok")
                 case "logs":
+                    verboseHeader()
                     // Like down: the whole file, no profile filter — existing
                     // containers must stay visible even when profile-gated.
                     try await Compose.logs(
                         plan: parsed, services: inv.services,
                         tail: inv.counts["tail"], follow: inv.flags.contains("follow"))
                 case "stop", "start", "restart", "pull":
+                    verboseHeader()
                     // Docker parity: these scope to EXACTLY the named services
                     // — no dependency closure (stopping web must not stop a db
                     // other services still use; pull adds dependencies only
@@ -541,18 +593,19 @@ enum ComposeCLI {
                         services: inv.services, activeProfiles: inv.profiles, includeDependencies: false)
                     let sub = inv.subcommand
                     let report: @Sendable (Compose.StepKind, Bool) async -> Void = { step, done in
-                        if done { print("\(sub): \(step.label) done") }
+                        if done { output.say("\(sub): \(step.label) done") }
                     }
                     var warnings: [String] = []
                     switch sub {
                     case "stop": try await Compose.stop(plan: plan, progress: report)
-                    case "start": warnings = try await Compose.start(plan: plan, progress: report)
-                    case "restart": warnings = try await Compose.restart(plan: plan, progress: report)
-                    default: try await Compose.pull(plan: plan, progress: report)
+                    case "start": warnings = try await Compose.start(plan: plan, diagnostic: { output.verbose($0) }, progress: report)
+                    case "restart": warnings = try await Compose.restart(plan: plan, diagnostic: { output.verbose($0) }, progress: report)
+                    default: try await Compose.pull(plan: plan, progress: report, output: { output.sayRaw($0) })
                     }
-                    for w in warnings { print("warning: \(w)") }
-                    print("compose \(sub): ok")
+                    for w in warnings { output.warn(w) }
+                    output.say("compose \(sub): ok")
                 case "exec":
+                    verboseHeader()
                     // Whole-file plan like logs/down — an existing container of
                     // a profile-gated service must stay reachable. Resolution
                     // errors (unknown service, nothing running) exit 1 below;
@@ -561,6 +614,7 @@ enum ComposeCLI {
                     let container = try await Compose.runningContainer(plan: parsed, service: inv.services[0])
                     await ExecMode.run(containerID: container, argv: inv.command)
                 case "ps":
+                    verboseHeader()
                     // Like stop/start: `ps web` lists exactly web (docker parity).
                     let plan = try parsed.selecting(
                         services: inv.services, activeProfiles: inv.profiles, includeDependencies: false)
@@ -726,6 +780,29 @@ enum SelfTest {
             let final = try await SystemConfigStore.load()
             guard final.effective["dns"]?["domain"] == nil || final.effective["dns"]?["domain"] is NSNull else {
                 throw CLIError(command: "selftest", message: "override not removed on revert")
+            }
+        }
+        await step("log level: DAVIT_LOG_LEVEL parsing") {
+            // Pure — LoggingSystem.bootstrap itself traps if called twice, so
+            // this exercises the parsing function bootstrapLogging() uses
+            // rather than re-bootstrapping the process' actual logger.
+            guard LoggingConfig.parseLevel(nil) == (.info, true) else {
+                throw CLIError(command: "selftest", message: "unset DAVIT_LOG_LEVEL should default to info")
+            }
+            guard LoggingConfig.parseLevel("") == (.info, true) else {
+                throw CLIError(command: "selftest", message: "empty DAVIT_LOG_LEVEL should default to info")
+            }
+            let cases: [(String, Logger.Level)] = [
+                ("trace", .trace), ("DEBUG", .debug), ("Info", .info), ("notice", .notice),
+                ("WARNING", .warning), ("error", .error), ("Critical", .critical),
+            ]
+            for (raw, expected) in cases {
+                guard LoggingConfig.parseLevel(raw) == (expected, true) else {
+                    throw CLIError(command: "selftest", message: "DAVIT_LOG_LEVEL=\(raw) parsed wrong: \(LoggingConfig.parseLevel(raw))")
+                }
+            }
+            guard LoggingConfig.parseLevel("bogus") == (.info, false) else {
+                throw CLIError(command: "selftest", message: "invalid DAVIT_LOG_LEVEL should fall back to info and flag ok=false")
             }
         }
         await step("compose: parse subset + ordering + cycle rejection") {
