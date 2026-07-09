@@ -322,7 +322,7 @@ enum Main {
 enum ComposeCLI {
     static let usage = """
     usage: compose <subcommand> [-f <file>] [--env-file <path>] [--profile <name>]... [service...]
-      subcommands: plan | up [-d|--detach] | down [-v|--volumes] | ps
+      subcommands: plan | up [-d|--detach] [--down-on-failure] | down [-v|--volumes] | ps
                    logs [-f|--follow] [--tail <n>] | stop | start | restart | pull
                    exec <service> <command...>
     """
@@ -345,7 +345,7 @@ enum ComposeCLI {
     /// Per-subcommand flags, token → canonical name. These shadow the shared
     /// flags: for `logs`, -f means --follow, so its file flag is `--file` only.
     private static let boolFlags: [String: [String: String]] = [
-        "up": ["-d": "detach", "--detach": "detach"],
+        "up": ["-d": "detach", "--detach": "detach", "--down-on-failure": "down-on-failure"],
         "down": ["-v": "volumes", "--volumes": "volumes"],
         "logs": ["-f": "follow", "--follow": "follow"],
     ]
@@ -475,8 +475,34 @@ enum ComposeCLI {
                     if let w = discoveryWarning { print("warning: \(w)") }
                     for w in plan.warnings { print("warning: \(w)") }
                     if inv.subcommand == "up" {
-                        let up = try await Compose.up(plan: plan) { step, done in
-                            if done { print("up: \(step.label) done") }
+                        let up: (warnings: [String], reused: Set<String>)
+                        do {
+                            up = try await Compose.up(plan: plan) { step, done in
+                                if done { print("up: \(step.label) done") }
+                            }
+                        } catch {
+                            if inv.flags.contains("down-on-failure") {
+                                print("up failed — tearing down (--down-on-failure)")
+                                // Scoped the same way the up itself was: a whole-
+                                // project up (no services named) tears the whole
+                                // project down (network/volumes per down's own
+                                // full-teardown rule); a service-scoped up tears
+                                // down exactly the services the up touched
+                                // (plan.services already carries the dependency
+                                // closure) and leaves networks/volumes alone.
+                                let teardown = inv.services.isEmpty ? [] : plan.services.map(\.service)
+                                do {
+                                    let warnings = try await Compose.down(
+                                        plan: plan, services: teardown, removeVolumes: false
+                                    ) { _, _ in }
+                                    for w in warnings { print("warning: \(w)") }
+                                } catch let teardownError {
+                                    let detail = (teardownError as? LocalizedError)?.errorDescription
+                                        ?? String(describing: teardownError)
+                                    print("warning: teardown after failed up did not complete cleanly (\(detail))")
+                                }
+                            }
+                            throw error
                         }
                         for w in up.warnings { print("warning: \(w)") }
                         print("compose up: ok")
@@ -1623,6 +1649,59 @@ enum SelfTest {
                 guard try await Compose.ps(plan: plan).isEmpty,
                       try await !haveNetwork(), try await !haveVolume()
                 else { throw CLIError(command: "selftest", message: "down -v should remove the declared volume too") }
+            } catch {
+                await cleanup()
+                throw error
+            }
+            await cleanup()
+        }
+        await step("compose: --down-on-failure teardown primitives") {
+            // I3 fixture: a starts fine; b's image can never resolve, so up
+            // fails partway through with a already running — exactly the
+            // situation --down-on-failure exists for. The flag's CLI-level
+            // orchestration (Main.swift ComposeCLI.run) just composes these
+            // two calls: default (no flag) leaves a running; with the flag
+            // it also runs the down below. (The flag parsing/print/rethrow
+            // itself is exercised by a CLI round-trip, not here — the CLI
+            // dispatcher exits the process on completion.)
+            let names = ["davit-selftest-dof-a", "davit-selftest-dof-b"]
+            func cleanup() async {
+                for n in names { try? await ContainerService.delete(n, force: true) }
+            }
+            await cleanup()  // leftovers from a previous aborted run
+
+            let plan = try Compose.parse(text: """
+            name: davit-selftest-dof
+            services:
+              a:
+                image: alpine:latest
+                command: ["sleep", "600"]
+              b:
+                image: davit-selftest-nonexistent-tag:does-not-exist
+            """, projectName: "ignored")
+
+            do {
+                var upFailed = false
+                do {
+                    _ = try await Compose.up(plan: plan) { _, _ in }
+                } catch {
+                    upFailed = true
+                }
+                guard upFailed else {
+                    throw CLIError(command: "selftest", message: "up with an unresolvable image did not fail")
+                }
+                let a1 = try await ContainerService.listContainers().first { $0.id == "davit-selftest-dof-a" }
+                guard a1?.isRunning == true else {
+                    throw CLIError(command: "selftest", message: "default (no flag) up should leave a running after b fails")
+                }
+
+                // What --down-on-failure does next: a whole-project down
+                // (no services named), same as the CLI teardown path when
+                // the failed up wasn't itself scoped to specific services.
+                _ = try await Compose.down(plan: plan, removeVolumes: false) { _, _ in }
+                guard try await Compose.ps(plan: plan).isEmpty else {
+                    throw CLIError(command: "selftest", message: "teardown after failed up should leave no project containers")
+                }
             } catch {
                 await cleanup()
                 throw error

@@ -96,7 +96,7 @@ level to .debug for the process unless DAVIT_LOG_LEVEL was explicitly set.
 - [x] **I2 — default-memory docs.** Per Design I2, README only. Done when: build OK
   (no code change) + README renders sensibly. Commit:
   `compose: document platform default memory/cpus for services without limits`.
-- [ ] **I3 — --down-on-failure.** Per Design I3. Live selftest: fixture svc a
+- [x] **I3 — --down-on-failure.** Per Design I3. Live selftest: fixture svc a
   (alpine sleep 600) + svc b (nonexistent image tag) — up WITHOUT flag → a's container
   remains (then clean); up WITH flag → error surfaced AND no project containers remain.
   CLI round-trip of the same. Done when: build + full selftest OK + round-trip.
