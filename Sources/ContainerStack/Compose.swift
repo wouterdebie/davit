@@ -172,9 +172,22 @@ enum Compose {
 
     /// KEY=VALUE dotenv subset: whitespace trimmed, blank and #-comment lines
     /// skipped, optional `export ` prefix, one matching pair of single or
-    /// double quotes stripped from the value — no escape processing beyond that.
-    private static func parseDotEnv(text: String) -> [String: String] {
+    /// double quotes stripped from the value — no escape processing beyond
+    /// that. Docker parity (load-time interpolation): a single-quoted value
+    /// stays literal; every other value is run through the existing
+    /// `substitute` grammar immediately, left-to-right, against `lookup =
+    /// processEnvironment (wins) ∪ this file's own previously-defined
+    /// entries` — so a later line can reference an earlier one, but the
+    /// caller's environment always wins a naming conflict. `${X:?msg}` throws
+    /// like it does during YAML substitution; other warnings (e.g. an unset
+    /// variable) are returned rather than printed, so the caller can route
+    /// them into whatever warnings channel it has.
+    private static func parseDotEnv(
+        text: String, processEnvironment: [String: String]
+    ) throws -> (values: [String: String], warnings: [String]) {
         var out: [String: String] = [:]
+        var warnings: [String] = []
+        var warned = Set<String>()
         for line in text.split(whereSeparator: \.isNewline) {
             // .whitespacesAndNewlines: CRLF files otherwise leave a trailing
             // \r in every value and defeat the quote stripping below.
@@ -185,30 +198,40 @@ enum Compose {
             let key = entry[..<eq].trimmingCharacters(in: .whitespaces)
             guard !key.isEmpty else { continue }
             var value = entry[entry.index(after: eq)...].trimmingCharacters(in: .whitespacesAndNewlines)
-            if value.count >= 2,
-               (value.hasPrefix("\"") && value.hasSuffix("\"")) || (value.hasPrefix("'") && value.hasSuffix("'")) {
+            var singleQuoted = false
+            if value.count >= 2, value.hasPrefix("'"), value.hasSuffix("'") {
+                singleQuoted = true
                 value = String(value.dropFirst().dropLast())
+            } else if value.count >= 2, value.hasPrefix("\""), value.hasSuffix("\"") {
+                value = String(value.dropFirst().dropLast())
+            }
+            if !singleQuoted {
+                let lookup = out.merging(processEnvironment) { _, process in process }
+                value = try substitute(value, environment: lookup, warned: &warned, warnings: &warnings)
             }
             out[key] = value
         }
-        return out
+        return (out, warnings)
     }
 
     /// The environment interpolation sees: `<composeDir>/.env` (or an explicit
     /// env file) layered under the process environment — process wins (docker
     /// precedence). A missing default `.env` is simply absent; a missing
-    /// explicit file is an error.
+    /// explicit file is an error. `.env` values are interpolated at load time
+    /// (see `parseDotEnv`); any warnings from that pass are returned alongside
+    /// the resolved environment so callers can surface them.
     static func effectiveEnvironment(
         composeDir: String,
         envFile: String? = nil,
         processEnvironment: [String: String] = ProcessInfo.processInfo.environment
-    ) throws -> [String: String] {
+    ) throws -> (environment: [String: String], warnings: [String]) {
         let path = envFile ?? URL(fileURLWithPath: composeDir).appendingPathComponent(".env").path
         guard let text = try? String(contentsOfFile: path, encoding: .utf8) else {
             if envFile != nil { throw Error.envFileNotFound(path) }
-            return processEnvironment
+            return (processEnvironment, [])
         }
-        return parseDotEnv(text: text).merging(processEnvironment) { _, process in process }
+        let (values, warnings) = try parseDotEnv(text: text, processEnvironment: processEnvironment)
+        return (values.merging(processEnvironment) { _, process in process }, warnings)
     }
 
     /// Replaces `${VAR}` in every string VALUE of the loaded YAML tree (never
@@ -427,12 +450,12 @@ enum Compose {
 
         // env_file: string, list, or {path, required} entries — paths resolve
         // against the compose file's directory; contents load through the
-        // dotenv parser and are NOT interpolated — a deliberate deviation:
-        // compose v2 expands ${VAR} inside env-file values (single-quoted
-        // ones excepted), here every value passes through literally. Later
-        // files override earlier ones; environment: below overrides them
-        // all. A missing file is an error unless the entry says
-        // `required: false`.
+        // same dotenv parser as .env, so values are interpolated at load
+        // time too (docker parity — single-quoted values stay literal), each
+        // file's own lookup layering the effective environment under its own
+        // previously-defined entries. Later files override earlier ones;
+        // environment: below overrides them all. A missing file is an error
+        // unless the entry says `required: false`.
         var envFileSpecs: [(path: String, required: Bool)] = []
         func envFileSpec(_ entry: Any) {
             if let m = entry as? [String: Any] {
@@ -466,7 +489,9 @@ enum Compose {
                 if required { throw Error.envFileNotFound(resolved) }
                 continue
             }
-            fileEnv.merge(parseDotEnv(text: text)) { _, later in later }
+            let (values, fileWarnings) = try parseDotEnv(text: text, processEnvironment: environment)
+            fileEnv.merge(values) { _, later in later }
+            warnings += fileWarnings
         }
 
         // environment: map or list form; its keys beat env_file entries

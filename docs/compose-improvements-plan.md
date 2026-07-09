@@ -86,7 +86,7 @@ level to .debug for the process unless DAVIT_LOG_LEVEL was explicitly set.
 
 ## Tasks (implementers: sonnet, strong briefs; verifiers: sonnet, evidence-first)
 
-- [ ] **I1 — dotenv load-time interpolation.** Per Design I1. Pure selftest
+- [x] **I1 — dotenv load-time interpolation.** Per Design I1. Pure selftest
   extensions: user's exact scenario (`.env` containing `V="${HOME}/test"` → compose
   `${V}` yields expanded HOME path; single-quoted variant stays literal), left-to-right
   self-reference (`A=1`, `B=${A}2` → `B=12`), process-env-wins lookup, `${X:?}` error

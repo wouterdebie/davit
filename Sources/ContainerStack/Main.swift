@@ -460,7 +460,8 @@ enum ComposeCLI {
             do {
                 let text = try String(contentsOfFile: path, encoding: .utf8)
                 let dir = URL(fileURLWithPath: path).deletingLastPathComponent()
-                let environment = try Compose.effectiveEnvironment(composeDir: dir.path, envFile: inv.envFile)
+                let (environment, envWarnings) = try Compose.effectiveEnvironment(composeDir: dir.path, envFile: inv.envFile)
+                for w in envWarnings { print("warning: \(w)") }
                 let parsed = try Compose.parse(
                     text: text, projectName: dir.lastPathComponent, baseDir: dir.path, environment: environment)
                 switch inv.subcommand {
@@ -988,7 +989,7 @@ enum SelfTest {
             defer { try? fm.removeItem(at: crlfDir) }
             try "A=plain\r\nB=\"quoted\"\r\n".write(
                 to: crlfDir.appendingPathComponent(".env"), atomically: true, encoding: .utf8)
-            let env = try Compose.effectiveEnvironment(composeDir: crlfDir.path, processEnvironment: [:])
+            let env = try Compose.effectiveEnvironment(composeDir: crlfDir.path, processEnvironment: [:]).environment
             guard env["A"] == "plain", env["B"] == "quoted" else {
                 throw CLIError(command: "selftest", message: "CRLF .env parsed wrong: \(env)")
             }
@@ -1009,20 +1010,47 @@ enum SelfTest {
             EMPTY=
               SPACED  =  padded
             SHARED=dotenv
+            A=1
+            B=${A}2
+            HOMEPATH="${HOME}/test"
+            HOMELITERAL='${HOME}/test'
+            REF=${SHARED}
             not a key-value line
             """.write(to: dir.appendingPathComponent(".env"), atomically: true, encoding: .utf8)
 
             // default <dir>/.env layered under the process env — process wins
-            let env = try Compose.effectiveEnvironment(
-                composeDir: dir.path, processEnvironment: ["SHARED": "process", "PROC_ONLY": "1"])
+            let (env, envWarnings) = try Compose.effectiveEnvironment(
+                composeDir: dir.path,
+                processEnvironment: ["SHARED": "process", "PROC_ONLY": "1", "HOME": "/Users/tester"])
             guard env["TAG"] == "3.19", env["EXPORTED"] == "yes",
                   env["QUOTED"] == "q value", env["SINGLE"] == "s value",
                   env["EMPTY"] == "", env["SPACED"] == "padded",
                   env["SHARED"] == "process", env["PROC_ONLY"] == "1"
             else { throw CLIError(command: "selftest", message: "effectiveEnvironment wrong: \(env)") }
+            guard envWarnings.isEmpty else {
+                throw CLIError(command: "selftest", message: "unexpected dotenv warnings: \(envWarnings)")
+            }
+            // left-to-right self-reference within the same file: A defined
+            // above, B references it on the very next line
+            guard env["B"] == "12" else {
+                throw CLIError(command: "selftest", message: "dotenv self-reference wrong: \(env["B"] ?? "nil")")
+            }
+            // user's exact scenario: double/unquoted interpolates at load time,
+            // single-quoted stays literal (docker parity)
+            guard env["HOMEPATH"] == "/Users/tester/test" else {
+                throw CLIError(command: "selftest", message: "dotenv interpolation wrong: \(env["HOMEPATH"] ?? "nil")")
+            }
+            guard env["HOMELITERAL"] == "${HOME}/test" else {
+                throw CLIError(command: "selftest", message: "single-quoted dotenv value was interpolated: \(env["HOMELITERAL"] ?? "nil")")
+            }
+            // process environment wins the lookup over this file's own
+            // same-named entry, even when referenced from a later line
+            guard env["REF"] == "process" else {
+                throw CLIError(command: "selftest", message: "process-env-wins lookup wrong: \(env["REF"] ?? "nil")")
+            }
 
             // absent default .env → just the process env; missing explicit file → error
-            guard try Compose.effectiveEnvironment(composeDir: altDir.path, processEnvironment: ["A": "b"]) == ["A": "b"] else {
+            guard try Compose.effectiveEnvironment(composeDir: altDir.path, processEnvironment: ["A": "b"]).environment == ["A": "b"] else {
                 throw CLIError(command: "selftest", message: "absent default .env should yield the process env")
             }
             do {
@@ -1034,8 +1062,18 @@ enum SelfTest {
             try "ONLY=here\n".write(to: altDir.appendingPathComponent("alt.env"), atomically: true, encoding: .utf8)
             guard try Compose.effectiveEnvironment(
                 composeDir: dir.path, envFile: altDir.appendingPathComponent("alt.env").path,
-                processEnvironment: [:]) == ["ONLY": "here"]
+                processEnvironment: [:]).environment == ["ONLY": "here"]
             else { throw CLIError(command: "selftest", message: "--env-file override wrong") }
+            // ${X:?msg} inside a .env value throws just like YAML substitution
+            let reqDir = fm.temporaryDirectory.appendingPathComponent("davit-selftest-envreq-\(UUID().uuidString)")
+            try fm.createDirectory(at: reqDir, withIntermediateDirectories: true)
+            defer { try? fm.removeItem(at: reqDir) }
+            try "NEEDED=${MISSING:?must be set}\n".write(
+                to: reqDir.appendingPathComponent(".env"), atomically: true, encoding: .utf8)
+            do {
+                _ = try Compose.effectiveEnvironment(composeDir: reqDir.path, processEnvironment: [:])
+                throw CLIError(command: "selftest", message: ".env :? unset not rejected")
+            } catch Compose.Error.requiredVariable(name: "MISSING", message: "must be set") { /* expected */ }
 
             // interpolation: every string value, resolved before per-key parsing
             let yaml = """
@@ -1097,6 +1135,7 @@ enum SelfTest {
             try """
             BASE=one
             SHARED=base
+            INTERP=${BASE}-two
             RAW=${NOT_INTERPOLATED}
             """.write(to: dir.appendingPathComponent("base.env"), atomically: true, encoding: .utf8)
             try """
@@ -1107,10 +1146,11 @@ enum SelfTest {
             """.write(to: dir.appendingPathComponent("sub/more.env"), atomically: true, encoding: .utf8)
 
             // All three entry forms; precedence: earlier files < later files <
-            // environment:. File contents are NOT interpolated (RAW stays
-            // literal — a deliberate deviation: compose v2 expands ${VAR} in
-            // env-file values); a bare environment KEY unset in the effective
-            // env falls back to the env_file value without a warning.
+            // environment:. File contents ARE interpolated at load time now
+            // (docker parity — INTERP self-references BASE within the same
+            // file); an unset reference still warns instead of throwing (RAW).
+            // A bare environment KEY unset in the effective env falls back to
+            // the env_file value without a warning.
             let plan = try Compose.parse(text: """
             services:
               app:
@@ -1123,18 +1163,18 @@ enum SelfTest {
             """, projectName: "envfile", baseDir: dir.path)
             guard plan.services[0].processArgs == [
                 "--env", "BASE=one", "--env", "EXTRA=two", "--env", "FALLBACK=fromfile",
-                "--env", "RAW=${NOT_INTERPOLATED}", "--env", "SHARED=later",
+                "--env", "INTERP=one-two", "--env", "RAW=", "--env", "SHARED=later",
                 "--env", "OVERLAP=explicit",
             ] else { throw CLIError(command: "selftest", message: "env_file merge wrong: \(plan.services[0].processArgs)") }
-            guard plan.warnings.isEmpty else {
-                throw CLIError(command: "selftest", message: "env_file should be warning-free: \(plan.warnings)")
+            guard plan.warnings.count == 1, plan.warnings[0].contains("\"NOT_INTERPOLATED\"") else {
+                throw CLIError(command: "selftest", message: "env_file interpolation warning wrong: \(plan.warnings)")
             }
             // string form; missing file without required: false is an error
             let single = try Compose.parse(
                 text: "services: {app: {image: alpine, env_file: base.env}}",
                 projectName: "envfile", baseDir: dir.path)
             guard single.services[0].processArgs == [
-                "--env", "BASE=one", "--env", "RAW=${NOT_INTERPOLATED}", "--env", "SHARED=base",
+                "--env", "BASE=one", "--env", "INTERP=one-two", "--env", "RAW=", "--env", "SHARED=base",
             ] else { throw CLIError(command: "selftest", message: "env_file string form wrong: \(single.services[0].processArgs)") }
             do {
                 _ = try Compose.parse(

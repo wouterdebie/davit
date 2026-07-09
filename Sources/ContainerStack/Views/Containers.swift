@@ -88,7 +88,7 @@ struct ContainersView: View {
                 let url = URL(fileURLWithPath: args[i + 1])
                 if let text = try? String(contentsOf: url, encoding: .utf8) {
                     let dir = url.deletingLastPathComponent()
-                    let environment = (try? Compose.effectiveEnvironment(composeDir: dir.path)) ?? [:]
+                    let environment = (try? Compose.effectiveEnvironment(composeDir: dir.path))?.environment ?? [:]
                     composePlan = try? ComposeImport.parseFiltered(
                         text: text, projectName: dir.lastPathComponent, baseDir: dir.path,
                         environment: environment)

@@ -208,9 +208,10 @@ enum ComposeImport {
             let text = try String(contentsOf: url, encoding: .utf8)
             let dir = url.deletingLastPathComponent()
             // The file's sibling .env participates automatically, like docker.
-            let environment = try Compose.effectiveEnvironment(composeDir: dir.path)
-            let plan = try parseFiltered(
+            let (environment, envWarnings) = try Compose.effectiveEnvironment(composeDir: dir.path)
+            var plan = try parseFiltered(
                 text: text, projectName: dir.lastPathComponent, baseDir: dir.path, environment: environment)
+            plan.warnings = envWarnings + plan.warnings
             return .success(plan)
         } catch {
             let message = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
