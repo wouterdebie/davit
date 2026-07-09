@@ -19,6 +19,7 @@ struct ComposeImportSheet: View {
     }
     @State private var phase: Phase = .ready
     @State private var completed: Set<Compose.StepKind> = []
+    @State private var runtimeWarnings: [String] = []  // from up's hosts sync
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -43,12 +44,12 @@ struct ComposeImportSheet: View {
                         serviceCard(svc)
                     }
 
-                    if !plan.warnings.isEmpty {
+                    if !plan.warnings.isEmpty || !runtimeWarnings.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
                             Label("Not everything in the file is supported", systemImage: "exclamationmark.triangle")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.orange)
-                            ForEach(plan.warnings, id: \.self) { w in
+                            ForEach(plan.warnings + runtimeWarnings, id: \.self) { w in
                                 Text(w).font(.caption).foregroundStyle(.secondary)
                             }
                         }
@@ -159,7 +160,7 @@ struct ComposeImportSheet: View {
         phase = .running("Starting…")
         Task {
             do {
-                try await Compose.up(plan: plan) { step, done in
+                let hostWarnings = try await Compose.up(plan: plan) { step, done in
                     await MainActor.run {
                         if done {
                             // .waiting is transient — the checkmark grid only keys
@@ -176,6 +177,7 @@ struct ComposeImportSheet: View {
                         }
                     }
                 }
+                runtimeWarnings = hostWarnings
                 phase = .done
                 await state.refreshAll()
             } catch {

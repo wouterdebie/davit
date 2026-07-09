@@ -448,9 +448,10 @@ enum ComposeCLI {
                     if let w = discoveryWarning { print("warning: \(w)") }
                     for w in plan.warnings { print("warning: \(w)") }
                     if inv.subcommand == "up" {
-                        try await Compose.up(plan: plan) { step, done in
+                        let hostWarnings = try await Compose.up(plan: plan) { step, done in
                             if done { print("up: \(step.label) done") }
                         }
+                        for w in hostWarnings { print("warning: \(w)") }
                         print("compose up: ok")
                         if !inv.flags.contains("detach") {
                             // docker-compose behavior: a non-detached up stays
@@ -1159,7 +1160,7 @@ enum SelfTest {
                 }
                 guard dbRunning else { throw CLIError(command: "selftest", message: "db never started") }
                 _ = try await ContainerService.exec("davit-selftest-compose-db", ["touch", "/ready"])
-                try await upTask.value
+                _ = try await upTask.value
 
                 let web = try await ContainerService.listContainers().first { $0.id == "davit-selftest-compose-web" }
                 guard web?.isRunning == true else { throw CLIError(command: "selftest", message: "web not running after up") }
@@ -1188,7 +1189,7 @@ enum SelfTest {
                       bad: { condition: service_healthy }
                 """, projectName: "ignored")
                 do {
-                    try await Compose.up(plan: failing) { _, _ in }
+                    _ = try await Compose.up(plan: failing) { _, _ in }
                     throw CLIError(command: "selftest", message: "unhealthy dependency did not fail up")
                 } catch Compose.Error.unhealthy(service: "bad", failures: _) { /* expected */ }
 
@@ -1208,7 +1209,7 @@ enum SelfTest {
                       dead: { condition: service_healthy }
                 """, projectName: "ignored")
                 do {
-                    try await Compose.up(plan: exiting) { _, _ in }
+                    _ = try await Compose.up(plan: exiting) { _, _ in }
                     throw CLIError(command: "selftest", message: "exited dependency did not fail up")
                 } catch Compose.Error.dependencyExited(service: "dead") { /* expected */ }
             } catch {
@@ -1244,7 +1245,7 @@ enum SelfTest {
                 return r
             }
             do {
-                try await Compose.up(plan: plan) { _, _ in }
+                _ = try await Compose.up(plan: plan) { _, _ in }
                 let a1 = try await record("davit-selftest-idem-a")
                 let b1 = try await record("davit-selftest-idem-b")
                 guard a1.isRunning, b1.isRunning else {
@@ -1254,7 +1255,7 @@ enum SelfTest {
                 // Second up reuses both running containers: no error, both service
                 // steps reported done, and the creation dates prove no recreate.
                 let events = ProgressLog()
-                try await Compose.up(plan: plan) { events.append($0, $1) }
+                _ = try await Compose.up(plan: plan) { events.append($0, $1) }
                 let a2 = try await record("davit-selftest-idem-a")
                 let b2 = try await record("davit-selftest-idem-b")
                 guard a2.isRunning, b2.isRunning,
@@ -1271,7 +1272,7 @@ enum SelfTest {
                 // land on the same timestamp.)
                 try await ContainerService.stop("davit-selftest-idem-b")
                 try await Task.sleep(for: .seconds(1))
-                try await Compose.up(plan: plan) { _, _ in }
+                _ = try await Compose.up(plan: plan) { _, _ in }
                 let a3 = try await record("davit-selftest-idem-a")
                 let b3 = try await record("davit-selftest-idem-b")
                 guard a3.isRunning, a3.configuration.creationDate == a1.configuration.creationDate else {
@@ -1291,10 +1292,85 @@ enum SelfTest {
                 try await ContainerService.stop("davit-selftest-idem-a")
                 let pre = try await record("davit-selftest-idem-a")
                 try await Task.sleep(for: .seconds(1))
-                try await Compose.up(plan: plan) { _, _ in }
+                _ = try await Compose.up(plan: plan) { _, _ in }
                 let a4 = try await record("davit-selftest-idem-a")
                 guard a4.isRunning, a4.configuration.creationDate != pre.configuration.creationDate else {
                     throw CLIError(command: "selftest", message: "colliding stopped container was not recreated")
+                }
+            } catch {
+                await cleanup()
+                throw error
+            }
+            await cleanup()
+        }
+        await step("compose: service-name hosts sync") {
+            let names = ["davit-selftest-hosts-db", "davit-selftest-hosts-migrator"]
+            func cleanup() async {
+                for n in names { try? await ContainerService.delete(n, force: true) }
+            }
+            await cleanup()  // leftovers from a previous aborted run
+
+            let plan = try Compose.parse(text: """
+            name: davit-selftest-hosts
+            services:
+              db:
+                image: alpine:latest
+                command: ["sleep", "600"]
+              migrator:
+                image: alpine:latest
+                command: ["sleep", "600"]
+                depends_on: [db]
+            """, projectName: "ignored")
+            func record(_ name: String) async throws -> ContainerRecord {
+                guard let r = try await ContainerService.listContainers().first(where: { $0.id == name }) else {
+                    throw CLIError(command: "selftest", message: "\(name) missing")
+                }
+                return r
+            }
+            func ip(_ name: String) async throws -> String {
+                guard let ip = try await record(name).primaryIPv4 else {
+                    throw CLIError(command: "selftest", message: "\(name) has no IPv4")
+                }
+                return ip
+            }
+            func resolved(_ host: String, in container: String) async throws -> String {
+                let result = try await ContainerService.exec(container, ["getent", "hosts", host])
+                guard result.exitCode == 0,
+                      let first = result.stdoutString.split(whereSeparator: \.isWhitespace).first else {
+                    throw CLIError(command: "selftest", message: "getent hosts \(host) in \(container) failed (exit \(result.exitCode)): \(result.stderr)")
+                }
+                return String(first)
+            }
+            do {
+                let upWarnings = try await Compose.up(plan: plan) { _, _ in }
+                guard upWarnings.isEmpty else {
+                    throw CLIError(command: "selftest", message: "hosts sync warned on alpine: \(upWarnings)")
+                }
+                let dbIP = try await ip(names[0])
+                let migratorIP = try await ip(names[1])
+                guard try await resolved("db", in: names[1]) == dbIP,
+                      try await resolved("migrator", in: names[0]) == migratorIP
+                else { throw CLIError(command: "selftest", message: "service names not cross-resolved after up") }
+
+                // The user scenario: recreate only the migrator. The selected up
+                // must reuse the running db yet still patch its hosts with the
+                // migrator's new IP (and give the fresh migrator db's entry).
+                let dbCreated = try await record(names[0]).configuration.creationDate
+                try await ContainerService.delete(names[1], force: true)
+                _ = try await Compose.up(plan: plan.selecting(services: ["migrator"], activeProfiles: [])) { _, _ in }
+                guard try await record(names[0]).configuration.creationDate == dbCreated else {
+                    throw CLIError(command: "selftest", message: "selected up recreated the running db")
+                }
+                let newIP = try await ip(names[1])
+                guard try await resolved("migrator", in: names[0]) == newIP,
+                      try await resolved("db", in: names[1]) == dbIP
+                else { throw CLIError(command: "selftest", message: "hosts not re-synced after selected up") }
+                // The rewrite replaces, never accumulates: exactly one managed
+                // migrator line in db, carrying the new IP (old line gone).
+                let hosts = try await ContainerService.exec(names[0], ["cat", "/etc/hosts"]).stdoutString
+                let managed = hosts.split(separator: "\n").filter { $0.hasSuffix("# davit-compose") && $0.contains(" migrator ") }
+                guard managed.count == 1, managed[0].hasPrefix("\(newIP) ") else {
+                    throw CLIError(command: "selftest", message: "managed migrator lines in db wrong: \(managed)")
                 }
             } catch {
                 await cleanup()
@@ -1333,7 +1409,7 @@ enum SelfTest {
                 try await ContainerService.listVolumes().map(\.name).contains("davit-selftest-updown-vol")
             }
             do {
-                try await Compose.up(plan: plan) { _, _ in }
+                _ = try await Compose.up(plan: plan) { _, _ in }
                 let rows = try await Compose.ps(plan: plan)
                 guard rows.map(\.service) == ["one", "two"],
                       rows.map(\.container) == names,
@@ -1353,7 +1429,7 @@ enum SelfTest {
 
                 // Full down (reusing one, recreating two first): containers gone in
                 // reverse dependency order, declared network gone, volume KEPT.
-                try await Compose.up(plan: plan) { _, _ in }
+                _ = try await Compose.up(plan: plan) { _, _ in }
                 let events = ProgressLog()
                 _ = try await Compose.down(plan: plan) { events.append($0, $1) }
                 let seen = events.all
@@ -1371,7 +1447,7 @@ enum SelfTest {
                 }
 
                 // down -v also removes the declared volume.
-                try await Compose.up(plan: plan) { _, _ in }
+                _ = try await Compose.up(plan: plan) { _, _ in }
                 _ = try await Compose.down(plan: plan, removeVolumes: true) { _, _ in }
                 guard try await Compose.ps(plan: plan).isEmpty,
                       try await !haveNetwork(), try await !haveVolume()
@@ -1405,7 +1481,7 @@ enum SelfTest {
                 return sink.text
             }
             do {
-                try await Compose.up(plan: plan) { _, _ in }
+                _ = try await Compose.up(plan: plan) { _, _ in }
                 // The echoes reach the daemon's log files asynchronously — poll
                 // the real read path until both services' lines are visible.
                 var all = ""
@@ -1460,7 +1536,7 @@ enum SelfTest {
                 try await ContainerService.listContainers().first { $0.id == name }?.isRunning
             }
             do {
-                try await Compose.up(plan: plan) { _, _ in }
+                _ = try await Compose.up(plan: plan) { _, _ in }
 
                 // exec resolution: service → running container name; unknown
                 // services are clear errors (the exec round-trip itself is

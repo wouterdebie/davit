@@ -203,7 +203,7 @@ follow-up tasks F1/F2 below on user request, 2026-07-09.)
 
 ## Tasks
 
-- [ ] **H1 — Service-name resolution (hosts cross-patch).** Decision 19: shared
+- [x] **H1 — Service-name resolution (hosts cross-patch).** Decision 19: shared
   `syncProjectHosts(plan:)` helper in Compose.swift called at the end of up (after all
   services), in start and restart; managed-block rewrite semantics; warnings for
   unpatchable images. Live selftest reproducing the user scenario: up full fixture →

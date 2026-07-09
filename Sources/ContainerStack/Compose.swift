@@ -891,11 +891,13 @@ extension Compose {
     /// container that is already running is reused untouched (docker "Running");
     /// a stopped one is force-deleted and recreated from the plan — the file wins.
     /// Reports each step; stops at the first failure (already-completed steps stay
-    /// up, like compose does).
+    /// up, like compose does). Once every service is up — reused ones included —
+    /// the project's /etc/hosts entries are re-synced (syncProjectHosts below);
+    /// its warnings are the return value.
     static func up(
         plan: Plan,
         progress: @escaping @Sendable (StepKind, _ done: Bool) async -> Void
-    ) async throws {
+    ) async throws -> [String] {
         let existingVolumes = Set((try? await ContainerService.listVolumes())?.map(\.name) ?? [])
         for volume in plan.volumes where !existingVolumes.contains(volume) {
             await progress(.volume(volume), false)
@@ -976,6 +978,51 @@ extension Compose {
             )
             await progress(.service(svc.service), true)
         }
+
+        return await syncProjectHosts(plan: plan)
+    }
+
+    /// Compose service names never resolve from inside containers on this
+    /// platform: the gateway DNS forwards to the macOS resolver (NXDOMAIN for
+    /// service and container names alike) and the apiserver's table is
+    /// loopback-only, so cross-service dialing works by IP only — and IPs
+    /// change on recreate. After up/start/restart, every RUNNING project
+    /// container therefore gets a managed block in its /etc/hosts mapping
+    /// each project container's service and container name — including its
+    /// own — to the current IP, cross-patching both directions (a running db
+    /// learns a recreated migrator's new IP and vice versa). Managed lines
+    /// carry a `# davit-compose` suffix; the rewrite filters the previous
+    /// block out and writes back into the same file (same inode — never mv),
+    /// then appends the fresh entries, one /bin/sh invocation per container.
+    /// A container that can't be patched (no usable /bin/sh, read-only
+    /// /etc/hosts) yields a warning, never a failure. Containers recreated
+    /// behind compose's back keep stale entries until the next up/start.
+    static func syncProjectHosts(plan: Plan) async -> [String] {
+        let records = Dictionary(uniqueKeysWithValues:
+            ((try? await ContainerService.listContainers()) ?? []).map { ($0.id, $0) })
+        let entries: [(service: String, name: String, ip: String)] = plan.services.compactMap { svc in
+            guard let record = records[svc.name], record.isRunning, let ip = record.primaryIPv4 else { return nil }
+            return (svc.service, svc.name, ip)
+        }
+        guard !entries.isEmpty else { return [] }
+        let block = entries.map { "\($0.ip) \($0.service) \($0.name) # davit-compose" }.joined(separator: "\n")
+        // grep exit 1 just means every line was managed; anything above means
+        // grep itself failed and the file must be left alone. The block comes
+        // in as $1 so no hosts content is ever shell-interpolated.
+        let script = """
+        keep=$(grep -v ' # davit-compose$' /etc/hosts); [ $? -le 1 ] || exit 9
+        printf '%s\\n' "$keep" > /etc/hosts
+        printf '%s\\n' "$1" >> /etc/hosts
+        """
+        var warnings: [String] = []
+        for entry in entries {
+            let result = try? await ContainerService.exec(
+                entry.name, ["/bin/sh", "-c", script, "davit", block], timeout: .seconds(30))
+            if result?.exitCode != 0 {
+                warnings.append("service \(entry.service): /etc/hosts not updated (image without /bin/sh?) — service names won't resolve there")
+            }
+        }
+        return warnings
     }
 
     /// Tear the plan down: stop each existing container in reverse dependency
@@ -1067,7 +1114,9 @@ extension Compose {
     /// forget like docker's start: no healthcheck or completion waits — up is
     /// the command that honors depends_on conditions. A service that was
     /// never created is a warning (start never creates, that's up's job);
-    /// already-running containers are left alone. Returns the warnings.
+    /// already-running containers are left alone. Once everything is running
+    /// the project's /etc/hosts entries are re-synced (a start after a stop
+    /// can hand out fresh IPs). Returns the warnings.
     static func start(
         plan: Plan,
         progress: @escaping @Sendable (StepKind, _ done: Bool) async -> Void
@@ -1083,12 +1132,13 @@ extension Compose {
             try await ContainerService.start(svc.name)
             await progress(.service(svc.service), true)
         }
+        warnings += await syncProjectHosts(plan: plan)
         return warnings
     }
 
-    /// stop then start, each per its own rules. The stop pass runs silent so
-    /// every service reports exactly one step pair — read as "restarted" —
-    /// once it is running again.
+    /// stop then start, each per its own rules (including start's hosts
+    /// re-sync). The stop pass runs silent so every service reports exactly
+    /// one step pair — read as "restarted" — once it is running again.
     static func restart(
         plan: Plan,
         progress: @escaping @Sendable (StepKind, _ done: Bool) async -> Void
