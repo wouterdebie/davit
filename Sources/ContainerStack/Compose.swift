@@ -453,9 +453,11 @@ enum Compose {
         // same dotenv parser as .env, so values are interpolated at load
         // time too (docker parity — single-quoted values stay literal), each
         // file's own lookup layering the effective environment under its own
-        // previously-defined entries. Later files override earlier ones;
-        // environment: below overrides them all. A missing file is an error
-        // unless the entry says `required: false`.
+        // previously-defined entries AND every earlier env_file's already-parsed
+        // values (compose-go parity — a later file can reference an earlier
+        // one's variables). Later files override earlier ones; environment:
+        // below overrides them all. A missing file is an error unless the
+        // entry says `required: false`.
         var envFileSpecs: [(path: String, required: Bool)] = []
         func envFileSpec(_ entry: Any) {
             if let m = entry as? [String: Any] {
@@ -489,7 +491,12 @@ enum Compose {
                 if required { throw Error.envFileNotFound(resolved) }
                 continue
             }
-            let (values, fileWarnings) = try parseDotEnv(text: text, processEnvironment: environment)
+            // Layer this file's lookup under the effective environment but over
+            // every earlier env_file's already-parsed values, so a later file
+            // can reference an earlier one's variables (compose-go parity) —
+            // the effective environment still wins any naming conflict.
+            let lookup = fileEnv.merging(environment) { _, env in env }
+            let (values, fileWarnings) = try parseDotEnv(text: text, processEnvironment: lookup)
             fileEnv.merge(values) { _, later in later }
             warnings += fileWarnings
         }
@@ -1002,9 +1009,14 @@ extension Compose {
     /// Returns the sync warnings plus the set of services that were reused
     /// untouched — the CLI's log attach skips those containers' backlog, like
     /// docker only replays history for containers the up actually created.
+    /// `onServiceTouched` fires just before a service is (re)created — never
+    /// for the reuse branch — so a caller that throws partway through this up
+    /// (e.g. --down-on-failure) knows exactly which services it, rather than
+    /// an earlier up, is responsible for tearing down.
     static func up(
         plan: Plan,
         diagnostic: @escaping Diagnostic = { _ in },
+        onServiceTouched: @escaping @Sendable (String) -> Void = { _ in },
         progress: @escaping @Sendable (StepKind, _ done: Bool) async -> Void
     ) async throws -> (warnings: [String], reused: Set<String>) {
         let existingVolumes = Set((try? await ContainerService.listVolumes())?.map(\.name) ?? [])
@@ -1089,6 +1101,7 @@ extension Compose {
             // The run path auto-pulls a missing image; reuse pull's own tracker
             // to turn that stream into the same coarse lines pull's output uses.
             let tracker = PullTracker()
+            onServiceTouched(svc.service)
             try await ContainerService.runContainer(
                 image: svc.image,
                 name: svc.name,
@@ -1183,16 +1196,23 @@ extension Compose {
     /// non-external networks and, with `removeVolumes`, the declared
     /// non-external volumes. Missing containers skip silently, so down is
     /// idempotent. Returns warnings (e.g. a network still in use elsewhere).
+    /// `limitContainersTo`, when non-nil, further intersects the container
+    /// selection (never the full/partial network-and-volume gate below, which
+    /// stays keyed on `requested`) — the `--down-on-failure` teardown uses
+    /// this to spare services this up run reused rather than created, without
+    /// losing the whole-project network cleanup a whole-project up implies.
     static func down(
         plan: Plan,
         services requested: [String] = [],
         removeVolumes: Bool = false,
+        limitContainersTo: Set<String>? = nil,
         diagnostic: Diagnostic = { _ in },
         progress: @escaping @Sendable (StepKind, _ done: Bool) async -> Void
     ) async throws -> [String] {
         let known = Set(plan.services.map(\.service))
         for name in requested where !known.contains(name) { throw Error.noSuchService(name) }
-        let selected = requested.isEmpty ? known : Set(requested)
+        var selected = requested.isEmpty ? known : Set(requested)
+        if let limitContainersTo { selected.formIntersection(limitContainersTo) }
         var warnings: [String] = []
 
         let records = Dictionary(uniqueKeysWithValues:

@@ -107,7 +107,7 @@ level to .debug for the process unless DAVIT_LOG_LEVEL was explicitly set.
   command lines; `--quiet` prints nothing but errors on a warning-producing fixture;
   `--verbose --quiet` → usage exit 2. Done when: build + full selftest OK +
   round-trips. Commit: `compose: --verbose/--quiet + DAVIT_LOG_LEVEL`.
-- [ ] **I5 — review + wrap.** Single correctness/parity reviewer over the I-round
+- [x] **I5 — review + wrap.** Single correctness/parity reviewer over the I-round
   diff (adversarially verified findings), fixer, docs/usage final pass, full suite +
   smoke round-trip, commit `compose: improvements round review fixes + docs`.
 

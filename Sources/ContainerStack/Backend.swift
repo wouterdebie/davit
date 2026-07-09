@@ -69,7 +69,10 @@ enum ContainerBinary {
             FileHandle.standardError.write(Data("DAVIT_LOG_LEVEL: unrecognized level \"\(raw ?? "")\" — using info\n".utf8))
         }
         LoggingConfig.level = level
-        LoggingConfig.explicitlySet = raw?.isEmpty == false
+        // A rejected value falls back to fully-default behavior (as if unset)
+        // so --verbose can still bump the level to .debug — only a value that
+        // actually parsed counts as the user explicitly choosing a level.
+        LoggingConfig.explicitlySet = ok && raw?.isEmpty == false
         LoggingSystem.bootstrap { label in
             var handler = StreamLogHandler.standardError(label: label)
             handler.logLevel = LoggingConfig.level

@@ -520,34 +520,39 @@ enum ComposeCLI {
                     for w in plan.warnings { output.warn(w) }
                     if inv.subcommand == "up" {
                         let up: (warnings: [String], reused: Set<String>)
+                        let touched = TouchedServices()
                         do {
                             up = try await Compose.up(
                                 plan: plan,
-                                diagnostic: { output.verbose($0) }
+                                diagnostic: { output.verbose($0) },
+                                onServiceTouched: { touched.insert($0) }
                             ) { step, done in
                                 if done { output.say("up: \(step.label) done") }
                             }
                         } catch {
                             if inv.flags.contains("down-on-failure") {
                                 output.say("up failed — tearing down (--down-on-failure)")
-                                // Scoped the same way the up itself was: a whole-
-                                // project up (no services named) tears the whole
-                                // project down (network/volumes per down's own
-                                // full-teardown rule); a service-scoped up tears
-                                // down exactly the services the up touched
-                                // (plan.services already carries the dependency
-                                // closure) and leaves networks/volumes alone.
+                                // Network/volume full-vs-partial gating is scoped the
+                                // same way the up itself was: a whole-project up (no
+                                // services named) tears the whole project down
+                                // (network/volumes per down's own full-teardown
+                                // rule); a service-scoped up leaves networks/volumes
+                                // alone. Either way, the actual CONTAINERS torn down
+                                // are limited to what THIS up run touched — plan.services
+                                // includes already-running services this up reused
+                                // untouched, and those must survive the teardown.
                                 let teardown = inv.services.isEmpty ? [] : plan.services.map(\.service)
                                 do {
                                     let warnings = try await Compose.down(
                                         plan: plan, services: teardown, removeVolumes: false,
+                                        limitContainersTo: touched.all,
                                         diagnostic: { output.verbose($0) }
                                     ) { _, _ in }
                                     for w in warnings { output.warn(w) }
                                 } catch let teardownError {
                                     let detail = (teardownError as? LocalizedError)?.errorDescription
                                         ?? String(describing: teardownError)
-                                    output.warn("teardown after failed up did not complete cleanly (\(detail))")
+                                    FileHandle.standardError.write(Data("teardown after failed up did not complete cleanly (\(detail))\n".utf8))
                                 }
                             }
                             throw error
@@ -1246,14 +1251,19 @@ enum SelfTest {
             EXTRA=two
             OVERLAP=file
             FALLBACK=fromfile
+            CROSS=${BASE}-cross
             """.write(to: dir.appendingPathComponent("sub/more.env"), atomically: true, encoding: .utf8)
 
             // All three entry forms; precedence: earlier files < later files <
             // environment:. File contents ARE interpolated at load time now
             // (docker parity — INTERP self-references BASE within the same
             // file); an unset reference still warns instead of throwing (RAW).
-            // A bare environment KEY unset in the effective env falls back to
-            // the env_file value without a warning.
+            // CROSS (in the later file) self-references BASE (defined in the
+            // earlier file) — compose-go parity, the confirmed review-fix
+            // regression: each env_file's lookup layers under every earlier
+            // file's already-parsed values, not just that file's own. A bare
+            // environment KEY unset in the effective env falls back to the
+            // env_file value without a warning.
             let plan = try Compose.parse(text: """
             services:
               app:
@@ -1265,7 +1275,7 @@ enum SelfTest {
                 environment: [OVERLAP=explicit, FALLBACK]
             """, projectName: "envfile", baseDir: dir.path)
             guard plan.services[0].processArgs == [
-                "--env", "BASE=one", "--env", "EXTRA=two", "--env", "FALLBACK=fromfile",
+                "--env", "BASE=one", "--env", "CROSS=one-cross", "--env", "EXTRA=two", "--env", "FALLBACK=fromfile",
                 "--env", "INTERP=one-two", "--env", "RAW=", "--env", "SHARED=later",
                 "--env", "OVERLAP=explicit",
             ] else { throw CLIError(command: "selftest", message: "env_file merge wrong: \(plan.services[0].processArgs)") }
@@ -1785,6 +1795,85 @@ enum SelfTest {
             }
             await cleanup()
         }
+        await step("compose: --down-on-failure spares reused services (I5 review fix)") {
+            // Regression for the confirmed review finding: a whole-project
+            // --down-on-failure teardown must not destroy services a PRIOR
+            // up already had running and this up merely reused. a, b come up
+            // healthy first; a second up against a plan that also adds c
+            // (unresolvable image) reuses a/b untouched and fails on c —
+            // onServiceTouched must report only "c", and a down scoped via
+            // limitContainersTo: touched must leave a/b running.
+            let names = ["davit-selftest-dof2-a", "davit-selftest-dof2-b"]
+            func cleanup() async {
+                for n in names { try? await ContainerService.delete(n, force: true) }
+            }
+            await cleanup()  // leftovers from a previous aborted run
+
+            let basePlan = try Compose.parse(text: """
+            name: davit-selftest-dof2
+            services:
+              a:
+                image: alpine:latest
+                command: ["sleep", "600"]
+              b:
+                image: alpine:latest
+                command: ["sleep", "600"]
+            """, projectName: "ignored")
+            let extendedPlan = try Compose.parse(text: """
+            name: davit-selftest-dof2
+            services:
+              a:
+                image: alpine:latest
+                command: ["sleep", "600"]
+              b:
+                image: alpine:latest
+                command: ["sleep", "600"]
+              c:
+                image: davit-selftest-nonexistent-tag:does-not-exist
+            """, projectName: "ignored")
+
+            do {
+                _ = try await Compose.up(plan: basePlan) { _, _ in }
+                for n in ["davit-selftest-dof2-a", "davit-selftest-dof2-b"] {
+                    let record = try await ContainerService.listContainers().first { $0.id == n }
+                    guard record?.isRunning == true else {
+                        throw CLIError(command: "selftest", message: "\(n) should be running before the second up")
+                    }
+                }
+
+                let touched = TouchedServices()
+                var upFailed = false
+                do {
+                    _ = try await Compose.up(plan: extendedPlan, onServiceTouched: { touched.insert($0) }) { _, _ in }
+                } catch {
+                    upFailed = true
+                }
+                guard upFailed else {
+                    throw CLIError(command: "selftest", message: "up with an unresolvable image did not fail")
+                }
+                guard touched.all == ["c"] else {
+                    throw CLIError(command: "selftest", message: "onServiceTouched should report only [\"c\"], got \(touched.all.sorted())")
+                }
+
+                _ = try await Compose.down(
+                    plan: extendedPlan, removeVolumes: false, limitContainersTo: touched.all
+                ) { _, _ in }
+
+                for n in ["davit-selftest-dof2-a", "davit-selftest-dof2-b"] {
+                    let record = try await ContainerService.listContainers().first { $0.id == n }
+                    guard record?.isRunning == true else {
+                        throw CLIError(command: "selftest", message: "\(n) (reused, untouched by the failed up) should survive a scoped teardown")
+                    }
+                }
+                guard try await ContainerService.listContainers().first(where: { $0.id == "davit-selftest-dof2-c" }) == nil else {
+                    throw CLIError(command: "selftest", message: "c should not exist after the failed up")
+                }
+            } catch {
+                await cleanup()
+                throw error
+            }
+            await cleanup()
+        }
         await step("compose: logs (non-follow)") {
             let names = ["davit-selftest-logs-a", "davit-selftest-logs-longer"]
             func cleanup() async {
@@ -2014,6 +2103,17 @@ final class Atomic: @unchecked Sendable {
         get { lock.lock(); defer { lock.unlock() }; return _value }
         set { lock.lock(); defer { lock.unlock() }; _value = newValue }
     }
+}
+
+/// Lock-protected accumulator of service names an `up` actually (re)created
+/// this invocation, fed by Compose.up's `onServiceTouched` callback. A
+/// `--down-on-failure` teardown intersects against this so it never tears
+/// down a service the up merely found already running and reused.
+final class TouchedServices: @unchecked Sendable {
+    private let lock = NSLock()
+    private var names = Set<String>()
+    func insert(_ name: String) { lock.lock(); names.insert(name); lock.unlock() }
+    var all: Set<String> { lock.lock(); defer { lock.unlock() }; return names }
 }
 
 enum ExecMode {
