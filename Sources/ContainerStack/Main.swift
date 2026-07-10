@@ -226,6 +226,11 @@ enum Main {
             semaphore.wait()
             return
         }
+        if args.count >= 2, args[1] == "run" {
+            // docker-style single-container run — RunCLI below.
+            RunCLI.run(Array(args.dropFirst(2)))
+            return
+        }
         if args.count >= 2, args[1] == "compose" {
             // Shared parse + dispatch for every compose subcommand — ComposeCLI below.
             ComposeCLI.run(Array(args.dropFirst(2)))
@@ -313,6 +318,23 @@ enum Main {
     }
 }
 
+/// stdout verbosity for one CLI invocation (compose decision 4 / plan I4b,
+/// reused by `davit run` / I6). `quiet` suppresses warnings and step/progress
+/// lines but never the final stderr error each mode's `run()` writes on
+/// failure; `verbose` adds diagnostics that are otherwise silent. GUI code
+/// never touches this — it calls Compose's functions directly with their
+/// default (no-op) diagnostic sinks.
+enum CLIOutputLevel { case quiet, normal, verbose }
+
+struct CLIOutput {
+    let level: CLIOutputLevel
+    func say(_ s: String) { if level != .quiet { print(s) } }
+    func warn(_ s: String) { if level != .quiet { print("warning: \(s)") } }
+    func verbose(_ s: String) { if level == .verbose { print(s) } }
+    /// Like `say` but without an added newline — pull's streamed lines carry their own.
+    func sayRaw(_ s: String) { if level != .quiet { print(s, terminator: "") } }
+}
+
 /// `davit compose <sub>` — shared CLI plumbing for every compose subcommand
 /// (plan decision 12): one argv parser covering the common flags, per-
 /// subcommand extras, and the file-vs-service positional rule, plus the
@@ -327,22 +349,6 @@ enum ComposeCLI {
                    logs [-f|--follow] [--tail <n>] | stop | start | restart | pull
                    exec <service> <command...>
     """
-
-    /// stdout verbosity for one invocation (decision 4 / plan I4b). `quiet`
-    /// suppresses warnings and step/progress lines but never the final stderr
-    /// error `run()` writes on failure; `verbose` adds diagnostics that are
-    /// otherwise silent. GUI code never touches this — it calls Compose's
-    /// functions directly with their default (no-op) diagnostic sinks.
-    enum OutputLevel { case quiet, normal, verbose }
-
-    struct Output {
-        let level: OutputLevel
-        func say(_ s: String) { if level != .quiet { print(s) } }
-        func warn(_ s: String) { if level != .quiet { print("warning: \(s)") } }
-        func verbose(_ s: String) { if level == .verbose { print(s) } }
-        /// Like `say` but without an added newline — pull's streamed lines carry their own.
-        func sayRaw(_ s: String) { if level != .quiet { print(s, terminator: "") } }
-    }
 
     struct Invocation {
         var subcommand: String
@@ -474,7 +480,7 @@ enum ComposeCLI {
 
     static func run(_ args: [String]) {
         let inv = parse(args)
-        let output = Output(level:
+        let output = CLIOutput(level:
             inv.flags.contains("verbose") ? .verbose : (inv.flags.contains("quiet") ? .quiet : .normal))
         if output.level == .verbose, !LoggingConfig.explicitlySet {
             LoggingConfig.level = .debug
@@ -645,6 +651,300 @@ enum ComposeCLI {
     }
 }
 
+/// `davit run [flags] IMAGE [COMMAND...]` — docker-style single-container run
+/// (plan I6). Flags strictly precede IMAGE (docker convention); a bare `--`
+/// also ends flag parsing, docker-style. Recognized flags route into the same
+/// four arg arrays `ContainerService.runContainer` hands to Apple's
+/// `Flags.Process/Management/Resource` parsers — this layer only decides
+/// which bucket a token belongs to and whether it consumes a value (the
+/// parsers themselves handle repeats and validation); everything after IMAGE
+/// is the command argv, never parsed. `-d`/`--rm`/`--pull`/`-i`/`--verbose`/
+/// `--quiet` are Davit's own grammar, handled before the routing table is
+/// consulted. Usage problems exit 2, runtime failures exit 1 (ComposeCLI's
+/// convention).
+enum RunCLI {
+    enum Bucket { case process, management, resource }
+
+    /// flag token → (bucket, takesValue). Both spellings of a flag route to
+    /// the same bucket; the RAW token (not a canonical name) is what actually
+    /// gets appended to that bucket's argv, since Flags.Process/Management/
+    /// Resource parse the real docker spelling themselves. `--name` is
+    /// handled as its own branch below (not here) — its value is needed
+    /// up front to resolve the container's name before create.
+    static let routing: [String: (bucket: Bucket, takesValue: Bool)] = [
+        // process
+        "-e": (.process, true), "--env": (.process, true),
+        "--env-file": (.process, true),
+        "-t": (.process, false), "--tty": (.process, false),
+        "-u": (.process, true), "--user": (.process, true),
+        "--uid": (.process, true), "--gid": (.process, true),
+        "-w": (.process, true), "--workdir": (.process, true),
+        "--ulimit": (.process, true),
+        // resource
+        "-c": (.resource, true), "--cpus": (.resource, true),
+        "-m": (.resource, true), "--memory": (.resource, true),
+        // management
+        "-p": (.management, true), "--publish": (.management, true),
+        "-v": (.management, true), "--volume": (.management, true),
+        "--mount": (.management, true),
+        "--tmpfs": (.management, true),
+        "--network": (.management, true),
+        "--entrypoint": (.management, true),
+        "-l": (.management, true), "--label": (.management, true),
+        "--platform": (.management, true),
+        "--arch": (.management, true),
+        "--os": (.management, true),
+        "--cap-add": (.management, true),
+        "--cap-drop": (.management, true),
+        "--init": (.management, false),
+        "--read-only": (.management, false),
+        "--shm-size": (.management, true),
+        "--dns": (.management, true),
+        "--dns-search": (.management, true),
+        "--dns-option": (.management, true),
+        "--no-dns": (.management, false),
+        "--rosetta": (.management, false),
+        "--virtualization": (.management, false),
+        "--ssh": (.management, false),
+        "--cidfile": (.management, true),
+    ]
+
+    /// Real `docker run` flags this platform has no equivalent for. Naming
+    /// them explicitly (rather than falling through to "unknown flag") gives
+    /// a docker-parity script an actionable message instead of a bare syntax
+    /// error, so it fails loudly instead of silently losing the setting.
+    static let unsupported: Set<String> = [
+        "--restart", "--add-host", "--privileged", "--hostname", "-h", "--domainname",
+        "--mac-address", "--gpus", "--device", "--device-cgroup-rule", "--link",
+        "--pid", "--ipc", "--uts", "--userns", "--security-opt", "--sysctl",
+        "--group-add", "--isolation", "--cgroup-parent", "--volumes-from",
+        "--stop-signal", "--stop-timeout", "--expose", "-P", "--publish-all",
+        "--log-driver", "--log-opt", "-a", "--attach",
+        "--health-cmd", "--health-interval", "--health-retries", "--health-timeout",
+        "--health-start-period", "--no-healthcheck",
+        "--memory-swap", "--memory-reservation", "--memory-swappiness", "--kernel-memory",
+        "--cpu-shares", "--cpuset-cpus", "--cpuset-mems", "--cpu-quota", "--cpu-period",
+        "--cpu-rt-runtime", "--cpu-rt-period", "--oom-kill-disable", "--oom-score-adj",
+        "--pids-limit", "--blkio-weight", "--blkio-weight-device",
+        "--device-read-bps", "--device-write-bps", "--device-read-iops", "--device-write-iops",
+    ]
+
+    static let usage = """
+    usage: run [flags] IMAGE [COMMAND...]
+      -d, --detach                  run detached; prints the container name (docker prints the ID; name==id here)
+      --rm                          remove the container once it stops
+      --pull missing|always|never   image pull policy (default: missing)
+      --verbose | -q, --quiet       per-run diagnostics (mutually exclusive)
+      flags must precede IMAGE (docker-style); `--` also ends flag parsing
+      docker-style flags: -e/--env, --env-file, -t/--tty, -u/--user, --uid, --gid,
+        -w/--workdir, --ulimit, -c/--cpus, -m/--memory, --name, -p/--publish,
+        -v/--volume, --mount, --tmpfs, --network, --entrypoint, -l/--label,
+        --platform, --arch, --os, --cap-add, --cap-drop, --init, --read-only,
+        --shm-size, --dns, --dns-search, --dns-option, --no-dns, --rosetta,
+        --virtualization, --ssh, --cidfile
+      -i/--interactive and docker flags with no platform mapping (--restart,
+      --privileged, --add-host, --hostname, --gpus, ...) are rejected — see README
+    """
+
+    struct Invocation {
+        var image = ""
+        var command: [String] = []
+        var process: [String] = []
+        var management: [String] = []
+        var resource: [String] = []
+        var name: String? = nil
+        var detach = false
+        var autoRemove = false
+        var pullPolicy = "missing"
+        var verbose = false
+        var quiet = false
+    }
+
+    /// Thrown by the pure `parseArgs` below instead of exiting the process —
+    /// keeps the routing logic selftest-able. `message == nil` prints the
+    /// bare usage line only (e.g. no IMAGE given at all).
+    struct ParseError: Error, Equatable { let message: String? }
+
+    /// Pure routing core: no I/O, no `exit()` — selftest calls this directly.
+    /// `parse(_:)` below is the process-exiting shell `run()` actually uses.
+    static func parseArgs(_ args: [String]) throws -> Invocation {
+        var inv = Invocation()
+        var i = 0
+        while i < args.count {
+            let raw = args[i]
+            if raw == "--" {
+                i += 1
+                break
+            }
+            var arg = raw
+            var inline: String? = nil
+            if raw.hasPrefix("--"), let eq = raw.firstIndex(of: "=") {
+                arg = String(raw[..<eq])
+                inline = String(raw[raw.index(after: eq)...])
+            }
+            func value() throws -> String {
+                if let v = inline { return v }
+                guard i + 1 < args.count else { throw ParseError(message: "flag \(arg) needs a value") }
+                i += 1
+                return args[i]
+            }
+            if arg == "-d" || arg == "--detach" {
+                guard inline == nil else { throw ParseError(message: "flag \(arg) takes no value") }
+                inv.detach = true
+            } else if arg == "--rm" {
+                guard inline == nil else { throw ParseError(message: "flag \(arg) takes no value") }
+                inv.autoRemove = true
+            } else if arg == "--pull" {
+                let v = try value()
+                guard ["missing", "always", "never"].contains(v) else {
+                    throw ParseError(message: "invalid --pull value: \(v) (want missing|always|never)")
+                }
+                inv.pullPolicy = v
+            } else if arg == "-i" || arg == "--interactive" {
+                throw ParseError(message: "interactive runs aren't supported; start detached, then `Davit exec <name>`")
+            } else if arg == "--name" {
+                let v = try value()
+                inv.name = v
+                inv.management.append(contentsOf: [arg, v])
+            } else if arg == "--verbose" {
+                guard inline == nil else { throw ParseError(message: "flag \(arg) takes no value") }
+                inv.verbose = true
+            } else if arg == "-q" || arg == "--quiet" {
+                guard inline == nil else { throw ParseError(message: "flag \(arg) takes no value") }
+                inv.quiet = true
+            } else if unsupported.contains(arg) {
+                throw ParseError(message: "docker flag \(arg) has no equivalent on this platform (apple/container doesn't support it) — remove it or adjust the parity script")
+            } else if let route = routing[arg] {
+                if route.takesValue {
+                    let v = try value()
+                    switch route.bucket {
+                    case .process: inv.process.append(contentsOf: [arg, v])
+                    case .management: inv.management.append(contentsOf: [arg, v])
+                    case .resource: inv.resource.append(contentsOf: [arg, v])
+                    }
+                } else {
+                    guard inline == nil else { throw ParseError(message: "flag \(arg) takes no value") }
+                    switch route.bucket {
+                    case .process: inv.process.append(arg)
+                    case .management: inv.management.append(arg)
+                    case .resource: inv.resource.append(arg)
+                    }
+                }
+            } else if raw.hasPrefix("-"), raw != "-" {
+                throw ParseError(message: "unknown flag: \(raw)")
+            } else {
+                inv.image = raw
+                i += 1
+                break
+            }
+            i += 1
+        }
+        if inv.image.isEmpty {
+            guard i < args.count else { throw ParseError(message: nil) }
+            inv.image = args[i]
+            i += 1
+        }
+        inv.command = i < args.count ? Array(args[i...]) : []
+        if inv.verbose, inv.quiet {
+            throw ParseError(message: "--verbose and -q/--quiet are mutually exclusive")
+        }
+        return inv
+    }
+
+    /// `parseArgs` wrapped for real CLI use: usage problems print to stderr
+    /// and exit 2, naming the offending token where there is one.
+    static func parse(_ args: [String]) -> Invocation {
+        do {
+            return try parseArgs(args)
+        } catch let error as ParseError {
+            let prefix = error.message.map { $0 + "\n" } ?? ""
+            FileHandle.standardError.write(Data((prefix + usage + "\n").utf8)); exit(2)
+        } catch {
+            FileHandle.standardError.write(Data((usage + "\n").utf8)); exit(2)
+        }
+    }
+
+    /// Resolves the container name, applies `--pull`, and creates+starts the
+    /// container — everything `run()` needs that a selftest can also drive
+    /// directly (no `exit()` in here, unlike `run()` itself). Returns the
+    /// resolved name (mirrors `Backend.runContainer`'s own id computation:
+    /// an empty --name value is treated like "not given", random id — same
+    /// as the GUI Run sheet).
+    static func execute(_ inv: Invocation, output: CLIOutput = CLIOutput(level: .normal)) async throws -> String {
+        let resolvedName = Utility.createContainerID(name: (inv.name?.isEmpty == true) ? nil : inv.name)
+        switch inv.pullPolicy {
+        case "always":
+            output.verbose("pulling \(inv.image) (--pull always)")
+            try await ContainerService.pullImage(inv.image) { _ in }
+        case "never":
+            guard try await ContainerService.imageExists(inv.image) else {
+                throw CLIError(command: "run", message: "image not present locally and --pull never was given: \(inv.image)")
+            }
+        default:
+            break  // "missing" (default): the create path's own fetch-if-absent already covers this
+        }
+
+        output.verbose("resolved name: \(resolvedName)")
+        try await ContainerService.runContainer(
+            image: inv.image,
+            name: resolvedName,
+            processArgs: inv.process,
+            managementArgs: inv.management,
+            resourceArgs: inv.resource,
+            commandArgs: inv.command,
+            autoRemove: inv.autoRemove
+        )
+        return resolvedName
+    }
+
+    static func run(_ args: [String]) {
+        let inv = parse(args)
+        let output = CLIOutput(level: inv.quiet ? .quiet : (inv.verbose ? .verbose : .normal))
+        if output.level == .verbose, !LoggingConfig.explicitlySet {
+            LoggingConfig.level = .debug
+        }
+        let semaphore = DispatchSemaphore(value: 0)
+        Task.detached {
+            do {
+                let resolvedName = try await execute(inv, output: output)
+
+                if inv.detach {
+                    // The primary, script-parsed output of `-d` (docker parity)
+                    // — printed unconditionally, --quiet notwithstanding, same
+                    // as docker itself never suppresses the printed ID.
+                    print(resolvedName)
+                    exit(0)
+                }
+
+                // Attach: stream this one container's logs, no prefix (I6
+                // design) — reuses compose's per-stream follow core so the
+                // tail/readability-handler/exit-detection logic isn't
+                // duplicated. Ctrl-C only detaches: signals can't be
+                // forwarded to the guest process on this platform (no exec
+                // signal delivery), so the container keeps running — a
+                // documented divergence from docker, not a bug.
+                output.say("Attaching to logs (Ctrl-C detaches; container keeps running)")
+                guard let handle = await Compose.openLogHandle(resolvedName) else {
+                    output.warn("no log stream available for \(resolvedName)")
+                    exit(0)
+                }
+                try await Compose.followLogStreams(
+                    [Compose.LogStream(prefix: "", name: resolvedName, handle: handle, backlog: true)],
+                    tail: nil, follow: true,
+                    output: { FileHandle.standardOutput.write(Data($0.utf8)) }
+                )
+                exit(0)
+            } catch {
+                let message = (error as? CLIError)?.message
+                    ?? (error as? LocalizedError)?.errorDescription
+                    ?? String(describing: error)
+                FileHandle.standardError.write(Data("run failed: \(message)\n".utf8)); exit(1)
+            }
+        }
+        semaphore.wait()
+    }
+}
+
 /// `davit selftest` — exercises the XPC-backed service layer end to end against
 /// the live daemon: lists, volume create/delete, container run/stop/start/delete.
 enum SelfTest {
@@ -808,6 +1108,173 @@ enum SelfTest {
             }
             guard LoggingConfig.parseLevel("bogus") == (.info, false) else {
                 throw CLIError(command: "selftest", message: "invalid DAVIT_LOG_LEVEL should fall back to info and flag ok=false")
+            }
+        }
+        await step("run: pure routing (RunCLI.parseArgs)") {
+            // Pure — no exit(), no async work; RunCLI.parse() is the process-
+            // exiting shell around this that a live CLI round-trip covers.
+            let full = try RunCLI.parseArgs([
+                "--env", "FOO=bar", "--cpus", "2", "--name", "x", "-p", "80:80",
+                "alpine", "echo", "hi",
+            ])
+            guard full.process == ["--env", "FOO=bar"] else {
+                throw CLIError(command: "selftest", message: "process bucket wrong: \(full.process)")
+            }
+            guard full.resource == ["--cpus", "2"] else {
+                throw CLIError(command: "selftest", message: "resource bucket wrong: \(full.resource)")
+            }
+            guard full.management == ["--name", "x", "-p", "80:80"] else {
+                throw CLIError(command: "selftest", message: "management bucket wrong: \(full.management)")
+            }
+            guard full.name == "x", full.image == "alpine", full.command == ["echo", "hi"] else {
+                throw CLIError(command: "selftest", message: "name/image/command wrong: \(full.name ?? "nil") \(full.image) \(full.command)")
+            }
+
+            // Boolean flags in each bucket append just the flag token, no value.
+            let bools = try RunCLI.parseArgs(["-t", "--init", "--rosetta", "alpine"])
+            guard bools.process == ["-t"], bools.management == ["--init", "--rosetta"], bools.image == "alpine", bools.command.isEmpty else {
+                throw CLIError(command: "selftest", message: "boolean routing wrong: \(bools.process) \(bools.management) \(bools.image) \(bools.command)")
+            }
+
+            // Davit-side flags never reach the bucket arrays.
+            let davit = try RunCLI.parseArgs(["-d", "--rm", "--pull", "always", "--verbose", "alpine"])
+            guard davit.detach, davit.autoRemove, davit.pullPolicy == "always", davit.verbose,
+                  davit.process.isEmpty, davit.management.isEmpty, davit.resource.isEmpty
+            else { throw CLIError(command: "selftest", message: "Davit-side flag parsing wrong: \(davit)") }
+
+            // `--flag=value` inline spelling.
+            let inline = try RunCLI.parseArgs(["--cpus=2", "--name=foo", "alpine"])
+            guard inline.resource == ["--cpus", "2"], inline.management == ["--name", "foo"], inline.name == "foo" else {
+                throw CLIError(command: "selftest", message: "inline =value wrong: \(inline.resource) \(inline.management) \(inline.name ?? "nil")")
+            }
+
+            // `--` ends flag parsing early; the very next token is IMAGE even
+            // if it looks like a flag.
+            let dashdash = try RunCLI.parseArgs(["--env", "A=1", "--", "--not-a-flag", "arg2"])
+            guard dashdash.process == ["--env", "A=1"], dashdash.image == "--not-a-flag", dashdash.command == ["arg2"] else {
+                throw CLIError(command: "selftest", message: "-- termination wrong: \(dashdash.process) \(dashdash.image) \(dashdash.command)")
+            }
+
+            // Everything after IMAGE is verbatim command argv — never parsed,
+            // even flag-shaped or explicitly-unsupported-looking tokens.
+            let postImage = try RunCLI.parseArgs(["alpine", "--restart", "always", "-e", "X=1"])
+            guard postImage.image == "alpine", postImage.command == ["--restart", "always", "-e", "X=1"],
+                  postImage.process.isEmpty, postImage.management.isEmpty
+            else { throw CLIError(command: "selftest", message: "post-IMAGE argv was reparsed: \(postImage.command)") }
+
+            // Unknown flag.
+            do {
+                _ = try RunCLI.parseArgs(["--bogus", "alpine"])
+                throw CLIError(command: "selftest", message: "unknown flag not rejected")
+            } catch let e as RunCLI.ParseError {
+                guard e.message == "unknown flag: --bogus" else {
+                    throw CLIError(command: "selftest", message: "unknown flag message wrong: \(e.message ?? "nil")")
+                }
+            }
+
+            // -i/--interactive hard error.
+            do {
+                _ = try RunCLI.parseArgs(["-i", "alpine"])
+                throw CLIError(command: "selftest", message: "-i not rejected")
+            } catch let e as RunCLI.ParseError {
+                guard e.message?.contains("interactive runs aren't supported") == true else {
+                    throw CLIError(command: "selftest", message: "-i message wrong: \(e.message ?? "nil")")
+                }
+            }
+
+            // Docker flags with no platform mapping.
+            do {
+                _ = try RunCLI.parseArgs(["--restart", "always", "alpine"])
+                throw CLIError(command: "selftest", message: "--restart not rejected")
+            } catch let e as RunCLI.ParseError {
+                guard e.message?.contains("--restart") == true, e.message?.contains("no equivalent") == true else {
+                    throw CLIError(command: "selftest", message: "--restart message wrong: \(e.message ?? "nil")")
+                }
+            }
+
+            // A value-taking flag at argv end.
+            do {
+                _ = try RunCLI.parseArgs(["--name"])
+                throw CLIError(command: "selftest", message: "trailing --name without a value not rejected")
+            } catch let e as RunCLI.ParseError {
+                guard e.message == "flag --name needs a value" else {
+                    throw CLIError(command: "selftest", message: "trailing-value message wrong: \(e.message ?? "nil")")
+                }
+            }
+
+            // Bare `run` (no IMAGE at all): usage only, no message.
+            do {
+                _ = try RunCLI.parseArgs([])
+                throw CLIError(command: "selftest", message: "empty argv not rejected")
+            } catch let e as RunCLI.ParseError {
+                guard e.message == nil else {
+                    throw CLIError(command: "selftest", message: "empty-argv error should carry no message: \(e.message ?? "nil")")
+                }
+            }
+
+            // --verbose and --quiet are mutually exclusive.
+            do {
+                _ = try RunCLI.parseArgs(["--verbose", "--quiet", "alpine"])
+                throw CLIError(command: "selftest", message: "--verbose --quiet combo not rejected")
+            } catch let e as RunCLI.ParseError {
+                guard e.message?.contains("mutually exclusive") == true else {
+                    throw CLIError(command: "selftest", message: "verbose/quiet message wrong: \(e.message ?? "nil")")
+                }
+            }
+
+            // Invalid --pull value.
+            do {
+                _ = try RunCLI.parseArgs(["--pull", "sometimes", "alpine"])
+                throw CLIError(command: "selftest", message: "invalid --pull value not rejected")
+            } catch let e as RunCLI.ParseError {
+                guard e.message?.contains("invalid --pull value") == true else {
+                    throw CLIError(command: "selftest", message: "--pull message wrong: \(e.message ?? "nil")")
+                }
+            }
+        }
+        await step("run: live run with --name/--env/--publish/--label, then --rm one-shot") {
+            let name = "davit-selftest-run"
+            try? await ContainerService.delete(name, force: true)
+            defer { Task { try? await ContainerService.delete(name, force: true) } }
+
+            let inv = try RunCLI.parseArgs([
+                "--name", name, "--env", "FOO=bar", "--publish", "18080:80",
+                "--label", "team=davit", "alpine:latest", "sleep", "120",
+            ])
+            _ = try await RunCLI.execute(inv)
+
+            let record = try await ContainerService.listContainers().first { $0.id == name }
+            guard record?.isRunning == true else {
+                throw CLIError(command: "selftest", message: "run: container not running after run")
+            }
+            guard record?.configuration.initProcess?.environment?.contains("FOO=bar") == true else {
+                throw CLIError(command: "selftest", message: "run: --env not applied: \(record?.configuration.initProcess?.environment ?? [])")
+            }
+            guard record?.configuration.labels?["team"] == "davit" else {
+                throw CLIError(command: "selftest", message: "run: --label not applied: \(record?.configuration.labels ?? [:])")
+            }
+            guard let port = record?.configuration.publishedPorts?.first, port.hostPort == 18080, port.containerPort == 80 else {
+                throw CLIError(command: "selftest", message: "run: --publish not applied: \(record?.configuration.publishedPorts ?? [])")
+            }
+            try await ContainerService.delete(name, force: true)
+
+            // --rm one-shot: the container must be gone once it exits, no
+            // manual cleanup — poll rather than sleep a fixed amount.
+            let rmName = "davit-selftest-run-rm"
+            try? await ContainerService.delete(rmName, force: true)
+            let rmInv = try RunCLI.parseArgs(["--name", rmName, "--rm", "alpine:latest", "true"])
+            _ = try await RunCLI.execute(rmInv)
+            var gone = false
+            for _ in 0..<30 {
+                if try await ContainerService.listContainers().first(where: { $0.id == rmName }) == nil {
+                    gone = true
+                    break
+                }
+                try await Task.sleep(for: .seconds(1))
+            }
+            guard gone else {
+                try? await ContainerService.delete(rmName, force: true)
+                throw CLIError(command: "selftest", message: "run: --rm container still present 30s after a one-shot exit")
             }
         }
         await step("compose: parse subset + ordering + cycle rejection") {

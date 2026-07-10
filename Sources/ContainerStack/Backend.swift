@@ -193,6 +193,20 @@ enum ContainerService {
         reference.contains("/containerization/vminit") || reference.contains("/container-builder-shim/")
     }
 
+    /// Whether `reference` already resolves to a locally present image — the
+    /// same lookup `ClientImage.fetch` does internally before falling back to
+    /// a pull. Used by `davit run --pull never` to fail fast instead of
+    /// silently degrading to `missing`'s pull-if-absent behavior.
+    static func imageExists(_ reference: String) async throws -> Bool {
+        let config = try await Backend.systemConfig()
+        do {
+            _ = try await ClientImage.get(reference: reference, containerSystemConfig: config)
+            return true
+        } catch {
+            return false
+        }
+    }
+
     static func listNetworks() async throws -> [NetworkRecord] {
         try await NetworkClient().list().map(NetworkRecord.init(resource:))
     }
@@ -314,6 +328,7 @@ enum ContainerService {
         managementArgs: [String],
         resourceArgs: [String],
         commandArgs: [String],
+        autoRemove: Bool = false,
         retainExitCode: Bool = false,
         progressUpdate: @escaping ProgressUpdateHandler = { _ in }
     ) async throws {
@@ -347,7 +362,7 @@ enum ContainerService {
             let client = ContainerClient()
             try await client.create(
                 configuration: configuration,
-                options: ContainerCreateOptions(autoRemove: false),
+                options: ContainerCreateOptions(autoRemove: autoRemove),
                 kernel: kernel,
                 initImage: initImage
             )

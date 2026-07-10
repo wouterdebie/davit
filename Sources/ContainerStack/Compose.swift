@@ -1454,7 +1454,9 @@ extension Compose {
     /// handler per container printing new lines as they arrive, and the call
     /// never returns — Ctrl-C ends the process (the containers keep running).
     /// `output` receives whole prefixed lines (stdout by default) so the
-    /// selftest can capture the non-follow path.
+    /// selftest can capture the non-follow path. The actual per-stream
+    /// tail/follow mechanics live in `followLogStreams` below, shared with
+    /// `davit run`'s single-container attach (Main.swift RunCLI).
     static func logs(
         plan: Plan,
         services requested: [String] = [],
@@ -1467,24 +1469,61 @@ extension Compose {
         for name in requested where !known.contains(name) { throw Error.noSuchService(name) }
         let selected = requested.isEmpty ? known : Set(requested)
 
-        // Log lines bypass print's stdio buffer — flush it so any headers the
-        // CLI printed earlier stay ahead of them when stdout is a pipe.
-        fflush(stdout)
-
         let existing = Set(try await ContainerService.listContainers().map(\.id))
         let targets = plan.services.filter { selected.contains($0.service) && existing.contains($0.name) }
         let width = targets.map(\.name.count).max() ?? 0
-        var streams: [(prefix: String, name: String, handle: FileHandle, backlog: Bool)] = []
+        var streams: [LogStream] = []
         for svc in targets {
-            // Index 0 is the stdio log, 1 the boot log (LogStreamer convention);
-            // a container deleted since the snapshot just drops out. The fds
-            // come dup'd from XPC with closeOnDealloc off — close what we
-            // don't keep or every call leaks the boot-log descriptor.
-            guard let handles = try? await ContainerClient().logs(id: svc.name), !handles.isEmpty else { continue }
-            for extra in handles.dropFirst() { try? extra.close() }
+            guard let handle = await openLogHandle(svc.name) else { continue }
             let prefix = svc.name.padding(toLength: width, withPad: " ", startingAt: 0) + "  | "
-            streams.append((prefix, svc.name, handles[0], !skipBacklogFor.contains(svc.service)))
+            streams.append(LogStream(prefix: prefix, name: svc.name, handle: handle, backlog: !skipBacklogFor.contains(svc.service)))
         }
+        try await followLogStreams(streams, tail: tail, follow: follow, output: output)
+    }
+
+    /// Opens a container's primary stdio log handle. Index 0 of the pair
+    /// `ContainerClient.logs` returns is stdio, 1 is the boot log (LogStreamer
+    /// convention); a container deleted since the last snapshot just drops
+    /// out (`nil`). The fds come dup'd from XPC with closeOnDealloc off — the
+    /// boot-log handle is closed immediately or every call leaks it. Not
+    /// `private`: `davit run`'s attach path (Main.swift RunCLI) opens a
+    /// single stream this same way before handing it to `followLogStreams`.
+    static func openLogHandle(_ name: String) async -> FileHandle? {
+        guard let handles = try? await ContainerClient().logs(id: name), !handles.isEmpty else { return nil }
+        for extra in handles.dropFirst() { try? extra.close() }
+        return handles[0]
+    }
+
+    /// One log stream to print/follow: `prefix` is prepended to every line
+    /// (compose's aligned `"<name>  | "`, or `""` for a single container like
+    /// `davit run`'s attach); `name` is the container id, used to notice it
+    /// exiting; `backlog` gates whether any tail is replayed at all (compose's
+    /// `skipBacklogFor`).
+    struct LogStream {
+        let prefix: String
+        let name: String
+        let handle: FileHandle
+        let backlog: Bool
+    }
+
+    /// Prints each stream's backlog (bounded by `tail`, skipped entirely when
+    /// `backlog` is false) then, if `follow`, streams new lines until every
+    /// stream's container has stopped running. The shared core of compose
+    /// `logs`/`up`'s attach (many streams, aligned prefixes) and `davit run`'s
+    /// attach (one stream, no prefix) — never returns while followed
+    /// containers are still running; the caller owns the process lifetime
+    /// (Ctrl-C / exit()).
+    static func followLogStreams(
+        _ streams: [LogStream],
+        tail: Int?,
+        follow: Bool,
+        output: @escaping @Sendable (String) -> Void
+    ) async throws {
+        // Log lines bypass print's stdio buffer — flush it so any headers a
+        // caller printed earlier (compose's "Attaching to logs", `davit run`'s
+        // banner) stay ahead of them when stdout is a pipe or, as here, a
+        // process that exits before its buffered stdio is otherwise flushed.
+        fflush(stdout)
 
         for stream in streams {
             // Remember the end of file before the backwards tail read, so the

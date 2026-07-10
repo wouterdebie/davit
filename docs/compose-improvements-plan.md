@@ -147,7 +147,7 @@ Davit-side semantics (not passthrough):
 - `--verbose`/`-q/--quiet` honored like compose (reuse the I4 output level).
 
 **Tasks:**
-- [ ] **I6 — `Davit run` mode.** Per Design I6: Main.swift run mode + routing table,
+- [x] **I6 — `Davit run` mode.** Per Design I6: Main.swift run mode + routing table,
   Backend `autoRemove` param, usage string + README (Binary modes + a feature-bullet
   mention). Selftest: pure routing tests (each bucket, unknown flag, -i error,
   post-IMAGE argv untouched); live: run alpine sleep with --name/--env/--publish/
