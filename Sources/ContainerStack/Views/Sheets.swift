@@ -24,6 +24,7 @@ struct RunContainerSheet: View {
     @State private var cpus = ""
     @State private var memory = ""
     @State private var running = false
+    @State private var progressText = ""
     @State private var errorText: String?
 
     var body: some View {
@@ -56,6 +57,13 @@ struct RunContainerSheet: View {
                         .foregroundStyle(.red)
                         .lineLimit(3)
                         .textSelection(.enabled)
+                } else if running {
+                    ProgressView().controlSize(.small)
+                    Text(progressText)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                 }
                 Spacer()
                 Button("Cancel") { dismiss() }
@@ -261,6 +269,7 @@ struct RunContainerSheet: View {
     private func run() {
         running = true
         errorText = nil
+        progressText = "Creating container… (pulls the image on first run)"
 
         let args = buildArgs()
         let processArgs = args.process
@@ -284,8 +293,22 @@ struct RunContainerSheet: View {
                     processArgs: processArgs,
                     managementArgs: managementArgs,
                     resourceArgs: resourceArgs,
-                    commandArgs: commandArgs
+                    commandArgs: commandArgs,
+                    progressUpdate: { events in
+                        // Image-fetch phase: surface the platform's own
+                        // descriptions ("Fetching image…", layer counts) live.
+                        await MainActor.run {
+                            for event in events {
+                                switch event {
+                                case .setDescription(let text): progressText = text
+                                case .setSubDescription(let text): progressText = text
+                                default: break
+                                }
+                            }
+                        }
+                    }
                 )
+                await MainActor.run { progressText = "Starting…" }
                 if let replacing, !sameName {
                     // Rename: the new container is up, now retire the old one.
                     try? await ContainerService.stop(replacing.id)
