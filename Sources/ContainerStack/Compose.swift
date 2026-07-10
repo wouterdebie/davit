@@ -183,7 +183,7 @@ enum Compose {
     /// variable) are returned rather than printed, so the caller can route
     /// them into whatever warnings channel it has.
     private static func parseDotEnv(
-        text: String, processEnvironment: [String: String]
+        text: String, processEnvironment: [String: String], fallback: [String: String] = [:]
     ) throws -> (values: [String: String], warnings: [String]) {
         var out: [String: String] = [:]
         var warnings: [String] = []
@@ -199,14 +199,28 @@ enum Compose {
             guard !key.isEmpty else { continue }
             var value = entry[entry.index(after: eq)...].trimmingCharacters(in: .whitespacesAndNewlines)
             var singleQuoted = false
-            if value.count >= 2, value.hasPrefix("'"), value.hasSuffix("'") {
-                singleQuoted = true
-                value = String(value.dropFirst().dropLast())
-            } else if value.count >= 2, value.hasPrefix("\""), value.hasSuffix("\"") {
-                value = String(value.dropFirst().dropLast())
+            // Docker dotenv: a quoted value ends at the MATCHING close quote
+            // (anything after, e.g. an inline comment, is dropped), and an
+            // unquoted value is cut at the first whitespace-preceded "#".
+            // Suffix-testing the whole line instead would mis-handle
+            // `PASS='p$wd' # login` and interpolate a "literal" value.
+            if let quote = value.first, quote == "'" || quote == "\"" {
+                let inner = value.dropFirst()
+                if let close = inner.firstIndex(of: quote) {
+                    singleQuoted = (quote == "'")
+                    value = String(inner[..<close])
+                }
+            } else if let hash = value.firstIndex(of: "#"),
+                      hash != value.startIndex,
+                      value[value.index(before: hash)].isWhitespace {
+                value = String(value[..<hash]).trimmingCharacters(in: .whitespaces)
             }
             if !singleQuoted {
-                let lookup = out.merging(processEnvironment) { _, process in process }
+                // Precedence (compose-go): process/effective env > this file's
+                // earlier lines > earlier env_files (the fallback tier).
+                let lookup = fallback
+                    .merging(out) { _, own in own }
+                    .merging(processEnvironment) { _, process in process }
                 value = try substitute(value, environment: lookup, warned: &warned, warnings: &warnings)
             }
             out[key] = value
@@ -491,12 +505,12 @@ enum Compose {
                 if required { throw Error.envFileNotFound(resolved) }
                 continue
             }
-            // Layer this file's lookup under the effective environment but over
-            // every earlier env_file's already-parsed values, so a later file
-            // can reference an earlier one's variables (compose-go parity) —
-            // the effective environment still wins any naming conflict.
-            let lookup = fileEnv.merging(environment) { _, env in env }
-            let (values, fileWarnings) = try parseDotEnv(text: text, processEnvironment: lookup)
+            // Lookup precedence (compose-go): effective environment, then this
+            // file's own earlier lines, then earlier env_files — a file
+            // redefining X then referencing it must see its own value, not an
+            // earlier file's.
+            let (values, fileWarnings) = try parseDotEnv(
+                text: text, processEnvironment: environment, fallback: fileEnv)
             fileEnv.merge(values) { _, later in later }
             warnings += fileWarnings
         }
@@ -1017,6 +1031,7 @@ extension Compose {
         plan: Plan,
         diagnostic: @escaping Diagnostic = { _ in },
         onServiceTouched: @escaping @Sendable (String) -> Void = { _ in },
+        onNetworkCreated: @escaping @Sendable (String) -> Void = { _ in },
         progress: @escaping @Sendable (StepKind, _ done: Bool) async -> Void
     ) async throws -> (warnings: [String], reused: Set<String>) {
         let existingVolumes = Set((try? await ContainerService.listVolumes())?.map(\.name) ?? [])
@@ -1030,6 +1045,7 @@ extension Compose {
         for network in plan.networks where !existingNetworks.contains(network) {
             await progress(.network(network), false)
             try await ContainerService.createNetwork(name: network, subnet: nil, internal: false)
+            onNetworkCreated(network)
             await progress(.network(network), true)
         }
         // Undeclared networks referenced by services (we warned) — create those too.
@@ -1037,6 +1053,7 @@ extension Compose {
         for network in referenced.subtracting(plan.networks).subtracting(existingNetworks).sorted() {
             await progress(.network(network), false)
             try await ContainerService.createNetwork(name: network, subnet: nil, internal: false)
+            onNetworkCreated(network)
             await progress(.network(network), true)
         }
 
@@ -1206,6 +1223,7 @@ extension Compose {
         services requested: [String] = [],
         removeVolumes: Bool = false,
         limitContainersTo: Set<String>? = nil,
+        limitNetworksTo: Set<String>? = nil,
         diagnostic: Diagnostic = { _ in },
         progress: @escaping @Sendable (StepKind, _ done: Bool) async -> Void
     ) async throws -> [String] {
@@ -1248,7 +1266,11 @@ extension Compose {
         guard requested.isEmpty else { return warnings }
 
         let networks = Set((try? await ContainerService.listNetworks())?.map(\.name) ?? [])
-        for network in plan.networks where !plan.externalNetworks.contains(network) && networks.contains(network) {
+        // limitNetworksTo (the --down-on-failure path) restricts deletion to
+        // networks that specific up CREATED — a pre-existing project network
+        // (from an earlier successful up) must survive a failed re-up.
+        for network in plan.networks where !plan.externalNetworks.contains(network) && networks.contains(network)
+            && (limitNetworksTo?.contains(network) ?? true) {
             await progress(.network(network), false)
             diagnostic("network \(network): removing")
             do {

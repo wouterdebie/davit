@@ -88,7 +88,8 @@ struct ContainersView: View {
                 let url = URL(fileURLWithPath: args[i + 1])
                 if let text = try? String(contentsOf: url, encoding: .utf8) {
                     let dir = url.deletingLastPathComponent()
-                    let environment = (try? Compose.effectiveEnvironment(composeDir: dir.path))?.environment ?? [:]
+                    let environment = (try? Compose.effectiveEnvironment(composeDir: dir.path))?.environment
+                        ?? ProcessInfo.processInfo.environment  // .env may throw (${X:?}); degrade to process env, not empty
                     composePlan = try? ComposeImport.parseFiltered(
                         text: text, projectName: dir.lastPathComponent, baseDir: dir.path,
                         environment: environment)

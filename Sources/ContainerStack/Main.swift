@@ -532,11 +532,13 @@ enum ComposeCLI {
                     if inv.subcommand == "up" {
                         let up: (warnings: [String], reused: Set<String>)
                         let touched = TouchedServices()
+                        let createdNetworks = TouchedServices()
                         do {
                             up = try await Compose.up(
                                 plan: plan,
                                 diagnostic: { output.verbose($0) },
-                                onServiceTouched: { touched.insert($0) }
+                                onServiceTouched: { touched.insert($0) },
+                                onNetworkCreated: { createdNetworks.insert($0) }
                             ) { step, done in
                                 if done { output.say("up: \(step.label) done") }
                             }
@@ -557,9 +559,13 @@ enum ComposeCLI {
                                     let warnings = try await Compose.down(
                                         plan: plan, services: teardown, removeVolumes: false,
                                         limitContainersTo: touched.all,
+                                        limitNetworksTo: createdNetworks.all,
                                         diagnostic: { output.verbose($0) }
                                     ) { _, _ in }
                                     for w in warnings { output.warn(w) }
+                                    // Surviving reused services may hold hosts
+                                    // entries for torn-down containers; re-sync.
+                                    for w in await Compose.syncProjectHosts(plan: plan) { output.warn(w) }
                                 } catch let teardownError {
                                     let detail = (teardownError as? LocalizedError)?.errorDescription
                                         ?? String(describing: teardownError)
@@ -635,6 +641,12 @@ enum ComposeCLI {
                     let plan = try parsed.selecting(
                         services: inv.services, activeProfiles: inv.profiles, includeDependencies: false)
                     let records = try await Compose.ps(plan: plan)
+                    if inv.flags.contains("quiet") {
+                        // docker parity: `ps -q` prints bare container IDs (our
+                        // IDs are the names), one per line, nothing else.
+                        for r in records { print(r.container) }
+                        exit(0)
+                    }
                     let rows = [["SERVICE", "CONTAINER", "STATE", "PORTS"]]
                         + records.map { [$0.service, $0.container, $0.state, $0.ports] }
                     let widths = (0..<4).map { c in rows.map { $0[c].count }.max() ?? 0 }
@@ -943,16 +955,28 @@ enum RunCLI {
         }
 
         output.verbose("resolved name: \(resolvedName)")
-        try await ContainerService.runContainer(
-            image: inv.image,
-            name: resolvedName,
-            processArgs: inv.process,
-            managementArgs: inv.management,
-            resourceArgs: inv.resource,
-            commandArgs: inv.command,
-            autoRemove: inv.autoRemove,
-            retainExitCode: retainExitCode
-        )
+        do {
+            try await ContainerService.runContainer(
+                image: inv.image,
+                name: resolvedName,
+                processArgs: inv.process,
+                managementArgs: inv.management,
+                resourceArgs: inv.resource,
+                commandArgs: inv.command,
+                autoRemove: inv.autoRemove,
+                retainExitCode: retainExitCode
+            )
+        } catch {
+            // create succeeded but start failed (port conflict etc.): with
+            // --rm, a container that never ran must not survive to block the
+            // name — daemon autoRemove only reaps STOPPED containers, and the
+            // foreground path strips it anyway. Without --rm docker leaves the
+            // created container behind; we match that.
+            if inv.autoRemove {
+                try? await ContainerService.delete(resolvedName, force: true)
+            }
+            throw error
+        }
 
         // Apple's own ContainerRun writes this right after bootstrap starts,
         // with the same 0644/create-only semantics; erroring here (rather
@@ -1018,6 +1042,22 @@ enum RunCLI {
                 // `davit run img cmd | consumer` never sees status noise
                 // ahead of (or interleaved with) real output.
                 output.sayErr("Attaching to logs (Ctrl-C detaches; container keeps running)")
+                var sigintSource: DispatchSourceSignal?
+                if deferRemoval {
+                    // Removal is deferred to after the attach; Ctrl-C ends the
+                    // process before that line runs, so the container would
+                    // silently outlive --rm. Can't forward signals to the guest
+                    // on this platform — be honest instead of silent.
+                    signal(SIGINT, SIG_IGN)
+                    let src = DispatchSource.makeSignalSource(signal: SIGINT)
+                    src.setEventHandler {
+                        FileHandle.standardError.write(Data(
+                            "\ndetached — container \(resolvedName) keeps running and will NOT be auto-removed (--rm removal runs after the attach): remove it later with `container delete \(resolvedName)`\n".utf8))
+                        exit(130)
+                    }
+                    src.resume()
+                    sigintSource = src
+                }
                 if let handle = await Compose.openLogHandle(resolvedName) {
                     // Best-effort: a follow error must not skip the exit-code
                     // fetch / --rm cleanup below.
@@ -1034,6 +1074,7 @@ enum RunCLI {
                 // stopped, so the registered wait (retainExitCode above)
                 // resolves immediately here.
                 let exitCode = await ComposeExitCodes.shared.exitCode(for: resolvedName) ?? 0
+                sigintSource?.cancel()
                 if deferRemoval {
                     try? await ContainerService.delete(resolvedName, force: true)
                 }
@@ -1803,8 +1844,35 @@ enum SelfTest {
             else { throw CLIError(command: "selftest", message: ":+ operator wrong") }
             _ = warned  // reserved for future warning assertions
 
-            // CRLF .env: values must not keep a trailing \r; quotes must strip.
             let fm = FileManager.default
+            // Cross-file env_file precedence: a file redefining X then
+            // referencing it must see its OWN value (compose-go), not an
+            // earlier file's.
+            let xDir = fm.temporaryDirectory.appendingPathComponent("davit-selftest-xfile-\(UUID().uuidString)")
+            try fm.createDirectory(at: xDir, withIntermediateDirectories: true)
+            defer { try? fm.removeItem(at: xDir) }
+            try "X=one\n".write(to: xDir.appendingPathComponent("a.env"), atomically: true, encoding: .utf8)
+            try "X=two\nY=${X}\n".write(to: xDir.appendingPathComponent("b.env"), atomically: true, encoding: .utf8)
+            let xPlan = try Compose.parse(
+                text: "services: {s: {image: alpine, env_file: [a.env, b.env]}}",
+                projectName: "x", baseDir: xDir.path)
+            guard xPlan.services[0].processArgs.contains("Y=two") else {
+                throw CLIError(command: "selftest", message: "cross-file env_file precedence wrong: \(xPlan.services[0].processArgs)")
+            }
+
+            // Inline comments: quoted values end at the close quote (rest
+            // dropped, single-quote stays literal); unquoted cut at " #".
+            let cDir = fm.temporaryDirectory.appendingPathComponent("davit-selftest-cmt-\(UUID().uuidString)")
+            try fm.createDirectory(at: cDir, withIntermediateDirectories: true)
+            defer { try? fm.removeItem(at: cDir) }
+            try "PASS='p$wd' # login\nPRICE=10 # in $USD\n".write(
+                to: cDir.appendingPathComponent(".env"), atomically: true, encoding: .utf8)
+            let cEnv = try Compose.effectiveEnvironment(composeDir: cDir.path, processEnvironment: [:])
+            guard cEnv.environment["PASS"] == "p$wd", cEnv.environment["PRICE"] == "10" else {
+                throw CLIError(command: "selftest", message: "inline comment handling wrong: \(cEnv.environment)")
+            }
+
+            // CRLF .env: values must not keep a trailing \r; quotes must strip.
             let crlfDir = fm.temporaryDirectory.appendingPathComponent("davit-selftest-crlf-\(UUID().uuidString)")
             try fm.createDirectory(at: crlfDir, withIntermediateDirectories: true)
             defer { try? fm.removeItem(at: crlfDir) }
