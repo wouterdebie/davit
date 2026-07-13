@@ -171,6 +171,7 @@ struct ImageDetailView: View {
 
     enum Tab: String, CaseIterable {
         case overview = "Overview"
+        case layers = "Layers"
         case inspect = "Inspect"
     }
     @State private var tab: Tab = .overview
@@ -188,6 +189,7 @@ struct ImageDetailView: View {
                     Divider()
                     switch tab {
                     case .overview: overview(image)
+                    case .layers: ImageLayersTab(reference: image.name)
                     case .inspect: InspectTab(kind: "image", id: image.name)
                     }
                 }
@@ -328,5 +330,74 @@ struct TagImageSheet: View {
         }
         .padding(20)
         .frame(width: 420)
+    }
+}
+
+
+/// Layers of an image (host platform): size, the command that made each, and
+/// the digest. The topmost layers are the most-recently-added.
+struct ImageLayersTab: View {
+    let reference: String
+    @State private var layers: [ContainerService.ImageLayer]?
+    @State private var error: String?
+
+    var body: some View {
+        Group {
+            if let error {
+                EmptyState(icon: "exclamationmark.triangle", title: "Couldn't read layers", message: error)
+            } else if let layers {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text("\(layers.count) layer\(layers.count == 1 ? "" : "s")")
+                                .font(.headline)
+                            Spacer()
+                            Text("total \(formatBytes(layers.reduce(0) { $0 + $1.sizeBytes }))")
+                                .foregroundStyle(.secondary)
+                        }
+                        ForEach(layers) { layer in
+                            DetailCard(title: "", icon: "square.3.layers.3d.down.right") {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack {
+                                        Text("Layer \(layer.index + 1)").font(.body.weight(.medium))
+                                        Spacer()
+                                        Text(formatBytes(layer.sizeBytes)).foregroundStyle(.secondary)
+                                    }
+                                    if let cmd = layer.createdBy, !cmd.isEmpty {
+                                        Text(prettyCommand(cmd))
+                                            .font(.system(.caption, design: .monospaced))
+                                            .foregroundStyle(.secondary)
+                                            .textSelection(.enabled)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                    Text(layer.digest)
+                                        .font(.system(.caption2, design: .monospaced))
+                                        .foregroundStyle(.tertiary)
+                                        .textSelection(.enabled)
+                                        .lineLimit(1).truncationMode(.middle)
+                                }
+                            }
+                        }
+                    }
+                    .padding(16)
+                }
+            } else {
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .task(id: reference) {
+            do { layers = try await ContainerService.imageLayers(reference) }
+            catch { self.error = (error as? CLIError)?.message ?? error.localizedDescription }
+        }
+    }
+
+    /// buildkit history commands are prefixed with a shell wrapper; strip the
+    /// common "/bin/sh -c #(nop) " and "/bin/sh -c " noise for readability.
+    private func prettyCommand(_ raw: String) -> String {
+        var c = raw
+        for prefix in ["/bin/sh -c #(nop) ", "/bin/sh -c "] {
+            if c.hasPrefix(prefix) { c = String(c.dropFirst(prefix.count)); break }
+        }
+        return c.trimmingCharacters(in: .whitespaces)
     }
 }

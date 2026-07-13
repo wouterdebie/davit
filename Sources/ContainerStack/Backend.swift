@@ -198,6 +198,8 @@ enum ContainerService {
             // Machine backing containers are infrastructure; they live in the
             // Machines section (the CLI hides them from `container list` too).
             .filter { $0.configuration.labels?["com.apple.container.plugin"] != "machine" }
+            // Volume-browser helpers are infrastructure too (see VolumeBrowser).
+            .filter { $0.configuration.labels?["com.davit.volume-browser"] == nil }
     }
 
     static func listImages() async throws -> [ImageRecord] {
@@ -585,6 +587,42 @@ enum ContainerService {
     }
 
     // MARK: Inspection
+
+    /// A built image layer for the detail view: size, digest, and the
+    /// Dockerfile-ish command that produced it (from the config history).
+    struct ImageLayer: Identifiable {
+        let index: Int
+        let sizeBytes: Int64
+        let digest: String
+        let createdBy: String?
+        var id: Int { index }
+    }
+
+    /// Layers of an image for the host platform, zipped with the non-empty
+    /// history entries (empty_layer history items are metadata-only and have
+    /// no matching layer blob).
+    static func imageLayers(_ reference: String) async throws -> [ImageLayer] {
+        do {
+            let config = try await Backend.systemConfig()
+            let image = try await ClientImage.get(reference: reference, containerSystemConfig: config)
+            let platform = ContainerizationOCI.Platform(
+                arch: Arch.hostArchitecture().rawValue, os: "linux")
+            let manifest = try await image.manifest(for: platform)
+            let history = (try? await image.config(for: platform))?.history ?? []
+            // Pair each real layer with the next non-empty history command,
+            // in order. History has extra empty_layer entries (ENV, CMD, …).
+            let commands = history.filter { $0.emptyLayer != true }.map(\.createdBy)
+            return manifest.layers.enumerated().map { i, layer in
+                ImageLayer(
+                    index: i,
+                    sizeBytes: layer.size,
+                    digest: layer.digest,
+                    createdBy: i < commands.count ? commands[i] : nil)
+            }
+        } catch {
+            throw CLIError.wrap("image layers \(reference)", error)
+        }
+    }
 
     static func inspectRaw(_ kind: String, _ id: String) async throws -> String {
         switch kind {
@@ -1474,5 +1512,43 @@ enum StopNotifier {
             identifier: "container-stopped-\(id)-\(UUID().uuidString)",
             content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
+    }
+}
+
+
+// MARK: - Volume browsing (mount into a throwaway container)
+
+/// Volumes have no filesystem API of their own, so browsing one means mounting
+/// it into a tiny helper container and reusing the exec/copy file operations.
+/// The helper is labeled infrastructure and cleaned up when the sheet closes.
+enum VolumeBrowser {
+    static let mountPoint = "/volume"
+    static let helperImage = "docker.io/library/alpine:latest"
+
+    /// Create + start a helper with the volume mounted at /volume; returns its id.
+    static func open(volumeName: String) async throws -> String {
+        do {
+            let id = "davit-volume-\(volumeName)-\(UUID().uuidString.prefix(6))".lowercased()
+            try await ContainerService.runContainer(
+                image: helperImage,
+                name: id,
+                processArgs: [],
+                managementArgs: [
+                    "--mount", "type=volume,source=\(volumeName),target=\(mountPoint)",
+                    "--label", "com.davit.volume-browser=\(volumeName)",
+                ],
+                resourceArgs: ["--cpus", "1", "--memory", "256m"],
+                commandArgs: ["sleep", "86400"]
+            )
+            return id
+        } catch let e as CLIError {
+            throw e
+        } catch {
+            throw CLIError.wrap("browse volume \(volumeName)", error)
+        }
+    }
+
+    static func close(_ helperID: String) async {
+        try? await ContainerService.delete(helperID, force: true)
     }
 }

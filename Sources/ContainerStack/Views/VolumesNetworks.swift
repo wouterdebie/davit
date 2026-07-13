@@ -6,6 +6,7 @@ struct VolumesView: View {
     @EnvironmentObject var state: AppState
     @State private var search = ""
     @State private var showCreateSheet = false
+    @State private var browsing: VolumeRecord?
 
     private var filtered: [VolumeRecord] {
         guard !search.isEmpty else { return state.volumes }
@@ -60,11 +61,12 @@ struct VolumesView: View {
                 }
             }
             .sheet(isPresented: $showCreateSheet) { CreateVolumeSheet() }
+            .sheet(item: $browsing) { VolumeBrowserSheet(volume: $0) }
         }
     }
 
     private var list: some View {
-        VolumeListContent(volumes: filtered, usedNames: usedVolumeNames)
+        VolumeListContent(volumes: filtered, usedNames: usedVolumeNames, browse: { browsing = $0 })
             .refreshIndicator(state.isRefreshing)
     }
 }
@@ -74,13 +76,15 @@ struct VolumeListContent: View {
     let volumes: [VolumeRecord]
     let usedNames: Set<String>
     var scrollable = true
+    var browse: (VolumeRecord) -> Void = { _ in }
 
     var body: some View {
         CardList(items: volumes, scrollable: scrollable) { volume in
-            HoverRow {
+            HoverRow(action: { browse(volume) }) {
                 VolumeRow(volume: volume, inUse: usedNames.contains(volume.name))
             }
             .contextMenu {
+                Button("Browse Files…") { browse(volume) }
                 Button("Copy Source Path") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(volume.source ?? "", forType: .string)
@@ -259,5 +263,52 @@ struct NetworkRow: View {
             }
         }
         .padding(.vertical, 5)
+    }
+}
+
+
+/// Browse a volume's contents by mounting it into a throwaway helper container
+/// and reusing the Files tab. The helper is created on appear and deleted on
+/// dismiss.
+struct VolumeBrowserSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let volume: VolumeRecord
+
+    @State private var helperID: String?
+    @State private var error: String?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Volume: \(volume.name)").font(.title3.weight(.semibold))
+                Spacer()
+                Button("Done") { dismiss() }
+            }
+            .padding(16)
+            Divider()
+            Group {
+                if let error {
+                    EmptyState(icon: "exclamationmark.triangle", title: "Couldn't open volume", message: error)
+                } else if let helperID {
+                    ContainerFilesTab(
+                        containerID: helperID, isRunning: true,
+                        notRunningMessage: "The helper container stopped.")
+                } else {
+                    VStack(spacing: 8) {
+                        ProgressView()
+                        Text("Mounting volume…").foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+        }
+        .frame(width: 640, height: 520)
+        .task {
+            do { helperID = try await VolumeBrowser.open(volumeName: volume.name) }
+            catch { self.error = (error as? CLIError)?.message ?? error.localizedDescription }
+        }
+        .onDisappear {
+            if let helperID { Task { await VolumeBrowser.close(helperID) } }
+        }
     }
 }

@@ -4,7 +4,21 @@ import SwiftUI
 /// Browse, download, upload and delete files inside a running container.
 struct ContainerFilesTab: View {
     @EnvironmentObject var state: AppState
-    let container: ContainerRecord
+    let containerID: String
+    let isRunning: Bool
+    var notRunningMessage = "Start the container to browse its files."
+
+    init(container: ContainerRecord) {
+        self.containerID = container.id
+        self.isRunning = container.isRunning
+    }
+    /// Browse an arbitrary running container by id (used by volume browsing,
+    /// where the container is a throwaway that mounts the volume).
+    init(containerID: String, isRunning: Bool, notRunningMessage: String) {
+        self.containerID = containerID
+        self.isRunning = isRunning
+        self.notRunningMessage = notRunningMessage
+    }
 
     @State private var path = Self.initialPath
 
@@ -21,9 +35,9 @@ struct ContainerFilesTab: View {
     @State private var busy = false
 
     var body: some View {
-        if !container.isRunning {
+        if !isRunning {
             EmptyState(icon: "folder", title: "Container not running",
-                       message: "Start the container to browse its files.")
+                       message: notRunningMessage)
         } else {
             VStack(spacing: 0) {
                 toolbar
@@ -150,7 +164,7 @@ struct ContainerFilesTab: View {
         loading = true
         error = nil
         do {
-            entries = try await ContainerService.listDirectory(container.id, path: path)
+            entries = try await ContainerService.listDirectory(containerID, path: path)
         } catch let e as CLIError {
             error = e.message
             entries = []
@@ -169,7 +183,7 @@ struct ContainerFilesTab: View {
         busy = true
         defer { busy = false }
         do {
-            try await ContainerService.downloadFile(container.id, containerPath: entry.path(in: path), to: dest)
+            try await ContainerService.downloadFile(containerID, containerPath: entry.path(in: path), to: dest)
         } catch let e as CLIError {
             state.lastError = e
         } catch {
@@ -187,7 +201,7 @@ struct ContainerFilesTab: View {
         defer { busy = false }
         for url in panel.urls {
             do {
-                try await ContainerService.uploadFile(container.id, hostURL: url, toDirectory: path)
+                try await ContainerService.uploadFile(containerID, hostURL: url, toDirectory: path)
             } catch let e as CLIError {
                 state.lastError = e
             } catch {
@@ -208,7 +222,7 @@ struct ContainerFilesTab: View {
         busy = true
         defer { busy = false }
         do {
-            try await ContainerService.deletePath(container.id, path: entry.path(in: path))
+            try await ContainerService.deletePath(containerID, path: entry.path(in: path))
             await load()
         } catch let e as CLIError {
             state.lastError = e
