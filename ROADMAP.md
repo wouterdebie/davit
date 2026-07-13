@@ -93,7 +93,10 @@ remaining A item is #2 (file browsing), intentionally scheduled in Wave 2.
   resolve in the shim (future).
 - ✅ #4/#5/#6 answered + FAQ ("replace Docker Desktop?", local images, compose).
 - Later: machine `.machine` DNS assumed default domain; devcontainers idea (#6);
-  compose `build:`; 1.1.0 platform bump (brew formula is ahead of our 1.0.0 pin).
+  compose `build:`; ~~1.1.0 platform bump~~ (done, v0.1.12). ClientProcess.kill
+  bug confirmed upstream on apple/container#1941 (2026-07-13, our findings added);
+  when it's fixed, the compose healthcheck abandoned-probe workaround can become
+  a real kill.
 
 ## Feasibility notes (grounded in the API)
 - File browsing: `ContainerClient.exec` + `copyIn`/`copyOut` exist — no new daemon capability needed.
