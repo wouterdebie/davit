@@ -92,6 +92,10 @@ remaining A item is #2 (file browsing), intentionally scheduled in Wave 2.
   pulls, run auto-pull, compose, machine create. Build-time base images still
   resolve in the shim (future).
 - ✅ #4/#5/#6 answered + FAQ ("replace Docker Desktop?", local images, compose).
+- Later: usage metrics — decided (2026-07-13) against feature telemetry (audience
+  trust); if wanted, the appcast model: point update checks at davit.app and count
+  access-log requests (disclosed, no payload). GitHub release download counts
+  already show ~400 active updating installs. Parked for now.
 - Later: machine `.machine` DNS assumed default domain; devcontainers idea (#6);
   compose `build:`; ~~1.1.0 platform bump~~ (done, v0.1.12). ClientProcess.kill
   bug confirmed upstream on apple/container#1941 (2026-07-13, our findings added);
