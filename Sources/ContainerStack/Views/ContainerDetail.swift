@@ -121,6 +121,9 @@ struct ContainerDetailView: View {
 struct ContainerOverviewTab: View {
     let container: ContainerRecord
     var scrollable = true
+    /// The configured default DNS domain (dns.domain), loaded once per show:
+    /// with a host resolver domain created, containers answer at id.<domain>.
+    @State private var dnsDomain: String?
 
     var body: some View {
         Group {
@@ -128,6 +131,13 @@ struct ContainerOverviewTab: View {
                 ScrollView { content }
             } else {
                 content
+            }
+        }
+        .task {
+            let domain = (try? await Backend.systemConfig())?.dns.domain
+            // Only show the hint when the host can actually resolve it.
+            if let domain, DNSDomainService.list().contains(domain) {
+                dnsDomain = domain
             }
         }
     }
@@ -167,6 +177,9 @@ struct ContainerOverviewTab: View {
                                 InfoRow(label: "Hostname", value: host, monospaced: true)
                             }
                             InfoRow(label: "Network", value: net.network ?? "default")
+                        }
+                        if let domain = dnsDomain, !domain.isEmpty {
+                            InfoRow(label: "DNS name", value: "\(container.id).\(domain)", monospaced: true, copyable: true)
                         }
                     }
                 }

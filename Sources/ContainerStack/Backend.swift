@@ -1319,7 +1319,7 @@ enum ShellCommandInstaller {
         try await runPrivileged("rm -f \(shellQuote(wrapperPath))")
     }
 
-    private static func runPrivileged(_ command: String) async throws {
+    static func runPrivileged(_ command: String) async throws {
         // osascript presents the standard macOS authorization dialog.
         let escaped = command
             .replacingOccurrences(of: "\\", with: "\\\\")
@@ -1378,5 +1378,45 @@ extension ContainerService {
         let imageEnv = Set(ociImage.config?.env ?? [])
         prefill.customEnv = recordEnv.filter { !imageEnv.contains($0) }
         return prefill
+    }
+}
+
+
+// MARK: - Local DNS domains (host -> container name resolution)
+
+/// Wraps the platform's local DNS domains (`container system dns`): an
+/// /etc/resolver entry per domain, so `web.<domain>` resolves from the host.
+/// Listing is unprivileged (public client API); create/delete write to
+/// /etc/resolver and therefore run the platform CLI once with admin rights.
+enum DNSDomainService {
+    static func list() -> [String] {
+        HostDNSResolver().listDomains().map(\.pqdn)
+    }
+
+    static func create(_ domain: String) async throws {
+        guard domain.range(of: "^[A-Za-z0-9.-]+$", options: .regularExpression) != nil else {
+            throw CLIError(command: "dns create", message: "invalid domain name: \(domain)")
+        }
+        guard let cli = cliPath() else {
+            throw CLIError(command: "dns create", message: "container CLI not found in the resolved platform install")
+        }
+        try await ShellCommandInstaller.runPrivileged("\(shellQuote(cli)) system dns create \(shellQuote(domain))")
+    }
+
+    static func delete(_ domain: String) async throws {
+        guard let cli = cliPath() else {
+            throw CLIError(command: "dns delete", message: "container CLI not found in the resolved platform install")
+        }
+        try await ShellCommandInstaller.runPrivileged("\(shellQuote(cli)) system dns delete \(shellQuote(domain))")
+    }
+
+    private static func cliPath() -> String? {
+        guard let root = ContainerBinary.resolve()?.installRoot else { return nil }
+        let path = "\(root)/bin/container"
+        return FileManager.default.isExecutableFile(atPath: path) ? path : nil
+    }
+
+    private static func shellQuote(_ s: String) -> String {
+        "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 }

@@ -330,6 +330,7 @@ struct SystemSettings: View {
                     Section("Registry & DNS") {
                         LabeledField(label: "Default registry", hint: model.hint("registry.domain"), text: $model.registryDomain)
                         LabeledField(label: "Local DNS domain", hint: model.hint("dns.domain") ?? "none", text: $model.dnsDomain)
+                        DNSDomainsRow(defaultDomain: $model.dnsDomain)
                     }
                     Section("Builder") {
                         SteppedCountField(label: "CPUs", hint: model.hint("build.cpus"), text: $model.buildCpus)
@@ -514,5 +515,86 @@ struct AboutSettings: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
+    }
+}
+
+
+/// Host-side local DNS domains (`container system dns`): an /etc/resolver
+/// entry per domain so `web.<domain>` resolves from the Mac. Creating and
+/// deleting write to /etc/resolver, so they ask for admin once.
+struct DNSDomainsRow: View {
+    @Binding var defaultDomain: String
+    @State private var domains: [String] = DNSDomainService.list()
+    @State private var newDomain = ""
+    @State private var working = false
+    @State private var errorText: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if domains.isEmpty {
+                Text("No host DNS domains. Create one (e.g. \u{201C}test\u{201D}) and containers become reachable at \u{201C}name.test\u{201D} from your Mac.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(domains, id: \.self) { domain in
+                HStack {
+                    Text(domain).font(.system(.body, design: .monospaced))
+                    if domain == defaultDomain {
+                        Text("default")
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 6).padding(.vertical, 1)
+                            .background(Color.accentColor.opacity(0.15), in: Capsule())
+                            .foregroundStyle(Color.accentColor)
+                    }
+                    Spacer()
+                    if domain != defaultDomain {
+                        Button("Make Default") { defaultDomain = domain }
+                            .controlSize(.small)
+                            .help("Containers join this domain (saved with these settings)")
+                    }
+                    Button("Delete") { run { try await DNSDomainService.delete(domain) } }
+                        .controlSize(.small)
+                }
+            }
+            HStack {
+                TextField("New domain (e.g. test)", text: $newDomain)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 180)
+                Button("Create\u{2026}") {
+                    let domain = newDomain.trimmingCharacters(in: .whitespaces)
+                    run {
+                        try await DNSDomainService.create(domain)
+                        await MainActor.run {
+                            newDomain = ""
+                            if defaultDomain.isEmpty { defaultDomain = domain }
+                        }
+                    }
+                }
+                .disabled(newDomain.trimmingCharacters(in: .whitespaces).isEmpty || working)
+                if working { ProgressView().controlSize(.small) }
+            }
+            Text("Creating or deleting a domain asks for administrator authorization (it writes /etc/resolver).")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+            if let errorText {
+                Text(errorText).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+            }
+        }
+    }
+
+    private func run(_ action: @escaping () async throws -> Void) {
+        working = true
+        errorText = nil
+        Task {
+            do {
+                try await action()
+            } catch {
+                // "User canceled" comes back from osascript when the auth dialog is dismissed
+                let text = (error as? CLIError)?.message ?? error.localizedDescription
+                if !text.contains("User canceled") { errorText = text }
+            }
+            domains = DNSDomainService.list()
+            working = false
+        }
     }
 }
