@@ -209,6 +209,42 @@ struct ImageRecord: Identifiable, Hashable, Encodable {
         return s
     }
 
+    func matchesReference(_ ref: String) -> Bool {
+        !Self.referenceAliases(for: name).isDisjoint(with: Self.referenceAliases(for: ref))
+    }
+
+    private static func referenceAliases(for ref: String) -> Set<String> {
+        let ref = ref.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !ref.isEmpty else { return [] }
+
+        var aliases: Set<String> = []
+        func add(_ value: String) {
+            guard !value.isEmpty else { return }
+            aliases.insert(value)
+            aliases.insert(withImplicitLatestTag(value))
+        }
+
+        add(ref)
+
+        let short = shortName(ref)
+        add(short)
+
+        if short.hasPrefix("library/") {
+            add(String(short.dropFirst("library/".count)))
+        }
+
+        return aliases
+    }
+
+    private static func withImplicitLatestTag(_ ref: String) -> String {
+        guard !ref.contains("@") else { return ref }
+        let lastSlash = ref.lastIndex(of: "/")
+        if let lastColon = ref.lastIndex(of: ":"), lastSlash == nil || lastColon > lastSlash! {
+            return ref
+        }
+        return "\(ref):latest"
+    }
+
     var repository: String {
         let base = shortNameTag.split(separator: ":").dropLast().joined(separator: ":")
         return base.isEmpty ? shortNameTag : base
@@ -238,6 +274,25 @@ extension ImageRecord {
             platforms: platforms,
             variants: variants
         )
+    }
+}
+
+extension ImageRecord {
+    enum Compatibility: Hashable {
+        case unknown
+        case native
+        case amd64RequiresRosetta
+        case otherCrossArch
+    }
+
+    func compatibility(hostArch: String) -> Compatibility {
+        guard !variants.isEmpty else { return .unknown }
+        let nativeDisplay = "linux/\(hostArch)"
+        if platforms.contains(nativeDisplay) { return .native }
+        if hostArch == "arm64" && platforms.contains("linux/amd64") {
+            return .amd64RequiresRosetta
+        }
+        return .otherCrossArch
     }
 }
 

@@ -26,6 +26,7 @@ struct RunContainerSheet: View {
     @State private var running = false
     @State private var progressText = ""
     @State private var errorText: String?
+    @State private var rosettaInstalled = RosettaCheck.isInstalled()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -77,12 +78,13 @@ struct RunContainerSheet: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(image.isEmpty || running)
+                .disabled(image.isEmpty || running || runBlockedByRosetta)
             }
             .padding(16)
         }
         .frame(width: 560, height: 680)
         .onAppear {
+            refreshRosettaStatus()
             image = prefilledImage
             if network.isEmpty || !state.networks.contains(where: { $0.name == network }) {
                 network = state.networks.first?.name ?? "default"
@@ -90,6 +92,9 @@ struct RunContainerSheet: View {
             if let source = recreate {
                 prefill(from: source)
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshRosettaStatus()
         }
     }
 
@@ -147,6 +152,10 @@ struct RunContainerSheet: View {
                     .textFieldStyle(.roundedBorder)
                 TextField("Command override (optional, e.g. sleep infinity)", text: $command)
                     .textFieldStyle(.roundedBorder)
+            }
+
+            if compatibility == .amd64RequiresRosetta {
+                compatibilityCard
             }
 
             DetailCard(title: "Ports", icon: "arrow.left.arrow.right") {
@@ -212,6 +221,70 @@ struct RunContainerSheet: View {
         .padding(16)
     }
 
+    // MARK: Compatibility (amd64-only image on Apple silicon)
+
+    private var selectedImage: ImageRecord? {
+        guard !image.isEmpty else { return nil }
+        return state.images.first { $0.matchesReference(image) }
+    }
+
+    private var compatibility: ImageRecord.Compatibility {
+        selectedImage?.compatibility(hostArch: HostPlatform.arch) ?? .unknown
+    }
+
+    private var runBlockedByRosetta: Bool {
+        compatibility == .amd64RequiresRosetta && !rosettaInstalled
+    }
+
+    private func refreshRosettaStatus() {
+        rosettaInstalled = RosettaCheck.isInstalled()
+    }
+
+    @ViewBuilder
+    private var compatibilityCard: some View {
+        let installed = rosettaInstalled
+        let tint: Color = installed ? .orange : .red
+        let icon = installed ? "exclamationmark.triangle" : "xmark.octagon"
+        DetailCard(title: "Compatibility", icon: icon) {
+            VStack(alignment: .leading, spacing: 8) {
+                if installed {
+                    Text("This image only ships `linux/amd64`. It will run under Rosetta translation on Apple silicon.")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(tint)
+                    Text("Davit is passing `--arch amd64` automatically. Performance will be lower than a native `arm64` image.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("This image only ships `linux/amd64` and Rosetta isn't installed.")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(tint)
+                    Text("Install Rosetta with `softwareupdate --install-rosetta --agree-to-license`, then try again.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Button {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(
+                                "softwareupdate --install-rosetta --agree-to-license",
+                                forType: .string)
+                        } label: {
+                            Label("Copy Install Command", systemImage: "doc.on.doc")
+                        }
+                        Button {
+                            let url = URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app")
+                            NSWorkspace.shared.open(url)
+                        } label: {
+                            Label("Open Terminal", systemImage: "terminal")
+                        }
+                    }
+                    .controlSize(.small)
+                    .padding(.top, 2)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
     /// The four flag groups the form produces, shared by run() and the CLI preview.
     private struct RunArgs { var process: [String]; var management: [String]; var resource: [String]; var command: [String] }
 
@@ -234,6 +307,10 @@ struct RunContainerSheet: View {
             }
         }
         if network != "default" && !network.isEmpty { managementArgs += ["--network", network] }
+        if compatibility == .amd64RequiresRosetta {
+            // Pin amd64-only images so the platform selects the Rosetta path.
+            managementArgs += ["--arch", "amd64"]
+        }
 
         var resourceArgs: [String] = []
         if !cpus.isEmpty { resourceArgs += ["--cpus", cpus] }
