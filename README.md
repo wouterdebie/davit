@@ -45,7 +45,7 @@ in-terminal shell (`davit exec`), and even launchd service bootstrap all go thro
 ## Releases
 
 Tagging `v*` triggers a GitHub Actions workflow that builds the app on a macOS
-runner and attaches `Davit-<version>.zip` (+ sha256) to a GitHub Release.
+runner and attaches `Davit-<version>.dmg` and `Davit-<version>.zip` (+ sha256s) to a GitHub Release. The DMG is the drag-to-Applications install; the zip feeds the in-app updater and Homebrew.
 
 With these repository secrets set, releases are Developer ID signed (hardened
 runtime) and notarized, so they open like any other app:
@@ -68,7 +68,7 @@ brew install wouterdebie/tap/davit
 ```
 
 (Homebrew 6 asks you to trust third-party taps on first use: `brew trust wouterdebie/tap`.)
-Or download the signed zip from [Releases](https://github.com/wouterdebie/davit/releases/latest) / [davit.app](https://davit.app).
+Or download the signed DMG from [Releases](https://github.com/wouterdebie/davit/releases/latest) / [davit.app](https://davit.app) and drag Davit to Applications.
 
 ## Getting started
 

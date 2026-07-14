@@ -119,14 +119,40 @@ jobs:
           ditto -c -k --keepParent "dist/Davit.app" "Davit-${VERSION}.zip"
           shasum -a 256 "Davit-${VERSION}.zip" > "Davit-${VERSION}.zip.sha256"
 
+      # The zip stays the machine channel (in-app updater, Homebrew cask);
+      # the DMG is the human one — mount, drag Davit to Applications.
+      - name: Build DMG
+        run: |
+          brew install create-dmg || echo "create-dmg unavailable — plain hdiutil layout"
+          VERSION="${GITHUB_REF_NAME#v}"
+          scripts/make-dmg.sh dist/Davit.app "Davit-${VERSION}.dmg"
+          if [ -n "$MACOS_CERT_P12" ]; then
+            codesign --force --timestamp -s "$CODESIGN_IDENTITY" "Davit-${VERSION}.dmg"
+          fi
+
+      - name: Notarize DMG
+        if: env.MACOS_CERT_P12 != ''
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: scripts/notarize.sh "Davit-${GITHUB_REF_NAME#v}.dmg"
+
+      - name: Checksum DMG
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          shasum -a 256 "Davit-${VERSION}.dmg" > "Davit-${VERSION}.dmg.sha256"
+
       - name: Write release notes
         run: |
           if [ -n "$MACOS_CERT_P12" ]; then
             cat > RELEASE_NOTES.md <<'NOTES'
           ## Install
 
-          Download the zip below, unzip, and move `Davit.app` to /Applications.
-          This build is Developer ID signed and notarized — it opens like any other app.
+          Download the DMG below, open it, and drag Davit to Applications.
+          This build is Developer ID signed and notarized — it opens like any
+          other app. (The zip is the same app; it's what the in-app updater
+          and Homebrew use.)
 
           Requires an Apple silicon Mac. On first launch Davit offers to install
           Apple's container platform if it isn't present (no admin rights needed).
@@ -135,7 +161,8 @@ jobs:
             cat > RELEASE_NOTES.md <<'NOTES'
           ## Install
 
-          1. Download the zip below, unzip, and move `Davit.app` to /Applications.
+          1. Download the DMG below, open it, and drag Davit to Applications
+             (or use the zip — same app).
           2. This build is not notarized (ad-hoc signature), so macOS will refuse to
              open it until you clear the quarantine flag:
 
@@ -152,6 +179,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            Davit-*.dmg
+            Davit-*.dmg.sha256
             Davit-*.zip
             Davit-*.zip.sha256
           generate_release_notes: true
