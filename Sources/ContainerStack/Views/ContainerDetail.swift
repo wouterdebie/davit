@@ -19,6 +19,9 @@ struct ContainerDetailView: View {
         if args.contains("--pose-tab-files") { return .files }
         return .overview
     }()
+    /// Set by the overview OOM banner's "View kernel log" button so the Logs
+    /// tab opens straight onto the boot (kernel) log.
+    @State private var openLogsOnBoot = false
 
     private var container: ContainerRecord? {
         state.containers.first { $0.id == containerID }
@@ -42,6 +45,11 @@ struct ContainerDetailView: View {
             if ProcessInfo.processInfo.arguments.contains(where: { $0.hasPrefix("--probe") }) {
                 FileHandle.standardError.write(Data("DBG detail-view-shown \(containerID)\n".utf8))
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .davitShowBootLog)) { note in
+            guard note.object as? String == containerID else { return }
+            openLogsOnBoot = true
+            tab = .logs
         }
         .toolbar {
             if let container {
@@ -108,7 +116,7 @@ struct ContainerDetailView: View {
     private func tabContent(_ c: ContainerRecord) -> some View {
         switch tab {
         case .overview: ContainerOverviewTab(container: c)
-        case .logs: ContainerLogsTab(containerID: c.id)
+        case .logs: ContainerLogsTab(containerID: c.id, initialBoot: openLogsOnBoot)
         case .stats: ContainerStatsTab(container: c)
         case .files: ContainerFilesTab(container: c)
         case .inspect: InspectTab(kind: "container", id: c.id)
@@ -119,6 +127,7 @@ struct ContainerDetailView: View {
 // MARK: - Overview tab
 
 struct ContainerOverviewTab: View {
+    @EnvironmentObject var state: AppState
     let container: ContainerRecord
     var scrollable = true
     /// The configured default DNS domain (dns.domain), loaded once per show:
@@ -140,10 +149,19 @@ struct ContainerOverviewTab: View {
                 dnsDomain = domain
             }
         }
+        .task(id: container.id) {
+            // Learn why a stopped container died (OOM), even if it happened
+            // while Davit wasn't running.
+            state.checkStopReasonIfNeeded(container.id)
+        }
     }
 
     private var content: some View {
             VStack(spacing: 14) {
+                if case .outOfMemory(let process) = state.stopReasons[container.id], !container.isRunning {
+                    oomBanner(process: process)
+                }
+
                 DetailCard(title: "General", icon: "info.circle") {
                     InfoRow(label: "ID", value: container.id, monospaced: true, copyable: true)
                     InfoRow(label: "Image", value: container.imageReference, monospaced: true, copyable: true)
@@ -243,6 +261,46 @@ struct ContainerOverviewTab: View {
         guard let date else { return "—" }
         return "\(date.formatted(date: .abbreviated, time: .shortened)) (\(relativeDate(date)))"
     }
+
+    /// Shown when a stopped container was OOM-killed against its own memory
+    /// limit — the common "why did it just die?" case (see the kernel log).
+    private func oomBanner(process: String?) -> some View {
+        let limit = container.configuration.resources?.memoryInBytes ?? 0
+        let who = process.map { "“\($0)” " } ?? "A process "
+        let limitText = limit > 0 ? " of \(formatBytes(limit))" : ""
+        return HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "memorychip")
+                .font(.title2)
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Stopped: out of memory")
+                    .font(.headline)
+                Text("\(who)exceeded this container's memory limit\(limitText) and was killed by the kernel. Give it more memory and recreate it.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 10) {
+                    Button("Edit & Recreate…") { state.recreateTarget = container }
+                        .controlSize(.small)
+                    Button("View kernel log") {
+                        NotificationCenter.default.post(name: .davitShowBootLog, object: container.id)
+                    }
+                    .controlSize(.small)
+                }
+                .padding(.top, 2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(.orange.opacity(0.35)))
+    }
+}
+
+extension Notification.Name {
+    /// Overview banner -> detail view: jump to the Logs tab showing boot logs.
+    static let davitShowBootLog = Notification.Name("davitShowBootLog")
 }
 
 // MARK: - Logs tab
@@ -252,8 +310,14 @@ struct ContainerLogsTab: View {
     var machine = false
     @StateObject private var streamer = LogStreamer()
     @State private var follow = true
-    @State private var bootLogs = false
+    @State private var bootLogs: Bool
     @State private var tailCount = 500
+
+    init(containerID: String, machine: Bool = false, initialBoot: Bool = false) {
+        self.containerID = containerID
+        self.machine = machine
+        self._bootLogs = State(initialValue: initialBoot)
+    }
 
     var body: some View {
         VStack(spacing: 0) {

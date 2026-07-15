@@ -25,6 +25,13 @@ final class AppState: ObservableObject {
     // UI state
     @Published var busyIDs: Set<String> = []
     @Published var recreateTarget: ContainerRecord?
+    /// Why a stopped container died (OOM, etc.), keyed by id — drives the
+    /// detail-view banner and enriches stop notifications. Populated on an
+    /// unexpected stop and lazily when a stopped container's detail is opened.
+    @Published var stopReasons: [String: StopReason] = [:]
+    /// Ids whose kernel log we've already inspected, so we don't re-read it
+    /// every refresh (an absence of OOM is a valid, cached result).
+    private var stopReasonChecked: Set<String> = []
     /// Cross-view intent: a container to reveal in the Containers detail view
     /// (e.g. clicked from the Dashboard). Consumed by ContainersView.
     @Published var pendingContainerOpen: String?
@@ -171,6 +178,12 @@ final class AppState: ObservableObject {
         if let cs {
             let sorted = cs.sorted { sortKey($0) < sortKey($1) }
             notifyUnexpectedStops(old: containers, new: sorted)
+            // A container that's running again gets a clean slate — clear any
+            // stale stop reason so a recovered container doesn't keep its banner.
+            for c in sorted where c.isRunning {
+                stopReasons[c.id] = nil
+                stopReasonChecked.remove(c.id)
+            }
             containers = sorted
         }
         if let imgs { images = imgs.sorted { $0.shortNameTag < $1.shortNameTag } }
@@ -179,17 +192,41 @@ final class AppState: ObservableObject {
         if let df { diskUsage = df }
     }
 
-    /// running -> stopped without a Davit-initiated stop/kill/delete => notify
-    /// (opt-in). Deleted-while-running also consumes its mark and stays quiet.
+    /// running -> stopped without a Davit-initiated stop/kill/delete. We read
+    /// the kernel log to learn *why* (OOM, etc.), cache it for the detail-view
+    /// banner, and — if notifications are on (opt-in) — post an enriched alert.
+    /// Deleted-while-running consumes its mark and stays quiet.
     private func notifyUnexpectedStops(old: [ContainerRecord], new: [ContainerRecord]) {
-        guard StopNotifier.enabled, !old.isEmpty else { return }
+        guard !old.isEmpty else { return }
         let newByID = Dictionary(uniqueKeysWithValues: new.map { ($0.id, $0) })
         for was in old where was.isRunning {
             let isRunningNow = newByID[was.id]?.isRunning ?? false
-            guard !isRunningNow else { continue }
-            if !ExpectedStops.shared.consume(was.id) && newByID[was.id] != nil {
-                StopNotifier.notifyStopped(was.id)
+            guard !isRunningNow, newByID[was.id] != nil else { continue }
+            guard !ExpectedStops.shared.consume(was.id) else { continue }
+            let id = was.id
+            let limitBytes = was.configuration.resources?.memoryInBytes ?? 0
+            stopReasonChecked.insert(id)   // this diff is our one authoritative check
+            Task { [weak self] in
+                let reason = await ContainerService.stopReason(id)
+                await MainActor.run {
+                    if let reason { self?.stopReasons[id] = reason }
+                    StopNotifier.notifyStopped(id, reason: reason, limitBytes: limitBytes)
+                }
             }
+        }
+    }
+
+    /// Lazily inspect a stopped container's kernel log for a death reason (OOM),
+    /// once. Covers containers that died before Davit was watching — e.g. when
+    /// you open the detail of a container that stopped while the app was closed.
+    func checkStopReasonIfNeeded(_ id: String) {
+        guard !stopReasonChecked.contains(id) else { return }
+        guard let c = containers.first(where: { $0.id == id }), !c.isRunning else { return }
+        stopReasonChecked.insert(id)
+        Task { [weak self] in
+            let reason = await ContainerService.stopReason(id)
+            guard let reason else { return }
+            await MainActor.run { self?.stopReasons[id] = reason }
         }
     }
 

@@ -1485,6 +1485,65 @@ enum DNSDomainService {
 }
 
 
+// MARK: - Stop reason (why did a container die?)
+
+/// A best-effort explanation for why a container stopped, read from the VM's
+/// kernel (boot) log. Only OOM is detected today; the enum leaves room to grow.
+enum StopReason: Equatable, Hashable {
+    /// The Linux OOM killer terminated a process because the container hit its
+    /// own `--memory` limit (memory cgroup OOM, not host RAM exhaustion).
+    /// `process` is the killed process name when the kernel logged it.
+    case outOfMemory(process: String?)
+
+    var isOOM: Bool { if case .outOfMemory = self { return true }; return false }
+}
+
+extension ContainerService {
+    /// Inspect a stopped container's kernel (boot) log for an out-of-memory
+    /// kill scoped to its own memory cgroup. The boot log is the VM kernel ring
+    /// for this container's last run, so a hit means *this* stop. Only the tail
+    /// is read; returns nil on any error (best-effort, never throws).
+    static func stopReason(_ id: String) async -> StopReason? {
+        guard let handles = try? await ContainerClient().logs(id: id), handles.count > 1 else {
+            return nil
+        }
+        let boot = handles[1]
+        defer { try? boot.close() }
+        return stopReason(fromKernelLines: LogStreamer.readTail(fh: boot, maxLines: 500))
+    }
+
+    /// Pure kernel-log scan, split out so it's unit-testable with captured
+    /// lines. Scans newest-first: the last OOM is the one that killed the
+    /// container. Matches a memory-cgroup OOM (the container's own `--memory`
+    /// limit), not host-RAM exhaustion.
+    static func stopReason(fromKernelLines lines: [String]) -> StopReason? {
+        for line in lines.reversed() {
+            let isMemcgOOM = line.contains("Memory cgroup out of memory")
+                || (line.contains("oom-kill:") && line.contains("CONSTRAINT_MEMCG"))
+            guard isMemcgOOM else { continue }
+            return .outOfMemory(process: killedProcessName(in: line))
+        }
+        return nil
+    }
+
+    /// Pull the process name out of a kernel OOM line, from either
+    /// "Killed process 109 (docling-serve)" or "...,task=docling-serve,...".
+    private static func killedProcessName(in line: String) -> String? {
+        if let open = line.range(of: "Killed process "),
+           let paren = line.range(of: "(", range: open.upperBound..<line.endIndex),
+           let close = line.range(of: ")", range: paren.upperBound..<line.endIndex) {
+            return String(line[paren.upperBound..<close.lowerBound])
+        }
+        if let r = line.range(of: "task=") {
+            let rest = line[r.upperBound...]
+            let name = rest.prefix { $0 != "," && $0 != " " }
+            return name.isEmpty ? nil : String(name)
+        }
+        return nil
+    }
+}
+
+
 // MARK: - Container stop notifications
 
 import UserNotifications
@@ -1502,11 +1561,18 @@ enum StopNotifier {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
-    static func notifyStopped(_ id: String) {
+    static func notifyStopped(_ id: String, reason: StopReason? = nil, limitBytes: Int64 = 0) {
         guard enabled, Bundle.main.bundleIdentifier != nil else { return }
         let content = UNMutableNotificationContent()
-        content.title = "Container stopped"
-        content.body = "\(id) stopped unexpectedly."
+        if case .outOfMemory(let process) = reason {
+            content.title = "Container ran out of memory"
+            let who = process.map { "\($0) " } ?? ""
+            let limit = limitBytes > 0 ? " (limit \(formatBytes(limitBytes)))" : ""
+            content.body = "\(id): \(who)was killed for exceeding its memory limit\(limit). Increase memory with Edit & Recreate."
+        } else {
+            content.title = "Container stopped"
+            content.body = "\(id) stopped unexpectedly."
+        }
         content.sound = .default
         let request = UNNotificationRequest(
             identifier: "container-stopped-\(id)-\(UUID().uuidString)",

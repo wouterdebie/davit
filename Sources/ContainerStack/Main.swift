@@ -2887,6 +2887,59 @@ enum SelfTest {
             guard json.contains("\"id\"") else { throw CLIError(command: "selftest", message: "bad inspect output") }
         }
 
+        await step("stop reason: parses memcg OOM from kernel log, ignores host OOM") {
+            // Real docling-test kernel lines (the memory-cgroup case).
+            let memcg = [
+                "[  235.040805] docling-serve invoked oom-killer: gfp_mask=0x100cca, order=0",
+                "[  235.046605] oom-kill:constraint=CONSTRAINT_MEMCG,oom_memcg=/container/docling-test,task=docling-serve,pid=109,uid=1001",
+                "[  235.046726] Memory cgroup out of memory: Killed process 109 (docling-serve) total-vm:4226544kB",
+            ]
+            guard ContainerService.stopReason(fromKernelLines: memcg) == .outOfMemory(process: "docling-serve") else {
+                throw CLIError(command: "selftest", message: "memcg OOM not parsed (process name from 'Killed process (...)')")
+            }
+            // task= is the fallback process source when the "Killed process" line isn't in the tail.
+            let taskOnly = ["oom-kill:constraint=CONSTRAINT_MEMCG,task=worker,pid=5"]
+            guard ContainerService.stopReason(fromKernelLines: taskOnly) == .outOfMemory(process: "worker") else {
+                throw CLIError(command: "selftest", message: "task= process fallback not parsed")
+            }
+            // A host-wide OOM (no memcg constraint) is NOT the container's own
+            // limit — don't misattribute it.
+            let hostOOM = ["oom-kill:constraint=CONSTRAINT_NONE,task=something,pid=1"]
+            guard ContainerService.stopReason(fromKernelLines: hostOOM) == nil else {
+                throw CLIError(command: "selftest", message: "host OOM should not be reported as the container's memory limit")
+            }
+            // A clean log yields no reason.
+            guard ContainerService.stopReason(fromKernelLines: ["[0.0] booting", "app ready"]) == nil else {
+                throw CLIError(command: "selftest", message: "clean log produced a spurious stop reason")
+            }
+        }
+
+        await step("stop reason: live OOM kill is detected from the boot log") {
+            let name = "davit-selftest-oom"
+            try? await ContainerService.delete(name, force: true)
+            defer { Task { try? await ContainerService.delete(name, force: true) } }
+
+            // tail /dev/zero is a classic memory bomb: unbounded anonymous
+            // memory until the cgroup OOM killer fires. 256 MB is the smallest
+            // the platform allows (minimum is 200 MiB) and fills in seconds.
+            let inv = try RunCLI.parseArgs([
+                "--name", name, "--memory", "256m", "--detach",
+                "alpine:latest", "sh", "-c", "tail /dev/zero"])
+            _ = try await RunCLI.execute(inv, retainExitCode: false)
+
+            // Wait (bounded) for it to die, then read the reason.
+            var reason: StopReason?
+            for _ in 0..<30 {
+                try? await Task.sleep(for: .seconds(1))
+                let running = (try? await ContainerService.listContainers().first { $0.id == name })??.isRunning ?? false
+                if !running { reason = await ContainerService.stopReason(name); break }
+            }
+            guard reason == .outOfMemory(process: "tail") || reason?.isOOM == true else {
+                throw CLIError(command: "selftest", message: "live OOM not detected (got \(String(describing: reason)))")
+            }
+            try await ContainerService.delete(name, force: true)
+        }
+
         print(failures == 0 ? "SELFTEST OK" : "SELFTEST FAILED (\(failures))")
         exit(failures == 0 ? 0 : 1)
     }
