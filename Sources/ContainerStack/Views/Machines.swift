@@ -181,46 +181,101 @@ struct CreateMachineSheet: View {
     @State private var progressText = ""
     @State private var errorText: String?
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Create Machine").font(.title3.weight(.semibold))
-            Text("A lightweight VM booted from a container image, with your home directory mounted and a stable DNS name.")
-                .font(.caption).foregroundStyle(.secondary)
+    private var defaultCPUs: Int {
+        max(1, ProcessInfo.processInfo.activeProcessorCount / 2)
+    }
 
-            Form {
-                TextField("Image (e.g. alpine:3.22, ubuntu:latest)", text: $image)
-                    .textFieldStyle(.roundedBorder)
-                TextField("Name", text: $name)
-                    .textFieldStyle(.roundedBorder)
-                HStack(alignment: .firstTextBaseline, spacing: 18) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("CPUs (default: half your cores)").font(.caption).foregroundStyle(.secondary)
-                        CountStepperControl(
-                            text: $cpus,
-                            placeholder: "\(max(1, ProcessInfo.processInfo.activeProcessorCount / 2))",
-                            defaultValue: max(1, ProcessInfo.processInfo.activeProcessorCount / 2))
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Memory (default: half your RAM)").font(.caption).foregroundStyle(.secondary)
-                        MemoryStepperControl(
-                            text: $memory, allowsEmpty: true,
-                            defaultText: "\(max(1, Int(ProcessInfo.processInfo.physicalMemory / 2 / 1_073_741_824)))GB")
+    private var defaultMemoryGB: Int {
+        max(1, Int(ProcessInfo.processInfo.physicalMemory / 2 / 1_073_741_824))
+    }
+
+    var body: some View {
+        VStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Create Machine").font(.title3.weight(.semibold))
+                Text("A lightweight VM booted from a container image, with your home directory mounted and a stable DNS name.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+
+            VStack(spacing: 14) {
+                DetailCard(title: "Image & Name", icon: "square.stack.3d.down.forward") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Image Reference").font(.caption).foregroundStyle(.secondary)
+                            TextField("e.g. alpine:3.22, ubuntu:latest", text: $image)
+                                .textFieldStyle(.roundedBorder)
+                                .onChange(of: image) {
+                                    updateDefaultName(for: image)
+                                }
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Machine Name").font(.caption).foregroundStyle(.secondary)
+                            TextField("e.g. alpine", text: $name)
+                                .textFieldStyle(.roundedBorder)
+                        }
                     }
                 }
+
+                DetailCard(title: "Resources", icon: "cpu") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .top, spacing: 20) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("CPUs").font(.caption).foregroundStyle(.secondary)
+                                CountStepperControl(
+                                    text: $cpus,
+                                    placeholder: "\(defaultCPUs)",
+                                    defaultValue: defaultCPUs
+                                )
+                            }
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Memory").font(.caption).foregroundStyle(.secondary)
+                                MemoryStepperControl(
+                                    text: $memory,
+                                    allowsEmpty: true,
+                                    defaultText: "\(defaultMemoryGB)GB"
+                                )
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        Text("CPU and memory default to half of your system resources.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+
+                DetailCard(title: "Options", icon: "gearshape") {
+                    Toggle(isOn: $setDefault) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Set as default machine").font(.callout)
+                            Text("Used by container machine commands when no machine name is specified.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .toggleStyle(.checkbox)
+                }
             }
-            .formStyle(.columns)
-            Toggle("Set as default machine", isOn: $setDefault)
-                .toggleStyle(.checkbox)
+            .padding(.horizontal, 16)
 
             if let errorText {
-                Text(errorText).font(.caption).foregroundStyle(.red)
-                    .textSelection(.enabled).lineLimit(4)
+                Text(errorText)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .textSelection(.enabled)
+                    .lineLimit(4)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
             }
 
             HStack {
                 if working {
                     ProgressView().controlSize(.small)
-                    Text(progressText).font(.caption).foregroundStyle(.secondary)
+                    Text(progressText).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer()
                 Button("Cancel") { dismiss() }
@@ -232,13 +287,21 @@ struct CreateMachineSheet: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(image.isEmpty || name.isEmpty || working)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .padding(.bottom, 8)
         }
-        .padding(20)
-        .frame(width: 460)
+        .frame(width: 480)
         .onAppear {
-            if name.isEmpty, let base = image.split(separator: ":").first?.split(separator: "/").last {
-                name = String(base)
+            if name.isEmpty {
+                updateDefaultName(for: image)
             }
+        }
+    }
+
+    private func updateDefaultName(for img: String) {
+        if let base = img.split(separator: ":").first?.split(separator: "/").last {
+            name = String(base)
         }
     }
 
@@ -469,35 +532,54 @@ struct EditMachineSheet: View {
     @State private var errorText: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Edit \(machine.id)").font(.title3.weight(.semibold))
-            Text(machine.isRunning
-                 ? "Changes apply after the machine is stopped and booted again."
-                 : "Changes apply on the next boot.")
-                .font(.caption).foregroundStyle(.secondary)
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Edit \(machine.id)").font(.title3.weight(.semibold))
+                Text(machine.isRunning
+                     ? "Changes apply after the machine is stopped and booted again."
+                     : "Changes apply on the next boot.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
 
-            Form {
-                HStack(alignment: .firstTextBaseline, spacing: 18) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("CPUs").font(.caption).foregroundStyle(.secondary)
-                        CountStepperControl(text: $cpus)
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Memory").font(.caption).foregroundStyle(.secondary)
-                        MemoryStepperControl(text: $memory)
+            VStack(spacing: 14) {
+                DetailCard(title: "Resources", icon: "cpu") {
+                    HStack(alignment: .top, spacing: 20) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("CPUs").font(.caption).foregroundStyle(.secondary)
+                            CountStepperControl(text: $cpus)
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Memory").font(.caption).foregroundStyle(.secondary)
+                            MemoryStepperControl(text: $memory)
+                        }
+                        Spacer(minLength: 0)
                     }
                 }
-                Picker("Home directory", selection: $homeMount) {
-                    Text("Mounted read-write").tag("rw")
-                    Text("Mounted read-only").tag("ro")
-                    Text("Not mounted").tag("none")
+
+                DetailCard(title: "Home Directory", icon: "folder") {
+                    Picker("Home directory", selection: $homeMount) {
+                        Text("Mounted read-write").tag("rw")
+                        Text("Mounted read-only").tag("ro")
+                        Text("Not mounted").tag("none")
+                    }
+                    .pickerStyle(.menu)
                 }
             }
-            .formStyle(.columns)
+            .padding(16)
 
             if let errorText {
-                Text(errorText).font(.caption).foregroundStyle(.red)
-                    .textSelection(.enabled).lineLimit(4)
+                Text(errorText)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .textSelection(.enabled)
+                    .lineLimit(4)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
             }
 
             HStack {
@@ -508,9 +590,11 @@ struct EditMachineSheet: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(working)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .padding(.bottom, 8)
         }
-        .padding(20)
-        .frame(width: 420)
+        .frame(width: 440)
         .onAppear {
             cpus = "\(machine.cpus)"
             // Binary units to match the platform ("64G" = GiB); decimal
