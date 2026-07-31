@@ -180,6 +180,9 @@ struct CreateMachineSheet: View {
     @State private var working = false
     @State private var progressText = ""
     @State private var errorText: String?
+    /// The last name we auto-derived from the image. Lets us keep the name in
+    /// sync as the image changes without clobbering a name the user typed.
+    @State private var autoFilledName = ""
 
     private var defaultCPUs: Int {
         max(1, ProcessInfo.processInfo.activeProcessorCount / 2)
@@ -300,9 +303,13 @@ struct CreateMachineSheet: View {
     }
 
     private func updateDefaultName(for img: String) {
-        if let base = img.split(separator: ":").first?.split(separator: "/").last {
-            name = String(base)
-        }
+        guard let base = img.split(separator: ":").first?.split(separator: "/").last.map(String.init)
+        else { return }
+        // Only fill in the name if the user hasn't hand-edited it — i.e. it's
+        // still empty or still equal to whatever we last auto-derived.
+        guard name.isEmpty || name == autoFilledName else { return }
+        name = base
+        autoFilledName = base
     }
 
     private func create() {
