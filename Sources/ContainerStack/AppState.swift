@@ -32,6 +32,11 @@ final class AppState: ObservableObject {
     /// Ids whose kernel log we've already inspected, so we don't re-read it
     /// every refresh (an absence of OOM is a valid, cached result).
     private var stopReasonChecked: Set<String> = []
+    /// True when services are running but no default guest kernel is configured
+    /// — containers can't start (issue #16). Drives the Dashboard banner.
+    @Published var kernelMissing = false
+    @Published var configuringKernel = false
+    private var kernelChecked = false
     /// Cross-view intent: a container to reveal in the Containers detail view
     /// (e.g. clicked from the Dashboard). Consumed by ContainersView.
     @Published var pendingContainerOpen: String?
@@ -163,8 +168,12 @@ final class AppState: ObservableObject {
         guard systemState.isRunning else {
             containers = []
             statsHistory = [:]
+            kernelChecked = false
+            kernelMissing = false
             return
         }
+
+        await checkKernelIfNeeded()
 
         async let c = try? ContainerService.listContainers()
         async let i = try? ContainerService.listImages()
@@ -232,6 +241,31 @@ final class AppState: ObservableObject {
 
     private func sortKey(_ c: ContainerRecord) -> String {
         (c.isRunning ? "0" : "1") + c.id.lowercased()
+    }
+
+    /// Check once per running session whether a default guest kernel exists.
+    /// Davit provisions it on its own Start, but a daemon started elsewhere
+    /// (CLI / official installer) may be running without one.
+    private func checkKernelIfNeeded() async {
+        guard !kernelChecked else { return }
+        kernelChecked = true
+        kernelMissing = !(await ContainerService.hasDefaultKernel())
+    }
+
+    /// One-click fix for the Dashboard banner: download + install the
+    /// recommended guest kernel, then clear the banner.
+    func configureKernel() {
+        guard !configuringKernel else { return }
+        configuringKernel = true
+        Task {
+            do {
+                try await ContainerService.configureDefaultKernel()
+                kernelMissing = false
+            } catch {
+                lastError = (error as? CLIError) ?? CLIError(command: "configure kernel", message: error.localizedDescription)
+            }
+            configuringKernel = false
+        }
     }
 
     func refreshStats() async {

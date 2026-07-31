@@ -1118,6 +1118,15 @@ enum SelfTest {
             let state = try await ContainerService.systemState()
             guard state.isRunning else { throw CLIError(command: "selftest", message: "services not running") }
         }
+        await step("default kernel is configured; configure is an idempotent no-op") {
+            // Services are up and containers run in this suite, so a default
+            // kernel must be present (issue #16 is the absence of this).
+            guard await ContainerService.hasDefaultKernel() else {
+                throw CLIError(command: "selftest", message: "hasDefaultKernel() false while services run")
+            }
+            // Idempotent: configuring when one already exists must not throw.
+            try await ContainerService.configureDefaultKernel()
+        }
         await step("list containers/images/volumes/networks/df") {
             _ = try await ContainerService.listContainers()
             _ = try await ContainerService.listImages()

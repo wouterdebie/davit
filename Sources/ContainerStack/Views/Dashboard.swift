@@ -45,6 +45,9 @@ struct DashboardView: View {
             if let update = state.availableUpdate {
                 UpdateBanner(update: update)
             }
+            if state.systemState.isRunning && state.kernelMissing {
+                KernelMissingBanner()
+            }
             systemCard
 
             if state.systemState.isRunning {
@@ -262,6 +265,41 @@ struct DiskUsageContent: View {
             }
             .fixedSize()
         }
+    }
+}
+
+/// Shown when services run but no default guest kernel is configured, so
+/// containers can't start (issue #16 — usually a daemon started outside Davit).
+/// One click downloads + installs the recommended kernel.
+struct KernelMissingBanner: View {
+    @EnvironmentObject var state: AppState
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "cpu")
+                .font(.system(size: 26))
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("No guest kernel configured")
+                    .font(.headline)
+                Text("The VM that runs your containers needs a Linux kernel, and none is set for this Mac. Containers won't start until one is installed.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            if state.configuringKernel {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Installing…").font(.caption).foregroundStyle(.secondary)
+                }
+            } else {
+                Button("Configure Kernel") { state.configureKernel() }
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(16)
+        .background(.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(.orange.opacity(0.30)))
     }
 }
 

@@ -560,6 +560,27 @@ enum ContainerService {
         }
     }
 
+    /// True when the daemon has a default guest kernel for this host arch.
+    /// When false, `run` fails with "default kernel not configured" (issue #16)
+    /// — which happens when the daemon was started outside Davit (CLI/official
+    /// installer), so Davit's start-time kernel provisioning never ran.
+    static func hasDefaultKernel() async -> Bool {
+        (try? await ClientKernel.getDefaultKernel(for: .current)) != nil
+    }
+
+    /// Download + install the recommended guest kernel — the manual equivalent
+    /// of what `systemStart` does. Idempotent (no-op if one already exists).
+    static func configureDefaultKernel() async throws {
+        do {
+            let config = try await Backend.systemConfig()
+            try await SystemController.ensureKernel(config: config)
+        } catch let e as CLIError {
+            throw e
+        } catch {
+            throw CLIError.wrap("configure kernel", error)
+        }
+    }
+
     static func systemStart() async throws {
         guard let resolved = ContainerBinary.resolve() else {
             throw CLIError(command: "system start", message: "container platform not found — install it from https://github.com/apple/container/releases or vendor it into the app")
@@ -744,7 +765,7 @@ enum SystemController {
         _ = try? await ClientImage.pull(reference: reference, containerSystemConfig: config)
     }
 
-    private static func ensureKernel(config: ContainerSystemConfig) async throws {
+    static func ensureKernel(config: ContainerSystemConfig) async throws {
         if (try? await ClientKernel.getDefaultKernel(for: .current)) != nil { return }
         // Download the recommended kernel archive and install it (mirrors --enable-kernel-install).
         let (tempURL, _) = try await URLSession.shared.download(from: config.kernel.url)
