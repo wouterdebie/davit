@@ -318,8 +318,6 @@ struct ContainerActions: View {
         panel.allowedContentTypes = [.init(filenameExtension: "tar") ?? .data]
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        state.perform(container.id) {
-            try await ContainerService.exportContainer(container.id, to: url)
-        }
+        state.exportContainer(container, to: url)
     }
 }

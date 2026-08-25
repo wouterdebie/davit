@@ -116,6 +116,25 @@ struct MainWindow: View {
                 dismissButton: .default(Text("OK"))
             )
         }
+        .overlay(alignment: .bottom) {
+            if let status = state.exportStatus {
+                HStack(spacing: 8) {
+                    if status.hasPrefix("Exported") {
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                    } else {
+                        ProgressView().controlSize(.small)
+                    }
+                    Text(status).font(.callout).monospacedDigit()
+                }
+                .padding(.horizontal, 16).padding(.vertical, 10)
+                .background(.regularMaterial, in: Capsule())
+                .overlay(Capsule().stroke(.separator))
+                .shadow(radius: 10, y: 2)
+                .padding(.bottom, 18)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.default, value: state.exportStatus)
     }
 
     private var sidebar: some View {

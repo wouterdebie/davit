@@ -349,6 +349,40 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Non-nil while a container export runs — drives the bottom HUD. The
+    /// export API reports no progress, so we poll the output file's size for a
+    /// live bytes-written readout (exports can be multi-GB and slow).
+    @Published var exportStatus: String?
+
+    func exportContainer(_ container: ContainerRecord, to url: URL) {
+        let id = container.id
+        exportStatus = "Exporting \(id)…"
+        let poll = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(500))
+                let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+                if let bytes = (attrs?[.size] as? NSNumber)?.int64Value, bytes > 0 {
+                    await MainActor.run { self?.exportStatus = "Exporting \(id)… \(formatBytes(bytes))" }
+                }
+            }
+        }
+        Task {
+            defer { poll.cancel() }
+            do {
+                try await ContainerService.exportContainer(id, to: url)
+                exportStatus = "Exported \(id)"
+                try? await Task.sleep(for: .seconds(2))
+                if exportStatus == "Exported \(id)" { exportStatus = nil }
+            } catch let e as CLIError {
+                exportStatus = nil
+                lastError = e
+            } catch {
+                exportStatus = nil
+                lastError = CLIError(command: "export", message: error.localizedDescription)
+            }
+        }
+    }
+
     func startContainer(_ c: ContainerRecord) { perform(c.id) { try await ContainerService.start(c.id) } }
     func stopContainer(_ c: ContainerRecord) { perform(c.id) { try await ContainerService.stop(c.id) } }
     func killContainer(_ c: ContainerRecord) { perform(c.id) { try await ContainerService.kill(c.id) } }

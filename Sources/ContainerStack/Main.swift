@@ -1128,11 +1128,16 @@ enum SelfTest {
             try await ContainerService.configureDefaultKernel()
         }
         await step("list containers/images/volumes/networks/df") {
-            _ = try await ContainerService.listContainers()
+            let listed = try await ContainerService.listContainers()
             _ = try await ContainerService.listImages()
             _ = try await ContainerService.listVolumes()
             _ = try await ContainerService.listNetworks()
             _ = try await ContainerService.diskUsage()
+            // Infrastructure containers (the buildkit builder VM) must not leak
+            // into the user-facing list.
+            guard !listed.contains(where: { ContainerService.isInfraImage($0.imageReference) }) else {
+                throw CLIError(command: "selftest", message: "infra container (buildkit) leaked into listContainers")
+            }
         }
         await step("volume create+delete") {
             try await ContainerService.createVolume(name: "davit-selftest-vol", size: nil)

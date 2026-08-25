@@ -200,6 +200,11 @@ enum ContainerService {
             .filter { $0.configuration.labels?["com.apple.container.plugin"] != "machine" }
             // Volume-browser helpers are infrastructure too (see VolumeBrowser).
             .filter { $0.configuration.labels?["com.davit.volume-browser"] == nil }
+            // The buildkit builder VM is infrastructure the build flow manages
+            // on its own — hide it like we already hide infra images and machine
+            // backings, so it isn't listed, counted, or acted on (e.g. Export,
+            // which fails on its special filesystem: "deep extents").
+            .filter { !isInfraImage($0.imageReference) }
     }
 
     static func listImages() async throws -> [ImageRecord] {
@@ -357,6 +362,13 @@ enum ContainerService {
         do {
             try await ContainerClient().export(id: id, archive: archive)
         } catch {
+            // Some filesystems (notably the builder VM's) use sparse ext4
+            // extents the archiver can't walk — surface that plainly instead
+            // of the raw "deep extents are not supported".
+            if String(describing: error).contains("deep extents") {
+                throw CLIError(command: "export \(id)",
+                    message: "This container's filesystem can't be exported — it uses a sparse format the archiver doesn't support. Regular application containers export fine.")
+            }
             throw CLIError.wrap("export \(id)", error)
         }
     }
