@@ -11,6 +11,8 @@ struct ContainersView: View {
     @State private var composeError: CLIError?
     /// Label key to group the list by ("" = flat). Shared with the Dashboard.
     @AppStorage("containerGroupBy") private var groupBy = ""
+    /// When set, the list shows only this group value ("show only this group").
+    @State private var focusedGroup: String?
     @State private var path: [String] = []
 
     private var filtered: [ContainerRecord] {
@@ -57,9 +59,12 @@ struct ContainersView: View {
 
                     let groupKeys = ContainerGrouping.availableKeys(state.containers)
                     if !groupKeys.isEmpty {
+                        // A Menu (not a bare .pickerStyle(.menu) Picker) so the
+                        // control doesn't flicker when the toolbar re-renders on
+                        // each refresh; the label shows the current grouping.
                         Menu {
                             Picker("Group by", selection: $groupBy) {
-                                Text("None").tag("")
+                                Text("No grouping").tag("")
                                 Divider()
                                 ForEach(groupKeys, id: \.self) { key in
                                     Text(ContainerGrouping.friendlyName(key)).tag(key)
@@ -67,7 +72,8 @@ struct ContainersView: View {
                             }
                             .pickerStyle(.inline)
                         } label: {
-                            Label("Group", systemImage: "rectangle.3.group")
+                            Label(groupBy.isEmpty ? "Group" : "Group: \(ContainerGrouping.friendlyName(groupBy))",
+                                  systemImage: "rectangle.3.group")
                         }
                         .help("Group containers by a label")
                     }
@@ -153,8 +159,35 @@ struct ContainersView: View {
     }
 
     private var list: some View {
-        ContainerListContent(containers: filtered, groupByKey: groupBy) { path.append($0) }
-            .refreshIndicator(state.isRefreshing)
+        VStack(spacing: 0) {
+            if let focusedGroup {
+                HStack(spacing: 8) {
+                    Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                        .foregroundStyle(.tint)
+                    Text("Showing only “\(focusedGroup)”").font(.callout)
+                    Spacer()
+                    Button("Show All Groups") { self.focusedGroup = nil }
+                        .controlSize(.small)
+                }
+                .padding(.horizontal, 16).padding(.vertical, 8)
+                .background(.tint.opacity(0.08))
+                Divider()
+            }
+            ContainerListContent(
+                containers: filtered, groupByKey: groupBy,
+                focusedGroup: focusedGroup, onFocusGroup: { focusedGroup = $0 }
+            ) { path.append($0) }
+                .refreshIndicator(state.isRefreshing)
+        }
+        // A focused group that no longer exists (grouping changed, or all its
+        // containers gone) should not silently hide everything.
+        .onChange(of: groupBy) { focusedGroup = nil }
+        .onChange(of: focusedGroup) {
+            if let f = focusedGroup,
+               !ContainerGrouping.groups(filtered, by: groupBy).contains(where: { $0.title == f }) {
+                focusedGroup = nil
+            }
+        }
     }
 
     /// Reveal a container requested from another section (e.g. the Dashboard,
@@ -222,6 +255,8 @@ struct ContainerListContent: View {
     let containers: [ContainerRecord]
     var scrollable = true
     var groupByKey: String = ""     // "" = flat list
+    var focusedGroup: String? = nil // when set, only this group's value is shown
+    var onFocusGroup: (String) -> Void = { _ in }
     let open: (String) -> Void
 
     /// Persisted collapsed group ids ("<key>\n<value>"), newline-joined.
@@ -244,14 +279,19 @@ struct ContainerListContent: View {
 
     private var grouped: some View {
         let collapsed = Set(collapsedRaw.split(separator: "\n").map(String.init))
+        var groups = ContainerGrouping.groups(containers, by: effectiveKey)
+        if let focusedGroup { groups = groups.filter { $0.title == focusedGroup } }
         return LazyVStack(alignment: .leading, spacing: 2) {
-            ForEach(ContainerGrouping.groups(containers, by: effectiveKey), id: \.title) { group in
+            ForEach(groups, id: \.title) { group in
                 let gid = "\(effectiveKey)\n\(group.title)"
-                let isCollapsed = collapsed.contains(gid)
+                // A focused single group can't usefully collapse.
+                let isCollapsed = focusedGroup == nil && collapsed.contains(gid)
                 GroupHeader(
                     title: group.title, count: group.containers.count,
-                    containers: group.containers, isCollapsed: isCollapsed,
-                    onToggle: { toggleCollapse(gid) })
+                    containers: group.containers, collapsible: focusedGroup == nil,
+                    showActions: true, isCollapsed: isCollapsed,
+                    onToggle: { toggleCollapse(gid) },
+                    onFocus: focusedGroup == nil ? { onFocusGroup(group.title) } : nil)
                 if !isCollapsed {
                     ForEach(group.containers) { row($0) }
                 }
@@ -283,15 +323,18 @@ struct GroupHeader: View {
     let title: String
     let count: Int
     var containers: [ContainerRecord] = []
+    var collapsible = false            // show the collapse chevron
+    var showActions = false            // show the group-actions ⋯ menu
     var isCollapsed = false
     var onToggle: (() -> Void)? = nil
+    var onFocus: (() -> Void)? = nil   // "show only this group"
 
     private var running: [ContainerRecord] { containers.filter(\.isRunning) }
     private var stopped: [ContainerRecord] { containers.filter { !$0.isRunning } }
 
     var body: some View {
         HStack(spacing: 6) {
-            if let onToggle {
+            if collapsible, let onToggle {
                 Button(action: onToggle) {
                     HStack(spacing: 6) {
                         Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
@@ -302,11 +345,11 @@ struct GroupHeader: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                groupMenu
             } else {
                 titleLabel
                 Spacer(minLength: 0)
             }
+            if showActions, !containers.isEmpty { groupMenu }
         }
         .padding(.horizontal, 12).padding(.top, 12).padding(.bottom, 2)
     }
@@ -323,6 +366,10 @@ struct GroupHeader: View {
 
     private var groupMenu: some View {
         Menu {
+            if let onFocus {
+                Button("Show Only This Group") { onFocus() }
+                Divider()
+            }
             Button("Start All") { stopped.forEach { state.startContainer($0) } }
                 .disabled(stopped.isEmpty)
             Button("Stop All") { running.forEach { state.stopContainer($0) } }

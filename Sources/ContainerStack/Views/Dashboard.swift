@@ -153,7 +153,9 @@ struct DashboardView: View {
                     }
                 } else {
                     ForEach(ContainerGrouping.groups(state.runningContainers, by: key), id: \.title) { group in
-                        GroupHeader(title: group.title, count: group.containers.count)
+                        // Glance view: group actions, but no collapse/focus.
+                        GroupHeader(title: group.title, count: group.containers.count,
+                                    containers: group.containers, showActions: true)
                         ForEach(group.containers) { c in
                             DashboardContainerRow(container: c)
                         }

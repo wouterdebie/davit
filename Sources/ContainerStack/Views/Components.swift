@@ -213,16 +213,11 @@ struct KVPair: Identifiable, Hashable {
 }
 
 extension View {
-    /// Standard toolbar progress indicator while state refreshes in the background.
-    func refreshIndicator(_ refreshing: Bool) -> some View {
-        toolbar {
-            if refreshing {
-                ToolbarItem(placement: .status) {
-                    ProgressView().controlSize(.small)
-                }
-            }
-        }
-    }
+    /// The background poll runs every few seconds and is effectively instant —
+    /// rows update in place. A toolbar spinner for it either reflowed the
+    /// toolbar (conditional item) or left a visible empty pill (reserved slot),
+    /// so the refresh is silent. Kept as a no-op so call sites stay put.
+    func refreshIndicator(_ refreshing: Bool) -> some View { self }
 }
 
 // MARK: - Custom scroll-based list (OrbStack-style rows with hover highlight)
