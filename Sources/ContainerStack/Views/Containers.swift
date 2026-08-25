@@ -224,6 +224,9 @@ struct ContainerListContent: View {
     var groupByKey: String = ""     // "" = flat list
     let open: (String) -> Void
 
+    /// Persisted collapsed group ids ("<key>\n<value>"), newline-joined.
+    @AppStorage("collapsedContainerGroups") private var collapsedRaw = ""
+
     /// Only group when the selected key is actually present, else fall back flat.
     private var effectiveKey: String {
         ContainerGrouping.availableKeys(containers).contains(groupByKey) ? groupByKey : ""
@@ -240,13 +243,27 @@ struct ContainerListContent: View {
     }
 
     private var grouped: some View {
-        LazyVStack(alignment: .leading, spacing: 2) {
+        let collapsed = Set(collapsedRaw.split(separator: "\n").map(String.init))
+        return LazyVStack(alignment: .leading, spacing: 2) {
             ForEach(ContainerGrouping.groups(containers, by: effectiveKey), id: \.title) { group in
-                GroupHeader(title: group.title, count: group.containers.count)
-                ForEach(group.containers) { row($0) }
+                let gid = "\(effectiveKey)\n\(group.title)"
+                let isCollapsed = collapsed.contains(gid)
+                GroupHeader(
+                    title: group.title, count: group.containers.count,
+                    containers: group.containers, isCollapsed: isCollapsed,
+                    onToggle: { toggleCollapse(gid) })
+                if !isCollapsed {
+                    ForEach(group.containers) { row($0) }
+                }
             }
         }
         .padding(10)
+    }
+
+    private func toggleCollapse(_ id: String) {
+        var set = Set(collapsedRaw.split(separator: "\n").map(String.init))
+        if set.contains(id) { set.remove(id) } else { set.insert(id) }
+        collapsedRaw = set.sorted().joined(separator: "\n")
     }
 
     @ViewBuilder private func row(_ container: ContainerRecord) -> some View {
@@ -257,20 +274,68 @@ struct ContainerListContent: View {
     }
 }
 
-/// Section header for a grouped list: title + a count pill.
+/// Section header for a grouped list: title + count pill. With `onToggle` set
+/// it becomes interactive — a collapse chevron and a group-actions menu
+/// (start/stop/restart every container in the group). Plain (Dashboard) when
+/// no toggle is provided.
 struct GroupHeader: View {
+    @EnvironmentObject var state: AppState
     let title: String
     let count: Int
+    var containers: [ContainerRecord] = []
+    var isCollapsed = false
+    var onToggle: (() -> Void)? = nil
+
+    private var running: [ContainerRecord] { containers.filter(\.isRunning) }
+    private var stopped: [ContainerRecord] { containers.filter { !$0.isRunning } }
+
     var body: some View {
+        HStack(spacing: 6) {
+            if let onToggle {
+                Button(action: onToggle) {
+                    HStack(spacing: 6) {
+                        Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                            .font(.caption2).foregroundStyle(.secondary).frame(width: 10)
+                        titleLabel
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                groupMenu
+            } else {
+                titleLabel
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.horizontal, 12).padding(.top, 12).padding(.bottom, 2)
+    }
+
+    private var titleLabel: some View {
         HStack(spacing: 6) {
             Text(title).font(.subheadline.weight(.semibold))
             Text("\(count)")
                 .font(.caption).foregroundStyle(.secondary)
                 .padding(.horizontal, 6).padding(.vertical, 1)
                 .background(.secondary.opacity(0.15), in: Capsule())
-            Spacer()
         }
-        .padding(.horizontal, 12).padding(.top, 12).padding(.bottom, 2)
+    }
+
+    private var groupMenu: some View {
+        Menu {
+            Button("Start All") { stopped.forEach { state.startContainer($0) } }
+                .disabled(stopped.isEmpty)
+            Button("Stop All") { running.forEach { state.stopContainer($0) } }
+                .disabled(running.isEmpty)
+            Button("Restart All") { running.forEach { state.restartContainer($0) } }
+                .disabled(running.isEmpty)
+        } label: {
+            Image(systemName: "ellipsis.circle").foregroundStyle(.secondary)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Actions for every container in “\(title)”")
     }
 }
 
