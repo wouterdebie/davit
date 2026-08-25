@@ -2896,6 +2896,36 @@ enum SelfTest {
             guard json.contains("\"id\"") else { throw CLIError(command: "selftest", message: "bad inspect output") }
         }
 
+        await step("build: ssh mode maps only when forwarding AND agent present") {
+            guard BuildService.sshMode(forward: true, agentAvailable: true) == "default" else {
+                throw CLIError(command: "selftest", message: "ssh should be 'default' when forwarding with an agent")
+            }
+            for (f, a) in [(false, true), (true, false), (false, false)] {
+                guard BuildService.sshMode(forward: f, agentAvailable: a) == "" else {
+                    throw CLIError(command: "selftest", message: "ssh should be off for forward=\(f) agent=\(a)")
+                }
+            }
+        }
+
+        await step("export: container filesystem writes a non-empty tar (container 1.2+)") {
+            let name = "davit-selftest-export"
+            try? await ContainerService.delete(name, force: true)
+            defer { Task { try? await ContainerService.delete(name, force: true) } }
+            let inv = try RunCLI.parseArgs(["--name", name, "--detach", "alpine:latest", "sleep", "60"])
+            _ = try await RunCLI.execute(inv, retainExitCode: false)
+
+            let out = FileManager.default.temporaryDirectory
+                .appendingPathComponent("davit-selftest-export-\(UUID().uuidString).tar")
+            defer { try? FileManager.default.removeItem(at: out) }
+            try await ContainerService.exportContainer(name, to: out)
+
+            let size = (try? FileManager.default.attributesOfItem(atPath: out.path)[.size] as? Int) ?? 0
+            guard (size ?? 0) > 100_000 else {
+                throw CLIError(command: "selftest", message: "exported tar too small (\(String(describing: size)) bytes)")
+            }
+            try await ContainerService.delete(name, force: true)
+        }
+
         await step("stop reason: parses memcg OOM from kernel log, ignores host OOM") {
             // Real docling-test kernel lines (the memory-cgroup case).
             let memcg = [

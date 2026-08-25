@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Containers list
 
@@ -287,6 +288,7 @@ struct ContainerActions: View {
             Button("Start") { state.startContainer(container) }
         }
         Button("Edit & Recreate…") { state.recreateTarget = container }
+        Button("Export Filesystem…") { exportFilesystem() }
         Toggle("Start when Davit Opens", isOn: Binding(
             get: { state.isAutoStart(container.id) },
             set: { _ in state.toggleAutoStart(container.id) }
@@ -305,6 +307,19 @@ struct ContainerActions: View {
         Divider()
         Button(container.isRunning ? "Force Delete" : "Delete", role: .destructive) {
             state.deleteContainer(container)
+        }
+    }
+
+    /// Export the container's filesystem to a tar archive the user picks.
+    private func exportFilesystem() {
+        let panel = NSSavePanel()
+        panel.title = "Export Container Filesystem"
+        panel.nameFieldStringValue = "\(container.id).tar"
+        panel.allowedContentTypes = [.init(filenameExtension: "tar") ?? .data]
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        state.perform(container.id) {
+            try await ContainerService.exportContainer(container.id, to: url)
         }
     }
 }

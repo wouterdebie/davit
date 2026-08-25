@@ -351,6 +351,16 @@ enum ContainerService {
         try await ContainerClient().delete(id: id, force: force)
     }
 
+    /// Export a container's filesystem to a tar archive on the host (container
+    /// 1.2+). Works on running or stopped containers.
+    static func exportContainer(_ id: String, to archive: URL) async throws {
+        do {
+            try await ContainerClient().export(id: id, archive: archive)
+        } catch {
+            throw CLIError.wrap("export \(id)", error)
+        }
+    }
+
     static func pruneContainers() async throws {
         let client = ContainerClient()
         for snapshot in try await client.list() where snapshot.status == .stopped {
