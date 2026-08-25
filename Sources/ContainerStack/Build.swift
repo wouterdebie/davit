@@ -22,19 +22,6 @@ enum BuildService {
         var noCache: Bool = false
         var pull: Bool = false            // re-pull base images
         var target: String = ""           // multi-stage target
-        var forwardSSHAgent: Bool = false // RUN --mount=type=ssh via the host agent
-    }
-
-    /// container's builder only supports the "default" SSH agent (SSH_AUTH_SOCK);
-    /// forwarding is impossible without it, so the toggle no-ops when unset.
-    static var sshAgentAvailable: Bool {
-        !(ProcessInfo.processInfo.environment["SSH_AUTH_SOCK"] ?? "").isEmpty
-    }
-
-    /// The `ssh` value BuildConfig expects: "default" only when the user asked
-    /// and an agent is present, else "" (off). Pure for testing.
-    static func sshMode(forward: Bool, agentAvailable: Bool) -> String {
-        (forward && agentAvailable) ? "default" : ""
     }
 
     /// Upstream bug apple/container#735: builds with Dockerfiles ≥16 KiB hang.
@@ -105,9 +92,10 @@ enum BuildService {
             contentStore: RemoteContentStoreClient(),
             buildArgs: request.buildArgs,
             secrets: [:],
-            // container's builder accepts only "default" (the host SSH agent);
-            // engage it only when the user asked AND an agent is present.
-            ssh: Self.sshMode(forward: request.forwardSSHAgent, agentAvailable: Self.sshAgentAvailable),
+            // SSH agent forwarding needs the builder VM to be *created* with
+            // ssh forwarding on (BuilderStart.start(ssh:), which is internal);
+            // the public builder-start we use can't do it, so leave it off.
+            ssh: "",
             contextDir: request.contextDir,
             dockerfile: dockerfile,
             dockerignore: dockerignore,

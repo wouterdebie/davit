@@ -2901,16 +2901,6 @@ enum SelfTest {
             guard json.contains("\"id\"") else { throw CLIError(command: "selftest", message: "bad inspect output") }
         }
 
-        await step("build: ssh mode maps only when forwarding AND agent present") {
-            guard BuildService.sshMode(forward: true, agentAvailable: true) == "default" else {
-                throw CLIError(command: "selftest", message: "ssh should be 'default' when forwarding with an agent")
-            }
-            for (f, a) in [(false, true), (true, false), (false, false)] {
-                guard BuildService.sshMode(forward: f, agentAvailable: a) == "" else {
-                    throw CLIError(command: "selftest", message: "ssh should be off for forward=\(f) agent=\(a)")
-                }
-            }
-        }
 
         await step("export: container filesystem writes a non-empty tar (container 1.2+)") {
             let name = "davit-selftest-export"

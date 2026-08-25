@@ -12,7 +12,6 @@ struct BuildImageSheet: View {
     @State private var buildArgs: [KVPair] = []
     @State private var noCache = false
     @State private var pullBase = false
-    @State private var forwardSSH = false
 
     @State private var working = false
     @State private var progressText = ""
@@ -44,11 +43,6 @@ struct BuildImageSheet: View {
             HStack(spacing: 16) {
                 Toggle("No cache", isOn: $noCache)
                 Toggle("Re-pull base images", isOn: $pullBase)
-                Toggle("Forward SSH agent", isOn: $forwardSSH)
-                    .disabled(!BuildService.sshAgentAvailable)
-                    .help(BuildService.sshAgentAvailable
-                          ? "Expose your host SSH agent to RUN --mount=type=ssh (e.g. to clone private repos)"
-                          : "No SSH agent found (SSH_AUTH_SOCK is unset)")
             }
             .toggleStyle(.checkbox)
             .font(.callout)
@@ -110,8 +104,7 @@ struct BuildImageSheet: View {
             tag: tag,
             buildArgs: buildArgs.filter { !$0.key.isEmpty }.map { "\($0.key)=\($0.value)" },
             noCache: noCache,
-            pull: pullBase,
-            forwardSSHAgent: forwardSSH
+            pull: pullBase
         )
         Task {
             do {
