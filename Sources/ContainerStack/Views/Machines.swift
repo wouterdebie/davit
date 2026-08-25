@@ -13,9 +13,11 @@ struct MachinesView: View {
 
     private var content: some View {
         Group {
-            if !state.systemState.isRunning && state.initialLoadDone {
+            // Keep the root as `list` while a detail is pushed — see the note
+            // in ContainersView (issue #17).
+            if path.isEmpty && !state.systemState.isRunning && state.initialLoadDone {
                 ServicesStoppedState()
-            } else if state.machines.isEmpty && state.initialLoadDone {
+            } else if path.isEmpty && state.machines.isEmpty && state.initialLoadDone {
                 EmptyState(
                     icon: "desktopcomputer",
                     title: "No machines",
@@ -62,8 +64,12 @@ struct MachinesView: View {
     /// ⌘K jumped to a machine: push its detail.
     private func consumePendingOpen() {
         guard state.pendingOpen?.section == .machines, let id = state.pendingOpen?.id else { return }
-        state.pendingOpen = nil
-        if state.machines.contains(where: { $0.id == id }), path.last != id { path.append(id) }
+        // Defer out of the current SwiftUI update transaction (issue #17) —
+        // see the note in ContainersView.consumePendingOpen.
+        DispatchQueue.main.async {
+            state.pendingOpen = nil
+            if state.machines.contains(where: { $0.id == id }), path.last != id { path.append(id) }
+        }
     }
 
     private var list: some View {

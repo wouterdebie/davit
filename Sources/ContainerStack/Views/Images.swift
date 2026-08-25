@@ -17,9 +17,11 @@ struct ImagesView: View {
     var body: some View {
         NavigationStack(path: $path) {
             Group {
-                if !state.systemState.isRunning && state.initialLoadDone {
+                // Keep the root as `list` while a detail is pushed — see the
+                // note in ContainersView (issue #17).
+                if path.isEmpty && !state.systemState.isRunning && state.initialLoadDone {
                     ServicesStoppedState()
-                } else if state.images.isEmpty && state.initialLoadDone {
+                } else if path.isEmpty && state.images.isEmpty && state.initialLoadDone {
                     EmptyState(
                         icon: "square.stack.3d.down.forward",
                         title: "No images",
@@ -84,9 +86,13 @@ struct ImagesView: View {
     /// ⌘K jumped to an image: push its detail.
     private func consumePendingOpen() {
         guard state.pendingOpen?.section == .images, let id = state.pendingOpen?.id else { return }
-        state.pendingOpen = nil
-        if let image = state.images.first(where: { $0.id == id }), path.last != image {
-            path.append(image)
+        // Defer out of the current SwiftUI update transaction (issue #17) —
+        // see the note in ContainersView.consumePendingOpen.
+        DispatchQueue.main.async {
+            state.pendingOpen = nil
+            if let image = state.images.first(where: { $0.id == id }), path.last != image {
+                path.append(image)
+            }
         }
     }
 }

@@ -21,9 +21,13 @@ struct ContainersView: View {
     var body: some View {
         NavigationStack(path: $path) {
             Group {
-                if !state.systemState.isRunning && state.initialLoadDone {
+                // While a detail is pushed (path non-empty) the root is hidden,
+                // so keep it as `list`: a transient systemState/containers flip
+                // must not swap the NavigationStack root out from under a queued
+                // navigation request (issue #17).
+                if path.isEmpty && !state.systemState.isRunning && state.initialLoadDone {
                     ServicesStoppedState()
-                } else if state.containers.isEmpty && state.initialLoadDone {
+                } else if path.isEmpty && state.containers.isEmpty && state.initialLoadDone {
                     EmptyState(
                         icon: "shippingbox",
                         title: "No containers",
@@ -136,14 +140,26 @@ struct ContainersView: View {
     /// Reveal a container requested from another section (e.g. the Dashboard,
     /// or ⌘K global search).
     private func consumePendingOpen() {
+        let target: String
+        let clearsPendingOpen: Bool
         if state.pendingOpen?.section == .containers, let id = state.pendingOpen?.id {
-            state.pendingOpen = nil
-            if path.last != id { path.append(id) }
+            target = id
+            clearsPendingOpen = true
+        } else if let id = state.pendingContainerOpen {
+            target = id
+            clearsPendingOpen = false
+        } else {
             return
         }
-        guard let id = state.pendingContainerOpen else { return }
-        state.pendingContainerOpen = nil
-        if path.last != id { path.append(id) }
+        // Defer the path mutation to the next runloop tick. .onChange/.onAppear
+        // run inside SwiftUI's Update.end() transaction, and mutating a
+        // NavigationStack-bound path there races NavigationAuthority's request
+        // flush — a NavigationColumnState assertion crash on some macOS
+        // versions (issue #17).
+        DispatchQueue.main.async {
+            if clearsPendingOpen { state.pendingOpen = nil } else { state.pendingContainerOpen = nil }
+            if path.last != target { path.append(target) }
+        }
     }
 }
 
