@@ -27,6 +27,8 @@ struct DashboardView: View {
     @EnvironmentObject var state: AppState
     var scrollable = true
     @State private var aggMetric: AggregateMetric = .cpu
+    /// Shared with the Containers view — groups the running list by a label.
+    @AppStorage("containerGroupBy") private var groupBy = ""
 
     var body: some View {
         Group {
@@ -143,9 +145,19 @@ struct DashboardView: View {
 
     private var runningCard: some View {
         DetailCard(title: "Running Containers", icon: "play.circle") {
-            VStack(spacing: 2) {
-                ForEach(state.runningContainers) { c in
-                    DashboardContainerRow(container: c)
+            VStack(alignment: .leading, spacing: 2) {
+                let key = ContainerGrouping.availableKeys(state.runningContainers).contains(groupBy) ? groupBy : ""
+                if key.isEmpty {
+                    ForEach(state.runningContainers) { c in
+                        DashboardContainerRow(container: c)
+                    }
+                } else {
+                    ForEach(ContainerGrouping.groups(state.runningContainers, by: key), id: \.title) { group in
+                        GroupHeader(title: group.title, count: group.containers.count)
+                        ForEach(group.containers) { c in
+                            DashboardContainerRow(container: c)
+                        }
+                    }
                 }
             }
         }

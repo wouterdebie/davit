@@ -9,6 +9,8 @@ struct ContainersView: View {
     @State private var showRunSheet = false
     @State private var composePlan: Compose.Plan?
     @State private var composeError: CLIError?
+    /// Label key to group the list by ("" = flat). Shared with the Dashboard.
+    @AppStorage("containerGroupBy") private var groupBy = ""
     @State private var path: [String] = []
 
     private var filtered: [ContainerRecord] {
@@ -52,6 +54,23 @@ struct ContainersView: View {
                         Label("Run Container", systemImage: "plus")
                     }
                     .help("Run a new container")
+
+                    let groupKeys = ContainerGrouping.availableKeys(state.containers)
+                    if !groupKeys.isEmpty {
+                        Menu {
+                            Picker("Group by", selection: $groupBy) {
+                                Text("None").tag("")
+                                Divider()
+                                ForEach(groupKeys, id: \.self) { key in
+                                    Text(ContainerGrouping.friendlyName(key)).tag(key)
+                                }
+                            }
+                            .pickerStyle(.inline)
+                        } label: {
+                            Label("Group", systemImage: "rectangle.3.group")
+                        }
+                        .help("Group containers by a label")
+                    }
 
                     Menu {
                         Button("Import Compose File…") {
@@ -134,7 +153,7 @@ struct ContainersView: View {
     }
 
     private var list: some View {
-        ContainerListContent(containers: filtered) { path.append($0) }
+        ContainerListContent(containers: filtered, groupByKey: groupBy) { path.append($0) }
             .refreshIndicator(state.isRefreshing)
     }
 
@@ -164,18 +183,94 @@ struct ContainersView: View {
     }
 }
 
+/// Grouping containers by a label value (e.g. a `project` label your tooling
+/// sets with `container run --label`). "" means no grouping (flat list).
+enum ContainerGrouping {
+    /// Label keys presented under the friendly name "Project", in priority order.
+    static let projectKeys = ["com.davit.compose.project", "com.docker.compose.project", "project"]
+
+    /// Label keys usable for grouping across these containers, sorted. Drops
+    /// platform-internal noise; compose-project keys are kept (shown as "Project").
+    static func availableKeys(_ containers: [ContainerRecord]) -> [String] {
+        var keys = Set<String>()
+        for c in containers { for k in (c.configuration.labels ?? [:]).keys { keys.insert(k) } }
+        return keys.filter { !$0.hasPrefix("com.apple.container.") }.sorted()
+    }
+
+    static func friendlyName(_ key: String) -> String {
+        projectKeys.contains(key) ? "Project" : key
+    }
+
+    /// Group by the value of `key`; containers missing it fall into "Ungrouped"
+    /// (always last). Group titles sort alphabetically.
+    static func groups(_ containers: [ContainerRecord], by key: String)
+        -> [(title: String, containers: [ContainerRecord])]
+    {
+        var byValue: [String: [ContainerRecord]] = [:]
+        var ungrouped: [ContainerRecord] = []
+        for c in containers {
+            if let v = c.configuration.labels?[key], !v.isEmpty { byValue[v, default: []].append(c) }
+            else { ungrouped.append(c) }
+        }
+        var result = byValue.keys.sorted().map { (title: $0, containers: byValue[$0]!) }
+        if !ungrouped.isEmpty { result.append((title: "Ungrouped", containers: ungrouped)) }
+        return result
+    }
+}
+
 struct ContainerListContent: View {
     let containers: [ContainerRecord]
     var scrollable = true
+    var groupByKey: String = ""     // "" = flat list
     let open: (String) -> Void
 
+    /// Only group when the selected key is actually present, else fall back flat.
+    private var effectiveKey: String {
+        ContainerGrouping.availableKeys(containers).contains(groupByKey) ? groupByKey : ""
+    }
+
     var body: some View {
-        CardList(items: containers, scrollable: scrollable) { container in
-            HoverRow(action: { open(container.id) }) {
-                ContainerRow(container: container)
-            }
-            .contextMenu { ContainerActions(container: container, includeOpen: false) }
+        if effectiveKey.isEmpty {
+            CardList(items: containers, scrollable: scrollable) { row($0) }
+        } else if scrollable {
+            ScrollView { grouped }
+        } else {
+            grouped
         }
+    }
+
+    private var grouped: some View {
+        LazyVStack(alignment: .leading, spacing: 2) {
+            ForEach(ContainerGrouping.groups(containers, by: effectiveKey), id: \.title) { group in
+                GroupHeader(title: group.title, count: group.containers.count)
+                ForEach(group.containers) { row($0) }
+            }
+        }
+        .padding(10)
+    }
+
+    @ViewBuilder private func row(_ container: ContainerRecord) -> some View {
+        HoverRow(action: { open(container.id) }) {
+            ContainerRow(container: container)
+        }
+        .contextMenu { ContainerActions(container: container, includeOpen: false) }
+    }
+}
+
+/// Section header for a grouped list: title + a count pill.
+struct GroupHeader: View {
+    let title: String
+    let count: Int
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(title).font(.subheadline.weight(.semibold))
+            Text("\(count)")
+                .font(.caption).foregroundStyle(.secondary)
+                .padding(.horizontal, 6).padding(.vertical, 1)
+                .background(.secondary.opacity(0.15), in: Capsule())
+            Spacer()
+        }
+        .padding(.horizontal, 12).padding(.top, 12).padding(.bottom, 2)
     }
 }
 
