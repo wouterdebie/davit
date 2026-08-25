@@ -185,7 +185,12 @@ struct DashboardView: View {
                             AreaMark(
                                 x: .value("Time", s.time),
                                 y: .value(aggMetric.rawValue, aggMetric.value(s)),
-                                series: .value("Container", entry.id)
+                                series: .value("Container", entry.id),
+                                // Each container's fill goes 0 -> its own value so
+                                // the line tops its area; without this AreaMarks
+                                // stack (fill sits above the line) while LineMarks
+                                // don't, which mismatches them.
+                                stacking: .unstacked
                             )
                             .interpolationMethod(.monotone)
                             .foregroundStyle(.linearGradient(
