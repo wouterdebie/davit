@@ -92,6 +92,7 @@ enum BuildService {
             contentStore: RemoteContentStoreClient(),
             buildArgs: request.buildArgs,
             secrets: [:],
+            ssh: "",                       // no SSH agent forwarding (added in container 1.2)
             contextDir: request.contextDir,
             dockerfile: dockerfile,
             dockerignore: dockerignore,
@@ -138,7 +139,7 @@ enum BuildService {
             do {
                 let fh = try await client.dial(id: "buildkit", port: 8088)
                 let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
-                let builder = try Builder(socket: fh, group: group, logger: Backend.log)
+                let builder = try await Builder(socket: fh, group: group, logger: Backend.log)
                 _ = try await builder.info()
                 return builder
             } catch {

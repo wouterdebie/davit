@@ -72,7 +72,11 @@ enum MachineService {
         progress: @escaping @Sendable (String) async -> Void
     ) async throws {
         do {
-            try Utility.validEntityName(name)
+            // container 1.3 replaced Utility.validEntityName (throwing) with
+            // ManagedContainer.nameValid (Bool).
+            guard ManagedContainer.nameValid(name) else {
+                throw CLIError(command: "machine create", message: "\"\(name)\" is not a valid machine name (letters, digits, and . _ - only)")
+            }
             await DockerCredentialHelpers.refreshCredentials(forReference: image)
             let systemConfig = try await Backend.systemConfig()
             let bootConfig = try systemConfig.machine.with(

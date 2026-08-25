@@ -384,7 +384,11 @@ enum ContainerService {
             await DockerCredentialHelpers.refreshCredentials(forReference: image)
             let config = try await Backend.systemConfig()
             let id = Utility.createContainerID(name: name?.isEmpty == true ? nil : name)
-            try Utility.validEntityName(id)
+            // container 1.3 replaced Utility.validEntityName (throwing) with
+            // ManagedContainer.nameValid (Bool).
+            guard ManagedContainer.nameValid(id) else {
+                throw CLIError(command: "run", message: "\"\(id)\" is not a valid container name (letters, digits, and . _ - only)")
+            }
 
             let process = try Flags.Process.parse(processArgs)
             let management = try Flags.Management.parse(managementArgs)
@@ -1133,6 +1137,11 @@ enum SystemConfigStore {
         if !wroteAny {
             // No overrides at all: remove the user file so defaults fully apply.
             try? fm.removeItem(atPath: path)
+            // container 1.3's copyConfigurationToReadOnly is a no-op when the
+            // source is missing, so removing the home file alone leaves the
+            // published read-only copy (<appRoot>/config/config.toml) stale and
+            // the daemon keeps reading the old override. Clear that copy too.
+            try? fm.removeItem(atPath: ConfigurationLoader.configurationFile(.appRoot).string)
         } else {
             // Validate through the real loader before committing.
             let tempPath = fm.temporaryDirectory.appendingPathComponent("davit-config-\(UUID().uuidString).toml").path
@@ -1206,7 +1215,7 @@ enum SystemConfigStore {
 /// root then hosts the launchd services exactly like a /usr/local install.
 enum PlatformInstaller {
     /// Must match the ContainerAPIClient version this app links (Package.swift pin).
-    static let pinnedVersion = "1.1.0"
+    static let pinnedVersion = "1.3.0"
 
     static var managedRoot: String {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
