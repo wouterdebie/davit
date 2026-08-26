@@ -137,29 +137,128 @@ struct ServicesStoppedState: View {
 
 // MARK: - Log / console text view
 
-struct ConsoleView: View {
+/// A log/console view backed by NSTextView: native multi-line selection and
+/// copy, and ANSI SGR color escapes (e.g. `ESC[92mINFO ESC[0m`) rendered as
+/// real colors instead of literal `[92m…` noise.
+struct ConsoleView: NSViewRepresentable {
     let lines: [String]
     var autoScroll = true
 
-    var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                        Text(line.isEmpty ? " " : line)
-                            .font(.system(size: 11.5, design: .monospaced))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    Color.clear.frame(height: 1).id("console-bottom")
+    private static let fontSize: CGFloat = 11.5
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scroll = NSTextView.scrollableTextView()
+        scroll.hasVerticalScroller = true
+        scroll.drawsBackground = true
+        scroll.backgroundColor = .textBackgroundColor
+        guard let tv = scroll.documentView as? NSTextView else { return scroll }
+        tv.isEditable = false
+        tv.isSelectable = true
+        tv.drawsBackground = true
+        tv.backgroundColor = .textBackgroundColor
+        tv.textContainerInset = NSSize(width: 8, height: 8)
+        tv.isAutomaticQuoteSubstitutionEnabled = false
+        tv.isAutomaticSpellingCorrectionEnabled = false
+        tv.isRichText = false
+        tv.textContainer?.widthTracksTextView = true
+        return scroll
+    }
+
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        guard let tv = scroll.documentView as? NSTextView, let storage = tv.textStorage else { return }
+        let coord = context.coordinator
+
+        // Rebuild fully if the buffer was reset/replaced (tail change, boot
+        // toggle); otherwise append only the new lines so selection survives.
+        if lines.count < coord.rendered || !coord.prefixMatches(lines) {
+            storage.setAttributedString(Self.render(Array(lines)))
+            coord.rendered = lines.count
+            coord.first = lines.first
+        } else if lines.count > coord.rendered {
+            let fresh = Array(lines[coord.rendered...])
+            let piece = Self.render(fresh, leadingNewline: coord.rendered > 0)
+            storage.append(piece)
+            coord.rendered = lines.count
+        } else {
+            return  // nothing changed
+        }
+
+        if autoScroll { tv.scrollToEndOfDocument(nil) }
+    }
+
+    final class Coordinator {
+        var rendered = 0
+        var first: String?
+        func prefixMatches(_ lines: [String]) -> Bool { lines.first == first || rendered == 0 }
+    }
+
+    // MARK: ANSI rendering
+
+    private static func render(_ lines: [String], leadingNewline: Bool = false) -> NSAttributedString {
+        let base = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        let out = NSMutableAttributedString()
+        for (i, line) in lines.enumerated() {
+            if leadingNewline || i > 0 { out.append(NSAttributedString(string: "\n")) }
+            appendANSI(line, to: out, baseFont: base)
+        }
+        return out
+    }
+
+    /// Standard/bright ANSI foreground colors, chosen to read on the dark
+    /// console background.
+    private static let palette: [NSColor] = [
+        .secondaryLabelColor, .systemRed, .systemGreen, .systemYellow,
+        .systemBlue, .systemPurple, .systemTeal, .labelColor,
+    ]
+
+    private static func appendANSI(_ line: String, to out: NSMutableAttributedString, baseFont: NSFont) {
+        let def = NSColor.labelColor
+        var color = def
+        var bold = false
+        var buffer = ""
+        let chars = Array(line)
+        var i = 0
+
+        func flush() {
+            guard !buffer.isEmpty else { return }
+            let font = bold ? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .bold) : baseFont
+            out.append(NSAttributedString(string: buffer, attributes: [.foregroundColor: color, .font: font]))
+            buffer = ""
+        }
+
+        while i < chars.count {
+            // An SGR escape: ESC [ <params> m
+            if chars[i] == "\u{1b}", i + 1 < chars.count, chars[i + 1] == "[" {
+                var j = i + 2
+                var code = ""
+                while j < chars.count, chars[j] != "m" { code.append(chars[j]); j += 1 }
+                if j < chars.count {   // found the terminating 'm'
+                    flush()
+                    applySGR(code, color: &color, bold: &bold, default: def)
+                    i = j + 1
+                    continue
                 }
-                .padding(10)
             }
-            .background(Color(nsColor: .textBackgroundColor))
-            .onChange(of: lines.count) {
-                if autoScroll {
-                    proxy.scrollTo("console-bottom", anchor: .bottom)
-                }
+            buffer.append(chars[i])
+            i += 1
+        }
+        flush()
+    }
+
+    private static func applySGR(_ code: String, color: inout NSColor, bold: inout Bool, default def: NSColor) {
+        let params = code.split(separator: ";").map { Int($0) ?? 0 }
+        if params.isEmpty { color = def; bold = false; return }   // ESC[m == reset
+        for p in params {
+            switch p {
+            case 0: color = def; bold = false
+            case 1: bold = true
+            case 22: bold = false
+            case 30...37: color = palette[p - 30]
+            case 39: color = def
+            case 90...97: color = palette[p - 90]
+            default: break   // background colors, italics, etc. — ignored
             }
         }
     }
