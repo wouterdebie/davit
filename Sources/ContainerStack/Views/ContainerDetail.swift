@@ -40,7 +40,9 @@ struct ContainerDetailView: View {
                            message: "This container no longer exists.")
             }
         }
-        .navigationTitle(containerID)
+        // Name lives in the principal toolbar item; an empty title avoids
+        // repeating it inline next to the back button.
+        .navigationTitle("")
         .onAppear {
             if ProcessInfo.processInfo.arguments.contains(where: { $0.hasPrefix("--probe") }) {
                 FileHandle.standardError.write(Data("DBG detail-view-shown \(containerID)\n".utf8))
@@ -94,16 +96,14 @@ struct ContainerDetailView: View {
     }
 
     private func header(_ c: ContainerRecord) -> some View {
+        // First content row: status dot (pulsing) + name + state pill. The name
+        // is here only (nav title is empty, so no "< name" duplicate), and the
+        // image shows once in the Overview → General card.
         VStack(spacing: 12) {
-            HStack(spacing: 14) {
+            HStack(spacing: 10) {
                 StatusDot(color: c.state.color, pulsing: c.isRunning)
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 10) {
-                        Text(c.id).font(.title2.weight(.semibold))
-                        StateChip(state: c.state)
-                    }
-                    Text(c.shortImage).foregroundStyle(.secondary)
-                }
+                Text(c.id).font(.title3.weight(.semibold))
+                StateChip(state: c.state)
                 Spacer()
             }
             Picker("", selection: $tab) {
@@ -114,7 +114,7 @@ struct ContainerDetailView: View {
             .frame(width: 460)
         }
         .padding(.horizontal, 18)
-        .padding(.vertical, 14)
+        .padding(.vertical, 12)
     }
 
     @ViewBuilder

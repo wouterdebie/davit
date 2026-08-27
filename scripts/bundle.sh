@@ -38,15 +38,25 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSHumanReadableCopyright</key><string>UI for Apple's open-source container platform.</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+      <dict>
+        <key>CFBundleURLName</key><string>$BUNDLE_ID</string>
+        <key>CFBundleURLSchemes</key><array><string>davit</string></array>
+      </dict>
+    </array>
 </dict>
 </plist>
 PLIST
 
-echo "==> Rendering app icon"
-if [ ! -f "$ROOT/.build/AppIcon.icns" ]; then
-  swift "$ROOT/scripts/make-icon.swift" "$ROOT/.build"
-fi
-cp "$ROOT/.build/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+echo "==> Installing app icon"
+# Committed artwork (icon/davit.svg is the master; regenerate with icon/regenerate.py).
+cp "$ROOT/icon/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+# Menu bar template glyph (NSImage(named: "DavitTemplate") — the "Template"
+# suffix makes AppKit treat it as a template image).
+cp "$ROOT/icon/menubar/DavitTemplate.png" \
+   "$ROOT/icon/menubar/DavitTemplate@2x.png" \
+   "$ROOT/icon/menubar/DavitTemplate@3x.png" "$APP/Contents/Resources/"
 
 if [ "${1:-}" = "--vendor" ]; then
   if [ -d "$ROOT/Vendor/container" ]; then

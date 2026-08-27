@@ -55,6 +55,13 @@ struct ContainerStackApp: App {
                     DockVisibility.shared.start()
                     state.startPolling()
                 }
+                // Deep links: davit://container/<id> opens that container's
+                // detail (Overview). Lets other apps refer to a container and
+                // reveal it here.
+                .onOpenURL { url in
+                    state.handleDeepLink(url)
+                    NSApp.activate(ignoringOtherApps: true)
+                }
         }
         .defaultSize(width: 1180, height: 720)
         // Always present the window on launch: without this, state restoration
@@ -90,8 +97,19 @@ struct ContainerStackApp: App {
 struct MenuBarIcon: View {
     @Environment(\.openWindow) private var openWindow
 
+    /// The bundled template glyph (three container outlines). Falls back to an
+    /// SF Symbol in dev/harness runs where the bundle has no Resources.
+    private static let templateImage: NSImage = {
+        let image = NSImage(named: "DavitTemplate")
+            ?? NSImage(systemSymbolName: "shippingbox.fill", accessibilityDescription: "Davit")!
+        image.isTemplate = true
+        image.size = NSSize(width: 18, height: 18)
+        return image
+    }()
+
     var body: some View {
-        Image(systemName: "shippingbox.fill")
+        Image(nsImage: Self.templateImage)
+            .renderingMode(.template)
             .task {
                 let args = ProcessInfo.processInfo.arguments
                 guard args.contains(where: { $0.hasPrefix("--snapshot") || $0.hasPrefix("--probe") || $0.hasPrefix("--pose") }) else { return }
@@ -115,10 +133,12 @@ struct MenuBarContent: View {
         Group {
             switch state.systemState {
             case .running:
-                Label("Services running", systemImage: "circle.fill")
+                // Menus tint images monochrome, so a green dot would just look
+                // like a grey ball — use symbols that read in grey instead.
+                Label("Services running", systemImage: "checkmark.circle.fill")
                 Button("Stop Services") { state.toggleSystem() }
             case .stopped:
-                Label("Services stopped", systemImage: "circle")
+                Label("Services stopped", systemImage: "stop.circle")
                 Button("Start Services") { state.toggleSystem() }
             case .unknown:
                 Label("Status unknown", systemImage: "questionmark.circle")

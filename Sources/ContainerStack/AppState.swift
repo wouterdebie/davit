@@ -48,6 +48,27 @@ final class AppState: ObservableObject {
     @Published var isRefreshing = false
     @Published var initialLoadDone = false
 
+    /// Handle a `davit://` deep link. Today: `davit://container/<id>` reveals
+    /// that container's detail (Overview tab). Other apps can link to a
+    /// container this way.
+    func handleDeepLink(_ url: URL) {
+        if let id = Self.containerID(fromDeepLink: url) { pendingContainerOpen = id }
+    }
+
+    /// Parse `davit://container/<id>` to the container id (pure, for testing).
+    /// nil for anything we don't recognize.
+    nonisolated static func containerID(fromDeepLink url: URL) -> String? {
+        guard url.scheme?.lowercased() == "davit" else { return nil }
+        switch url.host?.lowercased() {
+        case "container", "containers":
+            let id = (url.lastPathComponent.removingPercentEncoding ?? url.lastPathComponent)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            return id.isEmpty ? nil : id
+        default:
+            return nil
+        }
+    }
+
     @AppStorage("refreshInterval") var refreshInterval: Double = 4.0
 
     /// Containers to start when Davit launches (app feature; the platform has

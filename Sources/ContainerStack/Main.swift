@@ -2895,6 +2895,25 @@ enum SelfTest {
                 // expected: authentication rejected
             }
         }
+        await step("deep link: davit://container/<id> parses to the id") {
+            func id(_ s: String) -> String? { AppState.containerID(fromDeepLink: URL(string: s)!) }
+            guard id("davit://container/confida-docling") == "confida-docling" else {
+                throw CLIError(command: "selftest", message: "container deep link not parsed")
+            }
+            guard id("davit://containers/my-app") == "my-app" else {
+                throw CLIError(command: "selftest", message: "plural host not accepted")
+            }
+            guard id("davit://container/a%2Fb") == "a/b" else {
+                throw CLIError(command: "selftest", message: "percent-encoding not decoded")
+            }
+            // Unrecognized forms return nil (no navigation).
+            for bad in ["davit://container/", "davit://image/x", "https://container/x", "davit://"] {
+                guard id(bad) == nil else {
+                    throw CLIError(command: "selftest", message: "unexpected deep-link match: \(bad)")
+                }
+            }
+        }
+
         await step("inspect container JSON") {
             guard let first = try await ContainerService.listContainers().first else { return }
             let json = try await ContainerService.inspectRaw("container", first.id)
