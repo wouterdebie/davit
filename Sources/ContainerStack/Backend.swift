@@ -1044,14 +1044,27 @@ final class PullProgressModel: ObservableObject {
     @Published var lines: [String] = []
     @Published var isRunning = false
     @Published var succeeded: Bool?
+    /// 0...1 download progress when the total size is known (else nil → the
+    /// bar is indeterminate). Drives the pull sheet's progress bar.
+    @Published var fraction: Double?
+    /// "245 MB / 512 MB · 3/8 blobs" — the numbers the platform reports.
+    @Published var statusLine: String?
 
     private var task: Task<Void, Never>?
     private var currentDescription = ""
+    private var size: Int64 = 0
+    private var totalSize: Int64 = 0
+    private var items = 0
+    private var totalItems = 0
+    private var itemsName = "items"
 
     func start(reference: String) {
         task?.cancel()
         lines = []
         succeeded = nil
+        fraction = nil
+        statusLine = nil
+        size = 0; totalSize = 0; items = 0; totalItems = 0
         isRunning = true
         task = Task {
             do {
@@ -1059,6 +1072,7 @@ final class PullProgressModel: ObservableObject {
                     await self?.consume(events)
                 }
                 self.lines.append("✓ pull complete")
+                self.fraction = 1
                 self.succeeded = true
             } catch {
                 self.lines.append("✗ \(error.localizedDescription)")
@@ -1084,11 +1098,30 @@ final class PullProgressModel: ObservableObject {
                 }
             case .setSubDescription(let text):
                 lines.append("  \(text)")
+            // The platform reports progress with both absolute (set*) and
+            // incremental (add*) events — handle both.
+            case .setSize(let s): size = s; updateProgress()
+            case .addSize(let s): size += s; updateProgress()
+            case .setTotalSize(let t): totalSize = t; updateProgress()
+            case .addTotalSize(let t): totalSize += t; updateProgress()
+            case .setItems(let i): items = i; updateProgress()
+            case .addItems(let i): items += i; updateProgress()
+            case .setTotalItems(let t): totalItems = t; updateProgress()
+            case .addTotalItems(let t): totalItems += t; updateProgress()
+            case .setItemsName(let n): itemsName = n
             default:
                 break
             }
         }
         if lines.count > 500 { lines.removeFirst(lines.count - 500) }
+    }
+
+    private func updateProgress() {
+        fraction = totalSize > 0 ? min(1, Double(size) / Double(totalSize)) : nil
+        var parts: [String] = []
+        if totalSize > 0 { parts.append("\(formatBytes(size)) / \(formatBytes(totalSize))") }
+        if totalItems > 0 { parts.append("\(items)/\(totalItems) \(itemsName)") }
+        statusLine = parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }
 

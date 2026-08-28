@@ -13,6 +13,9 @@ import NIO
 /// build, export an OCI tar, then load + unpack + tag it into the image store.
 enum BuildService {
 
+    /// The host architecture ("arm64" | "amd64") — the build sheet's default.
+    static var defaultArch: String { Arch.hostArchitecture().rawValue }
+
     struct Request {
         var contextDir: String
         var dockerfilePath: String        // usually <contextDir>/Dockerfile
@@ -22,6 +25,7 @@ enum BuildService {
         var noCache: Bool = false
         var pull: Bool = false            // re-pull base images
         var target: String = ""           // multi-stage target
+        var arch: String = Arch.hostArchitecture().rawValue  // "arm64" | "amd64"
     }
 
     /// Upstream bug apple/container#735: builds with Dockerfiles ≥16 KiB hang.
@@ -83,8 +87,7 @@ enum BuildService {
         var export = try Builder.BuildExport(from: "type=oci")
         export.destination = exportDir.appendingPathComponent("out.tar")
 
-        let platform = ContainerizationOCI.Platform(
-            arch: Arch.hostArchitecture().rawValue, os: "linux")
+        let platform = ContainerizationOCI.Platform(arch: request.arch, os: "linux")
 
         await progress("Building \(imageName)…")
         let config = Builder.BuildConfig(

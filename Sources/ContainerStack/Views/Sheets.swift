@@ -483,6 +483,18 @@ struct PullImageSheet: View {
                 }
 
                 if started {
+                    if model.isRunning || model.fraction != nil {
+                        VStack(alignment: .leading, spacing: 4) {
+                            if let f = model.fraction {
+                                ProgressView(value: f)
+                            } else {
+                                ProgressView().progressViewStyle(.linear)
+                            }
+                            if let status = model.statusLine {
+                                Text(status).font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                            }
+                        }
+                    }
                     ConsoleView(lines: model.lines)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .overlay(RoundedRectangle(cornerRadius: 8).stroke(.separator))
@@ -497,6 +509,9 @@ struct PullImageSheet: View {
                           systemImage: ok ? "checkmark.circle.fill" : "xmark.circle.fill")
                         .foregroundStyle(ok ? .green : .red)
                         .font(.callout)
+                } else if model.isRunning {
+                    Text("The download continues in the background if you close.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button(model.succeeded == true ? "Done" : "Close") {

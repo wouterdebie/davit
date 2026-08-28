@@ -12,6 +12,7 @@ struct BuildImageSheet: View {
     @State private var buildArgs: [KVPair] = []
     @State private var noCache = false
     @State private var pullBase = false
+    @State private var arch = BuildService.defaultArch  // "arm64" | "amd64"
 
     @State private var working = false
     @State private var progressText = ""
@@ -28,10 +29,17 @@ struct BuildImageSheet: View {
                         .textFieldStyle(.roundedBorder)
                     Button("Choose…") { chooseContext() }
                 }
-                TextField("Dockerfile", text: $dockerfile)
-                    .textFieldStyle(.roundedBorder)
+                HStack {
+                    TextField("Dockerfile (e.g. Dockerfile, Dockerfile_t1)", text: $dockerfile)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Choose…") { chooseDockerfile() }
+                }
                 TextField("Tag (e.g. myapp:latest)", text: $tag)
                     .textFieldStyle(.roundedBorder)
+                Picker("Platform", selection: $arch) {
+                    Text("Apple silicon (linux/arm64)").tag("arm64")
+                    Text("Intel (linux/amd64)").tag("amd64")
+                }
             }
             .formStyle(.columns)
 
@@ -92,6 +100,23 @@ struct BuildImageSheet: View {
         }
     }
 
+    /// Pick any file as the Dockerfile (supports non-default names like
+    /// Dockerfile_t1); starts in the context dir when one is set.
+    private func chooseDockerfile() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose Dockerfile"
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        if !contextDir.isEmpty {
+            panel.directoryURL = URL(fileURLWithPath: (contextDir as NSString).expandingTildeInPath)
+        }
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        dockerfile = url.path
+        // Default the context to the Dockerfile's folder if none is set yet.
+        if contextDir.isEmpty { contextDir = url.deletingLastPathComponent().path }
+    }
+
     private func build() {
         working = true
         errorText = nil
@@ -104,7 +129,8 @@ struct BuildImageSheet: View {
             tag: tag,
             buildArgs: buildArgs.filter { !$0.key.isEmpty }.map { "\($0.key)=\($0.value)" },
             noCache: noCache,
-            pull: pullBase
+            pull: pullBase,
+            arch: arch
         )
         Task {
             do {
