@@ -127,7 +127,7 @@ non-interactively on first start. App data lives in the standard
 `~/Library/Application Support/com.apple.container/`, so Davit and the CLI (if
 installed) always see the same containers.
 
-**Version pinning:** the SPM dependency on apple/container is pinned `exact: "1.0.0"` to
+**Version pinning:** the SPM dependency on apple/container is pinned `exact:` (see `Package.swift`) to
 match the daemon; client and apiserver ship in lockstep and the XPC protocol is not a
 stable public API. When the installed platform updates, bump the pin and rebuild.
 

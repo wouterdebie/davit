@@ -1270,7 +1270,7 @@ enum SystemConfigStore {
 /// root then hosts the launchd services exactly like a /usr/local install.
 enum PlatformInstaller {
     /// Must match the ContainerAPIClient version this app links (Package.swift pin).
-    static let pinnedVersion = "1.3.0"
+    static let pinnedVersion = "1.3.1"
 
     static var managedRoot: String {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
