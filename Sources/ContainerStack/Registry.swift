@@ -78,8 +78,16 @@ enum RegistryService {
 
     /// ACL trusting Davit plus every platform binary that reads registry
     /// credentials, across all install roots present on this machine.
-    /// SecTrustedApplication/SecAccess are deprecated but remain the only way
-    /// to pre-authorize other apps on file-based keychain items.
+    ///
+    /// The three `[#DeprecatedDeclaration]` warnings this body emits are
+    /// expected and deliberate. SecTrustedApplication/SecAccess are the only
+    /// way to pre-authorize *other* apps on a file-based keychain item; the
+    /// data-protection keychain replaces them with access groups, which need a
+    /// shared signing team, and Apple's container binaries aren't signed by
+    /// ours. Silencing them would mean either faking an `@available` deprecation
+    /// on this function (a lie the next reader has to untangle) or moving the
+    /// calls into a C shim built with -Wno-deprecated-declarations. Both cost
+    /// more than the warnings do.
     private static func platformAccess(label: String) -> SecAccess? {
         var apps: [SecTrustedApplication] = []
         var selfApp: SecTrustedApplication?

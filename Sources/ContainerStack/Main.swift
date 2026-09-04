@@ -2954,8 +2954,8 @@ enum SelfTest {
             try await ContainerService.exportContainer(name, to: out)
 
             let size = (try? FileManager.default.attributesOfItem(atPath: out.path)[.size] as? Int) ?? 0
-            guard (size ?? 0) > 100_000 else {
-                throw CLIError(command: "selftest", message: "exported tar too small (\(String(describing: size)) bytes)")
+            guard size > 100_000 else {
+                throw CLIError(command: "selftest", message: "exported tar too small (\(size) bytes)")
             }
             try await ContainerService.delete(name, force: true)
         }

@@ -617,7 +617,13 @@ enum Compose {
                 let source = m["source"] as? String ?? ""
                 let readonly = (m["read_only"] as? Bool) ?? false
                 switch type {
-                case "bind", "volume" where !source.isEmpty:
+                // Spelled out rather than `case "bind", "volume" where …`: a
+                // `where` binds only to the pattern it follows, which reads as
+                // if it guarded both. A bind always maps; a named volume needs
+                // a source (an anonymous one falls to the default warning).
+                case "bind":
+                    management += ["--mount", mountSpec(source: source, target: target, readonly: readonly, baseDir: baseDir)]
+                case "volume" where !source.isEmpty:
                     management += ["--mount", mountSpec(source: source, target: target, readonly: readonly, baseDir: baseDir)]
                 case "tmpfs":
                     management += ["--tmpfs", target]

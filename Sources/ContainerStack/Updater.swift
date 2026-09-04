@@ -141,11 +141,11 @@ final class UpdateInstaller: ObservableObject {
             throw CLIError(command: "update", message: "not running from an app bundle — update manually")
         }
         guard !bundleURL.path.contains("/AppTranslocation/") else {
-            await MainActor.run { NSWorkspace.shared.open(info.releasePageURL) }
+            await MainActor.run { _ = NSWorkspace.shared.open(info.releasePageURL) }
             throw CLIError(command: "update", message: "app is running translocated — move Davit.app to /Applications first")
         }
         guard fm.isWritableFile(atPath: bundleURL.deletingLastPathComponent().path) else {
-            await MainActor.run { NSWorkspace.shared.open(info.releasePageURL) }
+            await MainActor.run { _ = NSWorkspace.shared.open(info.releasePageURL) }
             throw CLIError(command: "update", message: "no write permission for \(bundleURL.deletingLastPathComponent().path)")
         }
 

@@ -154,7 +154,7 @@ enum BuildService {
                 }
                 if !startedBuilder {
                     await progress("Starting builder… (pulls the BuildKit image on first use)")
-                    var start = try Application.BuilderStart.parse([])
+                    let start = try Application.BuilderStart.parse([])
                     try await start.run()
                     startedBuilder = true
                 }
