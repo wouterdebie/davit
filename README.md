@@ -99,7 +99,15 @@ talks to. Davit resolves the platform install root in this order:
 1. custom install root from Settings
 2. a Davit-managed install at `~/Library/Application Support/dev.wouter.davit/platform/<version>`
 3. `/usr/local` (the official installer)
-4. vendored inside the app at `Davit.app/Contents/Resources/vendor`
+4. Homebrew kegs (`/opt/homebrew/opt/container`, `/usr/local/opt/container`)
+5. vendored inside the app at `Davit.app/Contents/Resources/vendor`
+
+Order alone isn't enough: each candidate's `container-apiserver --version` is probed
+(and cached), an exact match for the client the app links wins outright, and installs
+whose major version differs are skipped — they can't be driven over XPC at all. When
+*every* install on disk is incompatible, onboarding says so by name and offers the
+in-app install rather than starting a daemon the app can't talk to. `Davit platform
+status` prints the same view from a terminal.
 
 **In-app install:** when no platform is found, the onboarding screen offers one-click
 install — Davit downloads Apple's signed installer pkg (with a live progress bar),
@@ -111,7 +119,7 @@ managed root before exec'ing the real CLI (one admin prompt; a bare symlink woul
 wrong, since the CLI derives its install root from the unresolved executable path). The managed copy sits
 above `/usr/local` in the resolution order on purpose: it always matches the client
 version the app links, so a newer system daemon can't break XPC compatibility.
-Also available headless: `Davit platform install|remove`.
+Also available headless: `Davit platform install|remove|status`.
 
 To ship a fully self-contained app that works without the system installer:
 
@@ -146,6 +154,7 @@ Davit exec <container-id> [command…]   # interactive TTY shell — or a one-of
 Davit selftest                   # end-to-end test of the XPC service layer against the live daemon
 Davit system start|stop          # bootstrap / tear down the container launchd services
 Davit platform install|remove    # download + verify Apple's signed pkg into an app-managed install root
+Davit platform status            # list the platform installs found, their versions, and which one Davit drives
 Davit registry login|list|logout # registry credentials (login reads the password from stdin)
 Davit run [flags] IMAGE [COMMAND…]    # docker-style single-container run
     # flags precede IMAGE (docker convention; -- also ends flag parsing, --help prints usage and

@@ -174,7 +174,7 @@ struct MainWindow: View {
                 Text(state.systemState.isRunning ? "Services running" : "Services stopped")
                     .font(.caption)
                 if let binary = state.resolvedBinary {
-                    Text(binary.source.rawValue)
+                    Text(binary.label)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -220,14 +220,41 @@ struct OnboardingView: View {
     @State private var installFraction: Double?
     @State private var installError: String?
 
+    /// Installs found on disk that Davit can't drive — issue #20: a 0.5.0 pkg at
+    /// /usr/local used to be picked anyway, and every Start failed against it.
+    private var incompatible: [ResolvedBinary] { state.incompatibleInstalls }
+
+    private var title: String {
+        guard let found = incompatible.first, let version = found.version else {
+            return "Apple container platform not found"
+        }
+        return version < PlatformInstaller.pinned
+            ? "Installed container platform is too old"
+            : "Installed container platform is too new"
+    }
+
+    private var subtitle: String {
+        guard let found = incompatible.first else {
+            return """
+                Davit talks directly to Apple's open-source container services.
+                Install them once — no administrator rights needed — and you're set.
+                """
+        }
+        return """
+            Davit found container \(found.version?.description ?? "(unknown version)") at \(found.installRoot), \
+            which speaks a protocol Davit \(PlatformInstaller.pinnedVersion) can't drive.
+            Install Davit's own copy — no administrator rights, and that install is left untouched.
+            """
+    }
+
     var body: some View {
         VStack(spacing: 18) {
-            Image(systemName: "shippingbox.fill")
+            Image(systemName: incompatible.isEmpty ? "shippingbox.fill" : "exclamationmark.triangle.fill")
                 .font(.system(size: 56))
                 .foregroundStyle(.tint)
-            Text("Apple container platform not found")
+            Text(title)
                 .font(.title2.weight(.semibold))
-            Text("Davit talks directly to Apple's open-source container services.\nInstall them once — no administrator rights needed — and you're set.")
+            Text(subtitle)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
 

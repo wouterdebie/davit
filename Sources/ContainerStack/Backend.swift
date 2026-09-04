@@ -15,16 +15,79 @@ import TerminalProgress
 
 // MARK: - Platform install resolution (replaces CLI binary resolution)
 
+/// A container platform version — `major.minor.patch`, as printed by
+/// `container-apiserver --version`.
+struct PlatformVersion: Comparable, Hashable, CustomStringConvertible {
+    let major: Int
+    let minor: Int
+    let patch: Int
+
+    init(_ major: Int, _ minor: Int, _ patch: Int) {
+        (self.major, self.minor, self.patch) = (major, minor, patch)
+    }
+
+    /// Parses a bare "1.3.1" or a whole version line
+    /// ("container-apiserver version 1.3.1 (build: release, commit: a9a62e2)").
+    init?(_ raw: String) {
+        guard let parsed = Self.parse(raw) else { return nil }
+        self = parsed
+    }
+
+    private static func parse(_ raw: String) -> PlatformVersion? {
+        let tokens = raw.split(whereSeparator: \.isWhitespace).map(String.init)
+        // The token after "version" when the line has one; otherwise anything
+        // that looks like a dotted number (a commit hash never contains a dot).
+        let candidates: [String]
+        if let i = tokens.firstIndex(of: "version"), i + 1 < tokens.count {
+            candidates = [tokens[i + 1]]
+        } else {
+            candidates = tokens
+        }
+        for token in candidates {
+            let digits = token.prefix { $0.isNumber || $0 == "." }
+            let parts = digits.split(separator: ".").map(String.init)
+            guard parts.count >= 2, let major = Int(parts[0]), let minor = Int(parts[1]) else { continue }
+            return PlatformVersion(major, minor, parts.count > 2 ? Int(parts[2]) ?? 0 : 0)
+        }
+        return nil
+    }
+
+    static func < (a: PlatformVersion, b: PlatformVersion) -> Bool {
+        (a.major, a.minor, a.patch) < (b.major, b.minor, b.patch)
+    }
+
+    var description: String { "\(major).\(minor).\(patch)" }
+}
+
 /// Locates the container *platform* (container-apiserver + plugins). The app talks
 /// to the daemon over XPC via ContainerAPIClient; these binaries are only needed to
-/// bootstrap the launchd services. Resolution order:
+/// bootstrap the launchd services. Candidate roots, in order:
 ///   1. User-configured install root (Settings)
-///   2. System install (/usr/local — the official pkg)
-///   3. A copy vendored inside the app bundle (Contents/Resources/vendor)
+///   2. The copy Davit installed into Application Support
+///   3. System install (/usr/local — the official pkg)
+///   4. Homebrew kegs
+///   5. A copy vendored inside the app bundle (Contents/Resources/vendor)
+///
+/// Order alone isn't enough. An install whose major version differs from the
+/// ContainerAPIClient this app links can't be driven over XPC at all, and taking
+/// the first one on disk left Davit *starting* a daemon it then couldn't talk to
+/// — issue #20, a 0.5.0 official pkg at /usr/local beating the platform Davit
+/// ships. So each candidate's version is probed, incompatible ones are skipped,
+/// and when every install is incompatible the app says so and offers to install
+/// its own (see `Resolution`).
 enum ContainerBinary {
     static let defaultsKey = "containerInstallRoot"
 
-    static func resolve() -> ResolvedBinary? {
+    enum Resolution {
+        case resolved(ResolvedBinary)
+        /// Platform installs exist, but none speak this client's protocol version.
+        case incompatible([ResolvedBinary])
+        case notFound
+    }
+
+    /// Every candidate root that holds an executable apiserver, version probed,
+    /// in preference order.
+    static func installs() -> [ResolvedBinary] {
         let custom = UserDefaults.standard.string(forKey: defaultsKey) ?? ""
         var candidates: [(String, ResolvedBinary.Source)] = []
         if !custom.isEmpty { candidates.append((custom, .userConfigured)) }
@@ -36,13 +99,118 @@ enum ContainerBinary {
         if let res = Bundle.main.resourceURL {
             candidates.append((res.appendingPathComponent("vendor").path, .bundled))
         }
+        var found: [ResolvedBinary] = []
+        var seen = Set<String>()
         for (root, source) in candidates {
             let apiserver = "\(root)/bin/container-apiserver"
-            if FileManager.default.isExecutableFile(atPath: apiserver) {
-                return ResolvedBinary(installRoot: root, apiserverPath: apiserver, source: source)
-            }
+            guard FileManager.default.isExecutableFile(atPath: apiserver),
+                  seen.insert(apiserver).inserted else { continue }
+            found.append(ResolvedBinary(
+                installRoot: root,
+                apiserverPath: apiserver,
+                source: source,
+                version: probeVersion(apiserverPath: apiserver)))
         }
-        return nil
+        return found
+    }
+
+    static func resolution() -> Resolution { choose(from: installs()) }
+
+    /// The pure half of `resolution()`: which install on disk to drive.
+    static func choose(from installs: [ResolvedBinary]) -> Resolution {
+        guard !installs.isEmpty else { return .notFound }
+        // An exact match for the client this app links is always the safest bet,
+        // wherever it sits in the candidate order.
+        if let exact = installs.first(where: { $0.version == PlatformInstaller.pinned }) {
+            return .resolved(exact)
+        }
+        // Otherwise the first candidate this client can actually talk to. An
+        // unreadable version counts as usable — that's the pre-probe behavior,
+        // and refusing to start over a missing `--version` would be worse.
+        if let usable = installs.first(where: { $0.version.map(isCompatible) ?? true }) {
+            return .resolved(usable)
+        }
+        return .incompatible(installs)
+    }
+
+    static func resolve() -> ResolvedBinary? {
+        guard case .resolved(let binary) = resolution() else { return nil }
+        return binary
+    }
+
+    /// Davit drives the daemon through ContainerAPIClient `pinnedVersion`, and the
+    /// XPC contract only holds within a major version — a 0.x daemon doesn't even
+    /// answer the health check a 1.x client sends (issue #20).
+    static func isCompatible(_ version: PlatformVersion) -> Bool {
+        version.major == PlatformInstaller.pinned.major
+    }
+
+    /// Why no platform was resolved, in the user's terms — naming the installs
+    /// that were rejected, so the message isn't a bare "not found" on a machine
+    /// that visibly has `container` on it.
+    static func unavailableMessage(_ resolution: Resolution) -> String {
+        switch resolution {
+        case .resolved:
+            return ""
+        case .incompatible(let installs):
+            let list = installs
+                .map { "container \($0.version?.description ?? "?") at \($0.installRoot)" }
+                .joined(separator: ", ")
+            return """
+                \(list) — Davit speaks container \(PlatformInstaller.pinnedVersion) and can't drive \
+                that version. Install a matching platform: Davit's welcome screen offers one click \
+                (no administrator rights), or run `Davit platform install`. Your existing install is \
+                left alone.
+                """
+        case .notFound:
+            return "container platform not found — install it from https://github.com/apple/container/releases or vendor it into the app"
+        }
+    }
+
+    /// `container-apiserver --version` at `path`, or nil when it can't be read.
+    /// Cached: resolution runs on every refresh tick, the probe forks a process,
+    /// and install roots don't change under a running app except through
+    /// `PlatformInstaller`, which invalidates.
+    static func probeVersion(apiserverPath path: String) -> PlatformVersion? {
+        cacheLock.lock()
+        let cached = versionCache[path]
+        cacheLock.unlock()
+        if let cached { return cached }
+        let version = readVersion(apiserverPath: path)
+        cacheLock.lock()
+        versionCache[path] = version
+        cacheLock.unlock()
+        return version
+    }
+
+    static func invalidateVersionCache() {
+        cacheLock.lock()
+        versionCache.removeAll()
+        cacheLock.unlock()
+    }
+
+    private nonisolated(unsafe) static var versionCache: [String: PlatformVersion?] = [:]
+    private static let cacheLock = NSLock()
+
+    private static func readVersion(apiserverPath path: String) -> PlatformVersion? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = ["--version"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        process.standardInput = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return nil }
+        // This runs on the main actor (refreshAll) — a wedged binary must not
+        // freeze the UI. Terminating closes the pipe, so the read returns and the
+        // non-zero status makes it an unknown version.
+        let watchdog = DispatchWorkItem { if process.isRunning { process.terminate() } }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 5, execute: watchdog)
+        defer { watchdog.cancel() }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return nil }
+        return PlatformVersion(String(decoding: data, as: UTF8.self))
     }
 
     /// Must run before any ContainerAPIClient/ContainerPlugin API is touched:
@@ -119,7 +287,11 @@ struct ResolvedBinary: Equatable {
     let installRoot: String
     let apiserverPath: String
     let source: Source
+    /// nil when `container-apiserver --version` couldn't be read.
+    var version: PlatformVersion?
     var path: String { apiserverPath }
+    /// "installed by Davit · 1.3.1" — source plus version, for the UI.
+    var label: String { version.map { "\(source.rawValue) · \($0)" } ?? source.rawValue }
 }
 
 // MARK: - Errors
@@ -608,8 +780,9 @@ enum ContainerService {
     }
 
     static func systemStart() async throws {
-        guard let resolved = ContainerBinary.resolve() else {
-            throw CLIError(command: "system start", message: "container platform not found — install it from https://github.com/apple/container/releases or vendor it into the app")
+        let resolution = ContainerBinary.resolution()
+        guard case .resolved(let resolved) = resolution else {
+            throw CLIError(command: "system start", message: ContainerBinary.unavailableMessage(resolution))
         }
         do {
             try await SystemController.start(resolved: resolved)
@@ -626,19 +799,22 @@ enum ContainerService {
     /// Translate a cryptic platform startup error into an actionable one.
     /// Returns nil when unrecognized (caller keeps the raw message).
     static func friendlyStartError(_ raw: String) -> String? {
-        // A health-check field failing to decode means the running daemon is a
-        // different (older) container-apiserver than the version Davit ships —
-        // typically a pre-existing `container` install answering instead of
-        // Davit's own. (apple/container issue: the client hard-requires fields
-        // its own health reply calls optional.)
+        // A health-check field failing to decode means an older container-apiserver
+        // is answering — its reply is missing fields this client hard-requires
+        // (apple/container added them in 0.8.0). Resolution won't *pick* such an
+        // install any more and `start` boots stale services out first, so reaching
+        // here means one survived both: it re-registered itself, or it lives in a
+        // launchd domain Davit can't reach. Point at removing it, not at a restart
+        // loop — the old message told users to `container system stop` and try
+        // again, which just started the same old daemon over and over (issue #20).
         if raw.contains("in health check"), raw.contains("decode") {
             return """
-            A different version of the container platform is running than Davit expects \
-            (Davit ships \(PlatformInstaller.pinnedVersion)). This usually means an older \
-            `container` was already installed — the official package or Homebrew — and its \
-            daemon is the one answering. Stop it with `container system stop` (or reboot), \
-            then start services again so Davit's own \(PlatformInstaller.pinnedVersion) \
-            platform takes over.
+            The container daemon that answered speaks an older protocol than Davit's \
+            \(PlatformInstaller.pinnedVersion) client, and Davit could not replace it. Stop it from \
+            a terminal with `container system stop` (or reboot), then start services again — Davit \
+            starts its own \(PlatformInstaller.pinnedVersion) platform. If it keeps coming back, \
+            remove that older install: `/usr/local/bin/uninstall-container.sh -k` for the official \
+            package (the `-k` keeps your containers and images), or `brew uninstall container`.
             """
         }
         return nil
@@ -731,6 +907,12 @@ enum SystemController {
     static let labelPrefix = "com.apple.container."
 
     static func start(resolved: ResolvedBinary) async throws {
+        // A daemon from another install can already be loaded under our label, and
+        // `launchctl bootstrap` is a silent no-op then (ServiceManager.register
+        // ignores its exit status). Without this, Davit would go on talking to that
+        // daemon instead of the platform it just resolved (issue #20).
+        await evictUnreachableServices()
+
         let appRoot = ApplicationRoot.path
         try? ConfigurationLoader.copyConfigurationToReadOnly(to: appRoot)
 
@@ -763,6 +945,30 @@ enum SystemController {
         let config = try await Backend.systemConfig()
         await ensureInitImage(config: config)
         try await ensureKernel(config: config)
+    }
+
+    /// Boots out every `com.apple.container.*` service when nothing answers a
+    /// health check — they're either wedged or they belong to an install whose
+    /// protocol this client can't speak. A daemon that *does* answer is left
+    /// alone: tearing that one down would kill running containers.
+    static func evictUnreachableServices() async {
+        // Generous timeout on purpose: a daemon that is merely slow to answer is
+        // one whose containers this must not kill. An absent or foreign daemon
+        // fails the ping immediately (no service, or a reply that can't decode),
+        // so the wait only ever costs something in the ambiguous case.
+        guard (try? await ClientHealthCheck.ping(timeout: .seconds(8))) == nil else { return }
+        guard let domain = try? ServiceManager.getDomainString() else { return }
+        let loaded = { (try? ServiceManager.enumerate())?.filter { $0.hasPrefix(labelPrefix) } ?? [] }
+        guard !loaded().isEmpty else { return }
+        for label in loaded() {
+            try? ServiceManager.deregister(fullServiceLabel: "\(domain)/\(label)")
+        }
+        // launchd unloads asynchronously — wait (briefly) so the bootstrap that
+        // follows isn't refused for a label still on its way out.
+        for _ in 0..<20 {
+            if loaded().isEmpty { return }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
     }
 
     static func stop() async throws {
@@ -1272,6 +1478,9 @@ enum PlatformInstaller {
     /// Must match the ContainerAPIClient version this app links (Package.swift pin).
     static let pinnedVersion = "1.3.1"
 
+    /// `pinnedVersion` parsed — what resolution matches installs against.
+    static let pinned = PlatformVersion(pinnedVersion) ?? PlatformVersion(1, 0, 0)
+
     static var managedRoot: String {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return base.appendingPathComponent("dev.wouter.davit/platform/\(pinnedVersion)").path
@@ -1326,6 +1535,7 @@ enum PlatformInstaller {
         }
         // Point resolution at the managed root before any library API caches paths.
         setenv(InstallRoot.environmentName, root, 1)
+        ContainerBinary.invalidateVersionCache()
         progress("Installed to \(root)", nil)
     }
 
@@ -1378,6 +1588,7 @@ enum PlatformInstaller {
     /// the shared app root under com.apple.container).
     static func removeManaged() throws {
         try FileManager.default.removeItem(atPath: managedRoot)
+        ContainerBinary.invalidateVersionCache()
     }
 
     private static func findPayload(in dir: URL) -> URL? {

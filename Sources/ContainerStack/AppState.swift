@@ -14,6 +14,10 @@ final class AppState: ObservableObject {
     @Published var cliMissing = false
     @Published var availableUpdate: UpdateInfo?
     @Published var resolvedBinary: ResolvedBinary?
+    /// Platform installs found on disk that Davit can't drive (wrong major
+    /// version) — set only when there's no usable install at all, so onboarding
+    /// can name what it rejected instead of claiming nothing is installed.
+    @Published var incompatibleInstalls: [ResolvedBinary] = []
 
     // Live stats: history per container id
     @Published var statsHistory: [String: [StatsSample]] = [:]
@@ -170,7 +174,17 @@ final class AppState: ObservableObject {
     // MARK: Refresh
 
     func refreshAll() async {
-        resolvedBinary = ContainerBinary.resolve()
+        switch ContainerBinary.resolution() {
+        case .resolved(let binary):
+            resolvedBinary = binary
+            incompatibleInstalls = []
+        case .incompatible(let found):
+            resolvedBinary = nil
+            incompatibleInstalls = found
+        case .notFound:
+            resolvedBinary = nil
+            incompatibleInstalls = []
+        }
         guard resolvedBinary != nil else {
             cliMissing = true
             initialLoadDone = true

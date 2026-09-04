@@ -236,6 +236,26 @@ enum Main {
             ComposeCLI.run(Array(args.dropFirst(2)))
             return
         }
+        if args.count >= 3, args[1] == "platform", args[2] == "status" {
+            // Triage aid: what Davit sees on disk and which install it will drive.
+            // ("Can't start davit container system" — issue #20 — was one line of
+            // this away from being self-diagnosing.)
+            print("davit expects container \(PlatformInstaller.pinnedVersion)")
+            let installs = ContainerBinary.installs()
+            if installs.isEmpty { print("no container-apiserver found") }
+            let chosen = ContainerBinary.choose(from: installs)
+            let selected: String? = {
+                if case .resolved(let binary) = chosen { return binary.apiserverPath }
+                return nil
+            }()
+            for install in installs {
+                let mark = install.apiserverPath == selected ? "*" : " "
+                let version = install.version?.description ?? "unknown version"
+                print("\(mark) \(install.apiserverPath) — \(version) (\(install.source.rawValue))")
+            }
+            if selected == nil { print("unusable: \(ContainerBinary.unavailableMessage(chosen))") }
+            return
+        }
         if args.count >= 3, args[1] == "platform", args[2] == "install" || args[2] == "remove" {
             let action = args[2]
             let semaphore = DispatchSemaphore(value: 0)
@@ -2990,12 +3010,110 @@ enum SelfTest {
             guard let friendly = ContainerService.friendlyStartError(raw) else {
                 throw CLIError(command: "selftest", message: "version-skew health error not translated")
             }
-            guard friendly.contains("different version"), friendly.contains(PlatformInstaller.pinnedVersion) else {
+            // Must name the version Davit speaks and a remedy that actually ends the
+            // loop — the pre-issue-#20 text told users to restart into the same
+            // stale daemon forever.
+            guard friendly.contains(PlatformInstaller.pinnedVersion),
+                  friendly.contains("uninstall-container.sh") else {
                 throw CLIError(command: "selftest", message: "friendly start error missing version guidance: \(friendly)")
             }
             // Unrelated errors are left untouched (caller keeps the raw message).
             guard ContainerService.friendlyStartError("some unrelated failure") == nil else {
                 throw CLIError(command: "selftest", message: "friendlyStartError should only fire for known cases")
+            }
+        }
+
+        await step("platform version: parses --version output, bare versions, and junk") {
+            guard let line = PlatformVersion("container-apiserver version 1.3.1 (build: release, commit: a9a62e2)"),
+                  line == PlatformVersion(1, 3, 1) else {
+                throw CLIError(command: "selftest", message: "full --version line not parsed")
+            }
+            // The reporter's daemon in issue #20.
+            guard PlatformVersion("container-apiserver version 0.5.0 (build: release, commit: 48230f3)")
+                == PlatformVersion(0, 5, 0) else {
+                throw CLIError(command: "selftest", message: "0.5.0 version line not parsed")
+            }
+            guard PlatformVersion("1.3.1") == PlatformVersion(1, 3, 1),
+                  PlatformVersion("2.0") == PlatformVersion(2, 0, 0) else {
+                throw CLIError(command: "selftest", message: "bare version not parsed")
+            }
+            // A commit hash must never read as a version.
+            guard PlatformVersion("48230f3") == nil, PlatformVersion("") == nil,
+                  PlatformVersion("no numbers here") == nil else {
+                throw CLIError(command: "selftest", message: "junk parsed as a version")
+            }
+            guard PlatformVersion(1, 3, 1) > PlatformVersion(1, 3, 0),
+                  PlatformVersion(0, 12, 3) < PlatformVersion(1, 0, 0) else {
+                throw CLIError(command: "selftest", message: "version ordering is wrong")
+            }
+            guard ContainerBinary.isCompatible(PlatformInstaller.pinned),
+                  !ContainerBinary.isCompatible(PlatformVersion(0, 5, 0)),
+                  !ContainerBinary.isCompatible(PlatformVersion(2, 0, 0)) else {
+                throw CLIError(command: "selftest", message: "compatibility rule is not major-version based")
+            }
+        }
+
+        await step("platform resolution: an incompatible install never wins (issue #20)") {
+            func install(_ root: String, _ source: ResolvedBinary.Source, _ version: PlatformVersion?) -> ResolvedBinary {
+                ResolvedBinary(
+                    installRoot: root, apiserverPath: "\(root)/bin/container-apiserver",
+                    source: source, version: version)
+            }
+            let pinned = PlatformInstaller.pinned
+            let old = install("/usr/local", .system, PlatformVersion(0, 5, 0))
+            let bundled = install("/App/vendor", .bundled, pinned)
+
+            // The exact case from the issue: a 0.5.0 pkg ahead of a usable install
+            // in candidate order used to be picked and started anyway.
+            guard case .resolved(let winner) = ContainerBinary.choose(from: [old, bundled]),
+                  winner.installRoot == "/App/vendor" else {
+                throw CLIError(command: "selftest", message: "a 0.5.0 install still beats a compatible one")
+            }
+            // Nothing usable: report what was rejected instead of "not found".
+            guard case .incompatible(let rejected) = ContainerBinary.choose(from: [old]),
+                  rejected.count == 1 else {
+                throw CLIError(command: "selftest", message: "an all-incompatible set should resolve to .incompatible")
+            }
+            let message = ContainerBinary.unavailableMessage(.incompatible(rejected))
+            guard message.contains("0.5.0"), message.contains("/usr/local"),
+                  message.contains(PlatformInstaller.pinnedVersion) else {
+                throw CLIError(command: "selftest", message: "unavailable message doesn't name the rejected install: \(message)")
+            }
+            guard case .notFound = ContainerBinary.choose(from: []) else {
+                throw CLIError(command: "selftest", message: "no installs should resolve to .notFound")
+            }
+            // An exact match wins over an also-compatible one, wherever it sits.
+            let sameMajor = install("/usr/local", .system, PlatformVersion(pinned.major, 0, 0))
+            guard case .resolved(let exact) = ContainerBinary.choose(from: [sameMajor, bundled]),
+                  exact.version == pinned else {
+                throw CLIError(command: "selftest", message: "exact pinned match should win the tie")
+            }
+            // A compatible install still wins when no exact match exists, and an
+            // unreadable version stays usable (pre-probe behavior).
+            guard case .resolved(let fallback) = ContainerBinary.choose(from: [old, sameMajor]),
+                  fallback.installRoot == sameMajor.installRoot else {
+                throw CLIError(command: "selftest", message: "same-major install should be used when nothing matches exactly")
+            }
+            guard case .resolved(let unknown) = ContainerBinary.choose(from: [install("/custom", .userConfigured, nil)]),
+                  unknown.installRoot == "/custom" else {
+                throw CLIError(command: "selftest", message: "an unreadable version must not disqualify an install")
+            }
+        }
+
+        await step("platform version probe: reads the resolved apiserver's own --version") {
+            guard let resolved = ContainerBinary.resolve() else {
+                throw CLIError(command: "selftest", message: "no container platform resolved")
+            }
+            guard let probed = ContainerBinary.probeVersion(apiserverPath: resolved.apiserverPath) else {
+                throw CLIError(command: "selftest", message: "could not read --version from \(resolved.apiserverPath)")
+            }
+            guard ContainerBinary.isCompatible(probed) else {
+                throw CLIError(command: "selftest", message: "resolved an install Davit can't drive: \(probed)")
+            }
+            // The daemon that answers must be the platform resolution picked.
+            if case .running(let reported) = try await ContainerService.systemState(),
+               let reported, let running = PlatformVersion(reported), running != probed {
+                throw CLIError(command: "selftest", message: "running daemon is \(running) but resolution picked \(probed)")
             }
         }
 

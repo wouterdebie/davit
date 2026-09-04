@@ -90,7 +90,7 @@ struct DashboardView: View {
                     Text("Start services to manage containers").font(.caption).foregroundStyle(.secondary)
                 }
                 if let binary = state.resolvedBinary {
-                    Text("\(binary.path) (\(binary.source.rawValue))")
+                    Text("\(binary.path) (\(binary.label))")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }

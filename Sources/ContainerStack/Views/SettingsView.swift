@@ -56,9 +56,18 @@ struct GeneralSettings: View {
                 LabeledField(label: "Install root", hint: "blank = auto-detect", text: $binaryPath, width: 240)
                 if let binary = state.resolvedBinary {
                     LabeledContent("Resolved") {
-                        Text("\(binary.path) — \(binary.source.rawValue)")
+                        Text("\(binary.path) — \(binary.label)")
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
+                    }
+                } else if !state.incompatibleInstalls.isEmpty {
+                    // Found, but the wrong major version to drive over XPC (issue #20).
+                    ForEach(state.incompatibleInstalls, id: \.apiserverPath) { install in
+                        LabeledContent("Unusable") {
+                            Text("\(install.path) — \(install.label), needs \(PlatformInstaller.pinnedVersion)")
+                                .foregroundStyle(.red)
+                                .textSelection(.enabled)
+                        }
                     }
                 } else {
                     Text("Container platform (container-apiserver) not found").foregroundStyle(.red)
