@@ -1,0 +1,106 @@
+name: CI
+
+# Exists to catch the two things release.yml can only discover mid-release:
+# that the app still builds, and that the build -> release artifact handoff
+# preserves the bundle. Tags are excluded; release.yml covers those.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "site/**"
+      - "**.md"
+  pull_request:
+    paths-ignore:
+      - "site/**"
+      - "**.md"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Select latest Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Cache SPM dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            .build
+            ~/Library/Caches/org.swift.swiftpm
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Build app bundle
+        run: |
+          # Ad-hoc signed: no credentials in this workflow at all, by the same
+          # reasoning that splits release.yml into two jobs.
+          export VERSION="0.0.0-ci"
+          scripts/bundle.sh
+
+      - name: Lint bundled resources
+        run: plutil -lint dist/Davit.app/Contents/Info.plist
+
+      # Mirrors release.yml's handoff exactly. Sparkle.framework is a versioned
+      # bundle of symlinks and upload-artifact flattens them, so the archive is
+      # what crosses, not the .app. If that ever stops holding -- a ditto flag
+      # change, a new actions/*-artifact major -- this fails here rather than
+      # after a release has already signed and notarized a broken bundle.
+      - name: Archive the bundle and the Sparkle tools
+        run: |
+          mkdir -p handoff
+          ditto -c -k --sequesterRsrc --keepParent dist/Davit.app handoff/Davit-unsigned.zip
+          ditto -c -k --keepParent .build/artifacts/sparkle/Sparkle/bin handoff/sparkle-tools.zip
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ci-handoff
+          path: handoff/
+          if-no-files-found: error
+          retention-days: 1
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ci-handoff
+          path: roundtrip
+
+      - name: Verify the artifact round-trip
+        run: |
+          set -euo pipefail
+          cmp handoff/Davit-unsigned.zip roundtrip/Davit-unsigned.zip
+          cmp handoff/sparkle-tools.zip roundtrip/sparkle-tools.zip
+
+          ditto -x -k roundtrip/Davit-unsigned.zip roundtrip/app
+          APP="roundtrip/app/Davit.app"
+          FRAMEWORK="$APP/Contents/Frameworks/Sparkle.framework"
+
+          test -x "$APP/Contents/MacOS/Davit"
+          # -L, not -e: a flattened symlink is a real directory that passes
+          # every existence check and only fails at codesign or launch.
+          test -L "$FRAMEWORK/Versions/Current"
+          test -L "$FRAMEWORK/Sparkle"
+          test -x "$FRAMEWORK/Versions/Current/Autoupdate"
+          test -d "$FRAMEWORK/Versions/B/XPCServices/Installer.xpc"
+          codesign --verify --deep --strict "$APP"
+
+          # The release job signs the appcast with these; it never builds, so a
+          # tool that loses its executable bit in transit breaks only at release.
+          ditto -x -k roundtrip/sparkle-tools.zip roundtrip/tools
+          test -x roundtrip/tools/bin/sign_update
+          test -x roundtrip/tools/bin/generate_appcast
+
+      - name: Verify the app links Sparkle through the bundle rpath
+        run: |
+          set -euo pipefail
+          BIN="roundtrip/app/Davit.app/Contents/MacOS/Davit"
+          # Package.swift adds this rpath by hand; SwiftPM does not. Without it
+          # the app builds, signs and notarizes, then dies at launch with
+          # "Library not loaded: @rpath/Sparkle.framework". Shipped once.
+          otool -l "$BIN" | grep -q "@executable_path/../Frameworks"
+          otool -L "$BIN" | grep -q "@rpath/Sparkle.framework"
