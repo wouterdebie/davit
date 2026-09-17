@@ -95,6 +95,30 @@ jobs:
           test -x roundtrip/tools/bin/sign_update
           test -x roundtrip/tools/bin/generate_appcast
 
+      # Exercises scripts/check-signing-key.sh without the real key, which this
+      # workflow deliberately does not have. Both directions matter: a guard
+      # that never refuses is worse than none, because it reads as protection.
+      - name: Verify the signing-key guard accepts and refuses correctly
+        run: |
+          set -euo pipefail
+          APP="dist/Davit.app"
+          SEED=$(python3 -c 'import base64,os; print(base64.b64encode(os.urandom(32)).decode())')
+
+          # Refuses a key the bundle does not trust.
+          if printf '%s' "$SEED" | scripts/check-signing-key.sh "$APP" >/dev/null 2>&1; then
+            echo "guard accepted a key the bundle does not trust" >&2
+            exit 1
+          fi
+
+          # Accepts the matching key: derive this seed's public half with the
+          # same arithmetic, stamp it into a copy, and the guard must agree.
+          mkdir -p fake/Fake.app/Contents
+          cp "$APP/Contents/Info.plist" fake/Fake.app/Contents/Info.plist
+          PUB=$(printf '%s' "$SEED" | scripts/check-signing-key.sh --print-public -)
+          test -n "$PUB"
+          /usr/libexec/PlistBuddy -c "Set :SUPublicEDKey $PUB" fake/Fake.app/Contents/Info.plist
+          printf '%s' "$SEED" | scripts/check-signing-key.sh fake/Fake.app
+
       - name: Verify the app links Sparkle through the bundle rpath
         run: |
           set -euo pipefail

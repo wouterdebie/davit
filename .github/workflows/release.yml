@@ -190,6 +190,22 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           shasum -a 256 "Davit-${VERSION}.dmg" > "Davit-${VERSION}.dmg.sha256"
 
+      # Before the key is ever used: confirm its public half is the
+      # SUPublicEDKey already baked into the bundle we just signed. Sparkle has
+      # no key list and no rotation path, so signing with the wrong key ships an
+      # update that every installed copy rejects, with no way to route those
+      # users back. Cheaper to fail the release here than to strand them.
+      - name: Check the Sparkle key matches the bundle
+        if: env.HAS_SPARKLE == 'true'
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set +x
+          set -euo pipefail
+          : "${SPARKLE_PRIVATE_KEY:?Missing SPARKLE_PRIVATE_KEY}"
+          printf '%s' "$SPARKLE_PRIVATE_KEY" |
+            env -u SPARKLE_PRIVATE_KEY scripts/check-signing-key.sh dist/Davit.app
+
       - name: Sign the Sparkle appcast
         if: env.HAS_SPARKLE == 'true'
         env:
