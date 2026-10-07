@@ -13,7 +13,16 @@ BUILD_DIR="$ROOT/.build/release"
 APP="$ROOT/dist/$APP_NAME.app"
 
 echo "==> Building release binary"
-swift build -c release
+# The SDK goes to the link as -isysroot. AppKit picks the window design from the
+# SDK version recorded in the binary (26+ gets Liquid Glass). Xcode 27's default
+# SwiftPM build system links through clang with --sysroot, which clang reads no
+# version from, so the binary recorded the deployment target (15.0) as its SDK
+# and the app came out in the pre-Tahoe design. Check with:
+#   vtool -show-build dist/Davit.app/Contents/MacOS/Davit | grep sdk
+SDK_PATH="$(xcrun --sdk macosx --show-sdk-path)"
+swift build -c release \
+  -Xswiftc -Xclang-linker -Xswiftc -isysroot \
+  -Xswiftc -Xclang-linker -Xswiftc "$SDK_PATH"
 
 echo "==> Assembling $APP"
 rm -rf "$APP"
