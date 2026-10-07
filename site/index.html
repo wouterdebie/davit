@@ -3,199 +3,121 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>Davit - a native macOS UI for Apple containers</title>
 <meta name="description" content="Davit is a free, open-source, fully native macOS app for Apple's container platform: containers, images, volumes and networks with live stats, logs, file browsing, private registries, Compose import, Dockerfile builds and one-click setup.">
 <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png?v=2">
+<link rel="canonical" href="https://davit.app">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://davit.app">
 <meta property="og:title" content="Davit - a native macOS UI for Apple containers">
 <meta property="og:description" content="Free, open-source, fully native. Run Linux containers on Apple silicon with Apple's container platform; no Docker Desktop required.">
-<meta property="og:image" content="img/dashboard.png">
-<style>
-  :root {
-    --bg: #fbfbfd;
-    --fg: #1d1d1f;
-    --muted: #6e6e73;
-    --card: #ffffff;
-    --border: rgba(0,0,0,.08);
-    --accent: #3b5bdb;
-    --accent2: #6b3bdb;
-    --shadow: 0 20px 60px rgba(30,40,90,.14);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0d0d10;
-      --fg: #f5f5f7;
-      --muted: #9b9ba1;
-      --card: #17171c;
-      --border: rgba(255,255,255,.1);
-      --shadow: 0 20px 60px rgba(0,0,0,.55);
-    }
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif;
-    background: var(--bg); color: var(--fg);
-    line-height: 1.55;
-    -webkit-font-smoothing: antialiased;
-  }
-  .wrap { max-width: 1060px; margin: 0 auto; padding: 0 24px; }
-
-  header.hero { text-align: center; padding: 88px 0 56px; }
-  .hero img.icon { width: 128px; height: 128px; filter: drop-shadow(0 12px 28px rgba(59,91,219,.35)); }
-  .hero h1 { font-size: clamp(40px, 7vw, 64px); letter-spacing: -.02em; margin-top: 20px; }
-  .hero p.tag { font-size: clamp(18px, 2.6vw, 24px); color: var(--muted); margin: 14px auto 0; max-width: 640px; }
-  .hero p.sub { font-size: 15px; color: var(--muted); margin-top: 10px; }
-  .cta { margin-top: 34px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-  .btn {
-    display: inline-block; padding: 14px 28px; border-radius: 14px;
-    font-size: 17px; font-weight: 600; text-decoration: none;
-    transition: transform .15s ease, box-shadow .15s ease;
-  }
-  .btn:hover { transform: translateY(-1px); }
-  .btn.primary {
-    color: #fff;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    box-shadow: 0 8px 24px rgba(59,91,219,.35);
-  }
-  .btn.secondary { color: var(--fg); background: var(--card); border: 1px solid var(--border); }
-  .hero .req { margin-top: 14px; font-size: 13px; color: var(--muted); }
-
-  .shot { margin: 26px auto 0; max-width: 980px; }
-  .shot img {
-    width: 100%; height: auto; display: block;
-    border-radius: 14px;
-  }
-  .shot figcaption { text-align: center; font-size: 13px; color: var(--muted); margin-top: 10px; }
-
-  section { padding: 64px 0; }
-  section.spaced { padding-top: 128px; }
-  section h2 { font-size: 32px; letter-spacing: -.01em; text-align: center; margin-bottom: 10px; }
-  section p.lead { text-align: center; color: var(--muted); max-width: 640px; margin: 0 auto 42px; }
-
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
-  .card {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 16px; padding: 22px;
-  }
-  .card .emoji { font-size: 26px; }
-  .card h3 { font-size: 17px; margin: 10px 0 6px; }
-  .card p { font-size: 14.5px; color: var(--muted); }
-  .card code { font-size: 13px; background: rgba(125,125,140,.12); padding: 1px 5px; border-radius: 5px; }
-
-  .shots-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 8px; }
-  @media (max-width: 760px) { .shots-2 { grid-template-columns: 1fr; } }
-  .shots-2 figure img { width: 100%; border-radius: 12px; }
-  .shots-2 figcaption { font-size: 13px; color: var(--muted); text-align: center; margin-top: 8px; }
-
-  .how { max-width: 680px; margin: 0 auto; }
-  .how li { margin: 12px 0 12px 8px; color: var(--muted); }
-  .how li strong { color: var(--fg); }
-
-  .steps { max-width: 720px; margin: 0 auto; counter-reset: step; list-style: none; }
-  .steps li { position: relative; padding: 0 0 20px 52px; }
-  .steps li:not(:last-child)::before {
-    content: ""; position: absolute; left: 17px; top: 34px; bottom: -2px; width: 2px;
-    background: var(--border);
-  }
-  .steps li > .num {
-    counter-increment: step; position: absolute; left: 0; top: 0;
-    width: 36px; height: 36px; border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff;
-    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px;
-  }
-  .steps li > .num::before { content: counter(step); }
-  .steps h3 { font-size: 17px; margin: 5px 0 4px; }
-  .steps p { color: var(--muted); font-size: 15px; }
-  .code {
-    display: block; margin: 8px 0 0; padding: 10px 14px; border-radius: 10px;
-    background: rgba(125,125,140,.12); font-family: ui-monospace, "SF Mono", Menlo, monospace;
-    font-size: 13px; overflow-x: auto; white-space: pre;
-  }
-  .faq { max-width: 720px; margin: 0 auto; }
-  .faq details {
-    border: 1px solid var(--border); border-radius: 12px; padding: 4px 18px; margin-bottom: 12px;
-    background: var(--card);
-  }
-  .faq summary { cursor: pointer; padding: 14px 0; font-weight: 600; font-size: 16px; list-style: none; }
-  .faq summary::-webkit-details-marker { display: none; }
-  .faq summary::after { content: "+"; float: right; color: var(--muted); font-weight: 400; }
-  .faq details[open] summary::after { content: "\2013"; }
-  .faq p { color: var(--muted); font-size: 15px; padding: 0 0 14px; }
-  .faq code { font-size: 13px; background: rgba(125,125,140,.12); padding: 1px 5px; border-radius: 5px; }
-
-  footer { border-top: 1px solid var(--border); padding: 36px 0 48px; text-align: center; font-size: 14px; color: var(--muted); }
-  footer a { color: var(--accent); text-decoration: none; }
-  footer a:hover { text-decoration: underline; }
-</style>
+<meta property="og:image" content="https://davit.app/img/dashboard.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<header class="hero wrap">
-  <img class="icon" src="img/icon-256.png?v=2" alt="Davit app icon" width="128" height="128">
-  <h1>Davit</h1>
-  <p class="tag">A fully native macOS app for Apple's container platform. Run Linux containers on Apple silicon; no Docker Desktop required.</p>
-  <p class="sub">Free &amp; open source · MIT licensed · Signed &amp; notarized</p>
-  <p class="sub" id="gh-stats" style="display:none; margin-top:6px">
-    <a href="https://github.com/wouterdebie/davit/stargazers" style="color:var(--muted);text-decoration:none">&#9733; <span id="gh-stars">-</span> stars</a>
-    &nbsp;·&nbsp;
-    <a href="https://github.com/wouterdebie/davit/releases" style="color:var(--muted);text-decoration:none">&#8595; <span id="gh-downloads">-</span> downloads</a>
-  </p>
-  <div class="cta">
-    <a class="btn primary" href="https://github.com/wouterdebie/davit/releases/latest">Download for macOS</a>
-    <a class="btn secondary" href="https://github.com/wouterdebie/davit">View on GitHub</a>
-  </div>
-  <p class="req">Requires an Apple silicon Mac running macOS 15 or later.<br>
-  Or via Homebrew: <code style="background:rgba(125,125,140,.15);padding:2px 8px;border-radius:6px;font-size:13px">brew install wouterdebie/tap/davit</code></p>
-
-  <figure class="shot">
-    <img src="img/dashboard.png" alt="Davit dashboard showing service status, resource counts, disk usage and a live CPU chart">
-    <figcaption>The dashboard: services, disk usage and live CPU across all running containers.</figcaption>
-  </figure>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header wrap">
+  <a class="brand" href="#" aria-label="Davit home"><img src="img/icon-256.png?v=2" alt="" width="36" height="36">Davit<span class="brand-dot">.</span></a>
+  <nav aria-label="Main navigation">
+    <a class="nav-features" href="#features">Features</a>
+    <a href="https://github.com/wouterdebie/davit">GitHub <span aria-hidden="true">↗</span></a>
+    <button class="theme-toggle" type="button" aria-label="Switch to dark appearance" hidden>Dark</button>
+  </nav>
 </header>
 
-<section class="wrap">
-  <h2>What it does</h2>
+<main id="main">
+<section class="hero wrap" aria-labelledby="hero-title">
+  <div class="hero-copy">
+  <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> Your containers. Right at home on your Mac.</p>
+  <h1 id="hero-title">Less wrangling.<br><span class="gradient-text">More building.</span></h1>
+  <p class="tag">Meet Davit. A native Mac app for Apple's container platform. Run Linux containers, explore your stack, and get back to what you're making.</p>
+  <p class="free-label">100% free <span aria-hidden="true">/</span> Open source <span aria-hidden="true">/</span> MIT licensed</p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/wouterdebie/davit/releases/latest">Download free <span aria-hidden="true">↓</span></a>
+    <a class="btn secondary" href="https://github.com/wouterdebie/davit">View on GitHub <span aria-hidden="true">↗</span></a>
+  </div>
+  <p class="req">macOS 15+ · Apple Silicon · Signed &amp; notarized</p>
+  <div class="brew"><span>Or make yourself at home with Homebrew</span><code>brew install wouterdebie/tap/davit</code></div>
+  <p class="repo-stats" id="gh-stats" hidden>
+    <a href="https://github.com/wouterdebie/davit/stargazers">&#9733; <span id="gh-stars">-</span> stars</a>
+    <span aria-hidden="true">·</span>
+    <a href="https://github.com/wouterdebie/davit/releases">&#8595; <span id="gh-downloads">-</span> ZIP downloads</a>
+  </p>
+  </div>
+  <figure class="shot">
+    <div class="shot-frame"><img src="img/dashboard.png" alt="Davit dashboard showing service status, resource counts, disk usage and a live CPU chart" width="2000" height="1281" fetchpriority="high"></div>
+    <figcaption>The dashboard: services, disk usage and live CPU across all running containers.</figcaption>
+  </figure>
+</section>
+
+<div class="principles wrap" aria-label="Built for your Mac">
+  <p><span aria-hidden="true">⌘</span> Fully native SwiftUI</p>
+  <p><span aria-hidden="true">◇</span> Apple's container engine</p>
+  <p><span aria-hidden="true">◎</span> No Docker Desktop required</p>
+  <p><span aria-hidden="true">↗</span> No subscription</p>
+</div>
+
+<section id="features" class="wrap">
+  <p class="eyebrow">LESS FRICTION. MORE FLOW.</p>
+  <h2>Your whole stack.<br>One native app.</h2>
   <p class="lead">Davit talks directly to Apple's open-source <a href="https://github.com/apple/container" style="color:var(--accent);text-decoration:none">container</a> daemon over XPC; the same wire path the CLI uses. No Electron, no web views, no background agents of its own.</p>
   <div class="grid">
-    <div class="card"><div class="emoji">📦</div><h3>Containers</h3>
+    <div class="card featured"><div class="feature-symbol" aria-hidden="true">◇</div><h3>Your containers, at a glance.</h3>
       <p>Start, stop, restart and delete with live CPU, memory and IP on every row. Streaming logs with follow &amp; boot mode, live stat charts, and raw config inspection.</p></div>
-    <div class="card"><div class="emoji">🖥️</div><h3>One-click terminal</h3>
+    <div class="card"><div class="feature-symbol" aria-hidden="true">⌘</div><h3>One-click terminal</h3>
       <p>Open an interactive shell in any running container, straight into Terminal or iTerm; over the native API, no CLI needed.</p></div>
-    <div class="card"><div class="emoji">🪄</div><h3>Edit &amp; Recreate</h3>
+    <div class="card"><div class="feature-symbol" aria-hidden="true">↻</div><h3>Edit &amp; Recreate</h3>
       <p>Containers are immutable, so Davit prefills a new one from the old config with the image's entrypoint and env subtracted, letting you change ports, env vars, mounts or resources in seconds.</p></div>
-    <div class="card"><div class="emoji">📂</div><h3>In-container files</h3>
+    <div class="card"><div class="feature-symbol" aria-hidden="true">⊞</div><h3>In-container files</h3>
       <p>Browse any running container's filesystem right in the app: navigate folders, download files to your Mac, upload or delete. All over the native API, no <code>docker cp</code> incantations.</p></div>
-    <div class="card"><div class="emoji">🐳</div><h3>Compose import</h3>
+    <div class="card"><div class="feature-symbol" aria-hidden="true">≋</div><h3>Compose import</h3>
       <p>Open a <code>docker-compose.yml</code> and Davit shows exactly what it will create: services in dependency order, volumes, networks, the equivalent CLI command per service, and honest warnings for anything unsupported. Then it starts the whole stack in one click.</p></div>
-    <div class="card"><div class="emoji">🔨</div><h3>Build from a Dockerfile</h3>
+    <div class="card"><div class="feature-symbol" aria-hidden="true">↗</div><h3>Build from a Dockerfile</h3>
       <p>Pick a context folder, set a tag, hit Build. Davit drives Apple's BuildKit builder directly, starting it if needed, and the image lands in your library, ready to run.</p></div>
-    <div class="card"><div class="emoji">💿</div><h3>Images, volumes, networks</h3>
+    <div class="card"><div class="feature-symbol" aria-hidden="true">◎</div><h3>Images, volumes, networks</h3>
       <p>Pull with live progress, run from any image, tag, prune. Create sized volumes and custom subnets. See what's in use before you delete it.</p></div>
-    <div class="card"><div class="emoji">🔑</div><h3>Registry logins</h3>
+    <div class="card"><div class="feature-symbol" aria-hidden="true">⌁</div><h3>Registry logins</h3>
       <p>Sign in to Docker Hub, ghcr.io, quay.io or any registry to pull private images. Credentials are verified on the spot and stored in your login keychain, shared with the <code>container</code> CLI, so both see them.</p></div>
-    <div class="card"><div class="emoji">⚙️</div><h3>Platform settings, editable</h3>
+    <div class="card"><div class="feature-symbol" aria-hidden="true">☷</div><h3>Platform settings, editable</h3>
       <p>Default CPU/memory for new containers, registry, DNS, builder resources; edited in the app, validated by the platform's own config loader, saved as clean TOML overrides.</p></div>
-    <div class="card"><div class="emoji">⬇️</div><h3>Installs the platform for you</h3>
+    <div class="card featured"><div class="feature-symbol" aria-hidden="true">↓</div><h3>A little setup. Then you're building.</h3>
       <p>No container platform installed? Davit downloads Apple's signed installer, verifies it, and sets everything up in your user Library; <em>no administrator rights needed</em>. It can add the <code>container</code> CLI to your shell, too.</p></div>
   </div>
 </section>
 
-<section class="wrap spaced">
-  <h2>Around the app</h2>
+<section id="screenshots" class="wrap spaced">
+  <p class="eyebrow">A CLOSER LOOK</p>
+  <h2>Built for the way<br>you work on a Mac.</h2>
   <p class="lead">Built entirely in SwiftUI. Menu bar quick actions, a Dock icon only when you want one, and live charts that don't spin up a browser to render.</p>
-  <div class="shots-2">
-    <figure><img src="img/containers.png" alt="Container list with live per-container CPU, memory and IP"><figcaption>Containers with live stats and port badges.</figcaption></figure>
-    <figure><img src="img/container-stats.png" alt="Live CPU and memory charts for a container"><figcaption>Per-container CPU &amp; memory, sampled every 2 seconds.</figcaption></figure>
-    <figure><img src="img/container-overview.png" alt="Container detail overview with network, ports, mounts and environment"><figcaption>Network, ports, mounts and environment at a glance.</figcaption></figure>
-    <figure><img src="img/images.png" alt="Image list with platform variants, sizes and in-use badges"><figcaption>Images with sizes, platforms and in-use badges.</figcaption></figure>
-    <figure><img src="img/files.png" alt="Browsing a running container's filesystem with folders, file sizes and per-file download"><figcaption>Browse a container's files; navigate, download, upload, delete.</figcaption></figure>
-    <figure><img src="img/registries.png" alt="Registry logins in Settings, listing signed-in registries"><figcaption>Sign in to registries to pull private images.</figcaption></figure>
-    <figure><img src="img/compose.png" alt="Compose import preview showing services, volumes, networks and warnings before starting the stack"><figcaption>Import a compose file; preview the plan, start the stack.</figcaption></figure>
+  <div class="showcase">
+    <div class="showcase-tabs" role="tablist" aria-label="Explore Davit" hidden>
+      <button type="button" id="tab-containers" role="tab" aria-controls="shot-containers" aria-selected="true">Containers</button>
+      <button type="button" id="tab-stats" role="tab" aria-controls="shot-stats" aria-selected="false" tabindex="-1">Live stats</button>
+      <button type="button" id="tab-images" role="tab" aria-controls="shot-images" aria-selected="false" tabindex="-1">Images</button>
+      <button type="button" id="tab-files" role="tab" aria-controls="shot-files" aria-selected="false" tabindex="-1">Files</button>
+      <button type="button" id="tab-compose" role="tab" aria-controls="shot-compose" aria-selected="false" tabindex="-1">Compose</button>
+    </div>
+    <div class="showcase-panels">
+      <figure id="shot-containers"><div class="showcase-image"><img src="img/containers.png" alt="Container list with live per-container CPU, memory and IP" width="2000" height="1281" loading="lazy"></div><figcaption>Containers with live stats and port badges.</figcaption></figure>
+      <figure id="shot-stats"><div class="showcase-image"><img src="img/container-stats.png" alt="Live CPU and memory charts for a container" width="2000" height="1281" loading="lazy"></div><figcaption>Per-container CPU &amp; memory, sampled every 2 seconds.</figcaption></figure>
+      <figure id="shot-images"><div class="showcase-image"><img src="img/images.png" alt="Image list with platform variants, sizes and in-use badges" width="2000" height="1281" loading="lazy"></div><figcaption>Images with sizes, platforms and in-use badges.</figcaption></figure>
+      <figure id="shot-files"><div class="showcase-image"><img src="img/files.png" alt="Browsing a running container's filesystem with folders, file sizes and per-file download" width="2594" height="1910" loading="lazy"></div><figcaption>Browse a container's files; navigate, download, upload, delete.</figcaption></figure>
+      <figure id="shot-compose"><div class="showcase-image"><img src="img/compose.png" alt="Compose import preview showing services, volumes, networks and warnings before starting the stack" width="2594" height="1910" loading="lazy"></div><figcaption>Import a compose file; preview the plan, start the stack.</figcaption></figure>
+    </div>
+    <p class="showcase-hint" hidden>Pick a tab, or swipe the screenshot to explore.</p>
+    <p class="visually-hidden showcase-status" aria-live="polite" aria-atomic="true"></p>
   </div>
 </section>
 
-<section class="wrap spaced">
-  <h2>Get started in two minutes</h2>
-  <p class="lead">From a fresh install to a running container you can open in your browser.</p>
+<section id="setup" class="wrap spaced setup">
+  <div class="section-heading">
+  <p class="eyebrow">FROM DOWNLOAD TO DEPLOY</p>
+  <h2>A fresh start.<br>A running stack.</h2>
+  <p class="lead">From a fresh install to a running container you can open in your browser. Davit helps set up Apple's platform along the way.</p>
+  </div>
   <ol class="steps">
     <li><span class="num"></span>
       <h3>Install &amp; open Davit</h3>
@@ -222,6 +144,7 @@
 </section>
 
 <section class="wrap spaced">
+  <p class="eyebrow">A DIFFERENT FOUNDATION</p>
   <h2>How is this different from Docker Desktop?</h2>
   <ul class="how">
     <li><strong>It's Apple's engine.</strong> Each container runs in its own lightweight VM via Apple's Virtualization framework; sub-second boots, per-container IP addresses, optimized for Apple silicon.</li>
@@ -231,8 +154,12 @@
   </ul>
 </section>
 
-<section class="wrap spaced">
-  <h2>FAQ</h2>
+<section id="faq" class="wrap spaced faq-section">
+  <div class="section-heading">
+  <p class="eyebrow">THE DETAILS MATTER</p>
+  <h2>Good to know.</h2>
+  <p class="lead">A different engine comes with a few differences. Here's what to expect.</p>
+  </div>
   <div class="faq">
     <details>
       <summary>Can it replace Docker Desktop for me?</summary>
@@ -256,7 +183,7 @@
     </details>
     <details>
       <summary>Does it work with my docker-compose.yml?</summary>
-      <p>Yes, with a supported subset. <strong>Containers → ⋯ → Import Compose File</strong> parses the file and previews the plan: services in <code>depends_on</code> order, named volumes, networks, and the equivalent <code>container run</code> command per service. Then it creates and starts everything in one click. Supported: image, ports, environment, volumes (named &amp; bind), networks, resource limits, command, user, working_dir. Anything the importer can't honor (e.g. <code>restart:</code>, <code>healthcheck:</code>, <code>build:</code>) is listed as a warning up front rather than silently dropped. Apple's platform has no native compose, so Davit orchestrates the stack itself.</p>
+      <p>Yes, with a supported subset. <strong>Containers → ⋯ → Import Compose File</strong> previews the services, volumes, networks and equivalent commands before starting your stack. Davit supports ports, environment files, mounts, resource limits, health checks, profiles and dependency conditions. Unsupported options are listed as warnings up front rather than silently dropped. Apple's platform has no native compose, so Davit orchestrates the stack itself. See the <a href="https://github.com/wouterdebie/davit#features">current support details</a> for the full list and command-line workflow.</p>
     </details>
     <details>
       <summary>Can I build images from a Dockerfile?</summary>
@@ -272,7 +199,7 @@
     </details>
     <details>
       <summary>Does Davit phone home?</summary>
-      <p>Almost not. The app talks to your local container daemon, and to GitHub for release downloads. The one exception: once a day the updater fetches <code>davit.app/appcast.json</code> to learn the latest version. That request carries no payload, no identifiers and nothing about you or your containers; the server's access log (deleted after 30 days) is used only to estimate how many installs exist. There is no feature telemetry of any kind, and the updater falls back to GitHub's API if davit.app is unreachable. The relevant code is <a href="https://github.com/wouterdebie/davit/blob/main/Sources/ContainerStack/Updater.swift">Updater.swift</a>; read it.</p>
+      <p>There is no feature telemetry. Davit connects to your local container platform, the registries you use, and download services when installing or updating software. Current releases use <a href="https://sparkle-project.org">Sparkle</a> to check for updates hosted on GitHub; update archives carry an independent EdDSA signature. Older releases (0.1.33 and earlier) still check <code>davit.app/appcast.json</code>. The current updater is open source: <a href="https://github.com/wouterdebie/davit/blob/main/Sources/ContainerStack/Updates.swift">read the code</a>.</p>
     </details>
     <details>
       <summary>Do I need the <code>container</code> CLI installed?</summary>
@@ -281,6 +208,18 @@
   </div>
 </section>
 
+<section class="closing wrap" aria-labelledby="closing-title">
+  <div class="closing-inner">
+    <img src="img/icon-256.png?v=2" alt="" width="72" height="72" loading="lazy">
+    <p class="eyebrow">SMALL APP. ROOM TO BUILD.</p>
+    <h2 id="closing-title">Your next project starts here.</h2>
+    <p>Free, open source, and right at home on your Mac.</p>
+    <a class="btn primary" href="https://github.com/wouterdebie/davit/releases/latest">Download free <span aria-hidden="true">↓</span></a>
+    <p class="req">Apple Silicon · macOS 15+ · No subscription</p>
+  </div>
+</section>
+</main>
+
 <footer>
   <div class="wrap">
     <p>Davit is free software, <a href="https://github.com/wouterdebie/davit/blob/main/LICENSE">MIT licensed</a>.
@@ -288,11 +227,81 @@
     <p style="margin-top:8px"><a href="https://github.com/wouterdebie/davit">GitHub</a> ·
     <a href="https://github.com/wouterdebie/davit/releases/latest">Download</a> ·
     <a href="https://github.com/wouterdebie/davit/issues">Issues</a></p>
-    <p style="margin-top:8px">© 2026 Wouter de Bie</p>
+    <p style="margin-top:8px">Made by <a href="https://github.com/wouterdebie">Wouter de Bie</a> · Also making <a href="https://dontmiss.now">Don't Miss</a></p>
   </div>
 </footer>
 
 <script>
+(() => {
+  const showcase = document.querySelector('.showcase');
+  const tablist = showcase.querySelector('[role="tablist"]');
+  const tabs = [...tablist.querySelectorAll('[role="tab"]')];
+  const panels = tabs.map(tab => document.getElementById(tab.getAttribute('aria-controls')));
+  const surface = showcase.querySelector('.showcase-panels');
+  let selected = 0;
+  const select = (index, focus = false) => {
+    selected = (index + tabs.length) % tabs.length;
+    tabs.forEach((tab, i) => {
+      tab.setAttribute('aria-selected', String(i === selected));
+      tab.tabIndex = i === selected ? 0 : -1;
+      panels[i].hidden = i !== selected;
+    });
+    if (focus) tabs[selected].focus({ preventScroll: true });
+  };
+  tabs.forEach((tab, index) => {
+    panels[index].setAttribute('role', 'tabpanel');
+    panels[index].setAttribute('aria-labelledby', tab.id);
+    panels[index].tabIndex = 0;
+    tab.addEventListener('click', () => select(index));
+    tab.addEventListener('keydown', event => {
+      const destinations = { ArrowLeft: index - 1, ArrowRight: index + 1, Home: 0, End: tabs.length - 1 };
+      if (!Object.hasOwn(destinations, event.key)) return;
+      event.preventDefault();
+      select(destinations[event.key], true);
+    });
+  });
+  let gesture = null;
+  surface.addEventListener('pointerdown', event => {
+    if (event.pointerType !== 'touch' || !event.isPrimary) {
+      gesture = null;
+      return;
+    }
+    gesture = { id: event.pointerId, x: event.clientX, y: event.clientY };
+    surface.setPointerCapture(event.pointerId);
+  });
+  surface.addEventListener('pointercancel', () => { gesture = null; });
+  surface.addEventListener('pointerup', event => {
+    if (!gesture || gesture.id !== event.pointerId) return;
+    const dx = event.clientX - gesture.x;
+    const dy = event.clientY - gesture.y;
+    gesture = null;
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 2) return;
+    select(selected + (dx < 0 ? 1 : -1));
+    showcase.querySelector('.showcase-status').textContent = `${tabs[selected].textContent}: ${panels[selected].querySelector('figcaption').textContent}`;
+  });
+  select(0);
+  tablist.hidden = false;
+  showcase.querySelector('.showcase-hint').hidden = false;
+  showcase.classList.add('is-interactive');
+})();
+(() => {
+  const button = document.querySelector('.theme-toggle');
+  const preference = window.matchMedia('(prefers-color-scheme: dark)');
+  const isDark = () => document.documentElement.dataset.theme
+    ? document.documentElement.dataset.theme === 'dark'
+    : preference.matches;
+  const updateLabel = () => {
+    button.textContent = isDark() ? 'Light' : 'Dark';
+    button.setAttribute('aria-label', `Switch to ${isDark() ? 'light' : 'dark'} appearance`);
+  };
+  button.hidden = false;
+  button.addEventListener('click', () => {
+    document.documentElement.dataset.theme = isDark() ? 'light' : 'dark';
+    updateLabel();
+  });
+  preference.addEventListener('change', updateLabel);
+  updateLabel();
+})();
 (async () => {
   try {
     const fmt = n => n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(n);
@@ -300,14 +309,17 @@
       fetch("https://api.github.com/repos/wouterdebie/davit").then(r => r.ok ? r.json() : null),
       fetch("https://api.github.com/repos/wouterdebie/davit/releases?per_page=100").then(r => r.ok ? r.json() : null),
     ]);
-    if (!repo || !releases) return;
+    if (!repo || !Array.isArray(releases)) {
+      console.warn('GitHub statistics unavailable; download links remain available.');
+      return;
+    }
     const downloads = releases.flatMap(r => r.assets || [])
       .filter(a => a.name && a.name.endsWith(".zip"))
       .reduce((sum, a) => sum + (a.download_count || 0), 0);
     document.getElementById("gh-stars").textContent = fmt(repo.stargazers_count || 0);
     document.getElementById("gh-downloads").textContent = fmt(downloads);
-    document.getElementById("gh-stats").style.display = "";
-  } catch (e) { /* stats are decoration; stay hidden */ }
+    document.getElementById("gh-stats").hidden = false;
+  } catch (e) { console.warn('Could not load optional GitHub statistics.', e); }
 })();
 </script>
 </body>

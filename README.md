@@ -204,3 +204,25 @@ Sources/ContainerStack/
 
 Stats note: the daemon reports cumulative `cpuUsageUsec`; Davit derives CPU% from deltas
 between polls, normalized to wall-clock time (100% = one full core).
+
+## Website
+
+[davit.app](https://davit.app) is a static page in [site/](site/), with no build step
+or remote fonts. Open [site/index.html](site/index.html) locally to preview it.
+The layout shares Don't Miss's visual style, follows the system appearance, and
+offers a light/dark toggle for the current page. Downloads and Homebrew work
+without JavaScript; GitHub statistics are optional.
+The screenshot showcase has five manually selected tabs, Left/Right and Home/End
+keyboard navigation, and touch swiping. Images fit a fixed-ratio frame without
+cropping; without JavaScript, all five screenshots remain visible in a stack.
+
+Deploy with your authorized personal GCP account:
+
+```sh
+GCLOUD_ACCOUNT=prutser@gmail.com GCLOUD_PROJECT=wouterdebie-personal \
+  bash site/deploy.sh davit-app
+```
+
+The script uploads images and CSS before HTML, sets HTML/CSS to revalidate,
+and never deletes bucket objects or touches the release-managed legacy
+`appcast.json`. No app release or load-balancer changes are needed.
