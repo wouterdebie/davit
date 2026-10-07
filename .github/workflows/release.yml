@@ -32,8 +32,9 @@ jobs:
   # execute arbitrary code. Scoping secrets to steps is not enough when the
   # untrusted code is in the same job, so the signing keys live in `release`.
   build:
-    # Apple silicon runner; the apple/container dependency needs Swift 6.2+
-    runs-on: macos-15
+    # Xcode 27, the toolchain Davit is built with locally; the macos-15 and
+    # macos-26 images stop at 26.x. A preview image, so jobs can queue.
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -41,6 +42,14 @@ jobs:
         uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
         with:
           xcode-version: latest-stable
+
+      # Part of the cache key. Keyed on the OS and Package.resolved alone, a
+      # .build from the previous Xcode keeps matching after a toolchain change:
+      # restored, discarded by a full rebuild, and never replaced, because a
+      # key that hit is not saved again.
+      - name: Record the Xcode build
+        id: xcode
+        run: echo "build=$(xcodebuild -version | awk '/Build version/ { print $3 }')" >> "$GITHUB_OUTPUT"
 
       - name: Swift version
         run: swift --version
@@ -51,8 +60,8 @@ jobs:
           path: |
             .build
             ~/Library/Caches/org.swift.swiftpm
-          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
-          restore-keys: spm-${{ runner.os }}-
+          key: spm-${{ runner.os }}-xcode-${{ steps.xcode.outputs.build }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: spm-${{ runner.os }}-xcode-${{ steps.xcode.outputs.build }}-
 
       - name: Build app bundle without release secrets
         run: |
@@ -80,7 +89,7 @@ jobs:
   # signs it, notarizes it, and publishes.
   release:
     needs: build
-    runs-on: macos-15
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 

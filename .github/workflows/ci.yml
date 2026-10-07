@@ -19,7 +19,9 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-15
+    # Xcode 27, the toolchain Davit is built with locally; the macos-15 and
+    # macos-26 images stop at 26.x. A preview image, so jobs can queue.
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -28,14 +30,22 @@ jobs:
         with:
           xcode-version: latest-stable
 
+      # Part of the cache key. Keyed on the OS and Package.resolved alone, a
+      # .build from the previous Xcode keeps matching after a toolchain change:
+      # restored, discarded by a full rebuild, and never replaced, because a
+      # key that hit is not saved again.
+      - name: Record the Xcode build
+        id: xcode
+        run: echo "build=$(xcodebuild -version | awk '/Build version/ { print $3 }')" >> "$GITHUB_OUTPUT"
+
       - name: Cache SPM dependencies
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             .build
             ~/Library/Caches/org.swift.swiftpm
-          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
-          restore-keys: spm-${{ runner.os }}-
+          key: spm-${{ runner.os }}-xcode-${{ steps.xcode.outputs.build }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: spm-${{ runner.os }}-xcode-${{ steps.xcode.outputs.build }}-
 
       - name: Build app bundle
         run: |
