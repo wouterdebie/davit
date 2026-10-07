@@ -11,11 +11,20 @@ struct RunContainerSheet: View {
     var recreate: ContainerRecord? = nil
     var scrollable = true
 
+    /// `initialError` lets the snapshot harness render the error state.
+    init(prefilledImage: String = "", recreate: ContainerRecord? = nil, scrollable: Bool = true, initialError: String? = nil) {
+        self.prefilledImage = prefilledImage
+        self.recreate = recreate
+        self.scrollable = scrollable
+        _errorText = State(initialValue: initialError)
+    }
+
     @State private var originalCommandArgs: [String] = []
     @State private var originalCommandDisplay = ""
 
     @State private var image = ""
     @State private var name = ""
+    @State private var options = ""   // free-form `container run` options
     @State private var command = ""
     @State private var ports: [KVPair] = []      // key = host port, value = container port
     @State private var envVars: [KVPair] = []
@@ -51,14 +60,15 @@ struct RunContainerSheet: View {
 
             Divider()
 
+            if let errorText {
+                ErrorPanel(
+                    message: errorText,
+                    title: recreate == nil ? "Couldn’t run the container" : "Couldn’t recreate the container",
+                    scrollable: scrollable)
+            }
+
             HStack {
-                if let errorText {
-                    Text(errorText)
-                        .font(.callout)
-                        .foregroundStyle(.red)
-                        .lineLimit(3)
-                        .textSelection(.enabled)
-                } else if running {
+                if running {
                     ProgressView().controlSize(.small)
                     Text(progressText)
                         .font(.callout)
@@ -120,7 +130,7 @@ struct RunContainerSheet: View {
         Task {
             let prefill = await ContainerService.recreatePrefill(for: source)
             originalCommandArgs = prefill.commandArgs
-            originalCommandDisplay = prefill.commandArgs.joined(separator: " ")
+            originalCommandDisplay = prefill.commandArgs.map(Compose.shellQuote).joined(separator: " ")
             command = originalCommandDisplay
             for entry in prefill.customEnv {
                 let parts = entry.split(separator: "=", maxSplits: 1).map(String.init)
@@ -150,6 +160,9 @@ struct RunContainerSheet: View {
                 }
                 TextField("Container name (optional)", text: $name)
                     .textFieldStyle(.roundedBorder)
+                TextField("Run options (optional, e.g. --platform linux/amd64 --ssh)", text: $options)
+                    .textFieldStyle(.roundedBorder)
+                    .help("Any `container run` option. These go before the image; the command below goes after it.")
                 TextField("Command override (optional, e.g. sleep infinity)", text: $command)
                     .textFieldStyle(.roundedBorder)
             }
@@ -281,8 +294,9 @@ struct RunContainerSheet: View {
         }
     }
 
-    /// The four flag groups the form produces, shared by run() and the CLI preview.
-    private struct RunArgs { var process: [String]; var management: [String]; var resource: [String]; var command: [String] }
+    /// The flag groups the form produces, plus the Options field verbatim, shared
+    /// by run() and the CLI preview.
+    private struct RunArgs { var process: [String]; var management: [String]; var resource: [String]; var extra: [String]; var command: [String] }
 
     private func buildArgs() -> RunArgs {
         var processArgs: [String] = []
@@ -316,9 +330,10 @@ struct RunContainerSheet: View {
         if !originalCommandDisplay.isEmpty, command == originalCommandDisplay {
             commandArgs = originalCommandArgs  // exact args, no whitespace re-splitting
         } else {
-            commandArgs = command.isEmpty ? [] : command.split(separator: " ").map(String.init)
+            commandArgs = Compose.shellSplit(command)
         }
-        return RunArgs(process: processArgs, management: managementArgs, resource: resourceArgs, command: commandArgs)
+        return RunArgs(process: processArgs, management: managementArgs, resource: resourceArgs,
+                       extra: Compose.shellSplit(options), command: commandArgs)
     }
 
     /// The equivalent `container run …` for what the form will do. Davit actually
@@ -327,7 +342,7 @@ struct RunContainerSheet: View {
         let a = buildArgs()
         var argv = ["container", "run", "--detach"]
         if !name.isEmpty { argv += ["--name", name] }
-        argv += a.management + a.resource + a.process
+        argv += a.management + a.resource + a.process + a.extra
         argv.append(image.isEmpty ? "<image>" : image)
         argv += a.command
         return argv.map(Self.shellQuote).joined(separator: " ")
@@ -348,12 +363,15 @@ struct RunContainerSheet: View {
         let processArgs = args.process
         let managementArgs = args.management
         let resourceArgs = args.resource
+        let extraArgs = args.extra
         let commandArgs = args.command
         let containerName = name
         let replacing = recreate
 
         Task {
             do {
+                // A typo in Options must fail here, before a recreate deletes the original.
+                _ = try ContainerService.parseRunFlags(processArgs + managementArgs + resourceArgs + extraArgs)
                 let sameName = replacing?.id == containerName
                 if let replacing, sameName {
                     // Same name: must clear it first (names are unique, no rename API).
@@ -366,6 +384,7 @@ struct RunContainerSheet: View {
                     processArgs: processArgs,
                     managementArgs: managementArgs,
                     resourceArgs: resourceArgs,
+                    extraArgs: extraArgs,
                     commandArgs: commandArgs,
                     progressUpdate: { events in
                         // Image-fetch phase: surface the platform's own

@@ -68,6 +68,8 @@ enum SnapshotDriver {
 
             render(RunContainerSheet(prefilledImage: "nginx:latest", scrollable: false),
                    state: state, size: CGSize(width: 560, height: 800), to: "\(dir)/run-sheet.png")
+            render(RunContainerSheet(prefilledImage: "nginx:latest", scrollable: false, initialError: SelfTest.issue24Error),
+                   state: state, size: CGSize(width: 560, height: 980), to: "\(dir)/run-sheet-error.png")
 
             if let running = state.containers.first(where: { $0.isRunning }) {
                 render(ContainerOverviewTab(container: running, scrollable: false),

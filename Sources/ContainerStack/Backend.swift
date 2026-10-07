@@ -313,6 +313,21 @@ struct CLIError: LocalizedError, Identifiable {
     static func wrap(_ operation: String, _ error: Error) -> CLIError {
         CLIError(command: operation, message: "\(operation): \(String(describing: error))")
     }
+
+    /// The innermost message of a nested platform error. Errors arrive from the
+    /// daemon already stringified as `code: "msg (cause: "code: "inner"")"`, often
+    /// four or five levels deep, and only the last level says what went wrong.
+    /// nil when the message isn't nested or its closing quotes don't line up.
+    static func rootCause(of message: String) -> String? {
+        let openers = message.matches(of: #/\b[a-z][A-Za-z]*: "/#)
+        guard openers.count >= 2, let last = openers.last else { return nil }
+        // Every opener closes with `"`; every `(cause: "` also closes with `)`.
+        let closers = openers.count + message.matches(of: #/\(cause: "/#).count
+        let tail = message[last.range.upperBound...]
+        guard tail.count > closers, tail.suffix(closers).allSatisfy({ $0 == "\"" || $0 == ")" }) else { return nil }
+        let inner = tail.dropLast(closers).trimmingCharacters(in: .whitespaces)
+        return inner.isEmpty ? nil : inner
+    }
 }
 
 // MARK: - Shared config / logging
@@ -562,43 +577,65 @@ enum ContainerService {
 
     // MARK: Run (create + detached start)
 
+    /// Every option group `container run` takes, parsed as one argv the way the
+    /// CLI's own ContainerRun does — so free-form options (the Run sheet's
+    /// Options field) land in whichever group owns them. Progress and Logging
+    /// are accepted for parity with a pasted CLI line and otherwise unused.
+    struct RunFlags: ParsableArguments {
+        @OptionGroup var process: Flags.Process
+        @OptionGroup var resource: Flags.Resource
+        @OptionGroup var management: Flags.Management
+        @OptionGroup var registry: Flags.Registry
+        @OptionGroup var progress: Flags.Progress
+        @OptionGroup var imageFetch: Flags.ImageFetch
+        @OptionGroup var logging: Flags.Logging
+    }
+
+    /// Throws a CLIError carrying ArgumentParser's own message ("Unknown option
+    /// '--foo'"), so callers can validate options before touching anything.
+    static func parseRunFlags(_ argv: [String]) throws -> RunFlags {
+        do {
+            return try RunFlags.parse(argv)
+        } catch {
+            throw CLIError(command: "run", message: RunFlags.message(for: error))
+        }
+    }
+
     static func runContainer(
         image: String,
         name: String?,
         processArgs: [String],
         managementArgs: [String],
         resourceArgs: [String],
+        extraArgs: [String] = [],
         commandArgs: [String],
         autoRemove: Bool = false,
         retainExitCode: Bool = false,
         progressUpdate: @escaping ProgressUpdateHandler = { _ in }
     ) async throws {
         do {
+            // Extras go last so a scalar option there (--cpus, --arch) wins over the form's.
+            let flags = try parseRunFlags(processArgs + managementArgs + resourceArgs + extraArgs)
+
             // The run path auto-pulls missing images; stage helper credentials first.
             await DockerCredentialHelpers.refreshCredentials(forReference: image)
             let config = try await Backend.systemConfig()
-            let id = Utility.createContainerID(name: name?.isEmpty == true ? nil : name)
+            let id = Utility.createContainerID(name: name?.isEmpty == false ? name : flags.management.name)
             // container 1.3 replaced Utility.validEntityName (throwing) with
             // ManagedContainer.nameValid (Bool).
             guard ManagedContainer.nameValid(id) else {
                 throw CLIError(command: "run", message: "\"\(id)\" is not a valid container name (letters, digits, and . _ - only)")
             }
 
-            let process = try Flags.Process.parse(processArgs)
-            let management = try Flags.Management.parse(managementArgs)
-            let resource = try Flags.Resource.parse(resourceArgs)
-            let registry = try Flags.Registry.parse([])
-            let imageFetch = try Flags.ImageFetch.parse([])
-
             let (configuration, kernel, initImage) = try await Utility.containerConfigFromFlags(
                 id: id,
                 image: image,
                 arguments: commandArgs,
-                process: process,
-                management: management,
-                resource: resource,
-                registry: registry,
-                imageFetch: imageFetch,
+                process: flags.process,
+                management: flags.management,
+                resource: flags.resource,
+                registry: flags.registry,
+                imageFetch: flags.imageFetch,
                 containerSystemConfig: config,
                 progressUpdate: progressUpdate,
                 log: Backend.log
@@ -607,7 +644,7 @@ enum ContainerService {
             let client = ContainerClient()
             try await client.create(
                 configuration: configuration,
-                options: ContainerCreateOptions(autoRemove: autoRemove),
+                options: ContainerCreateOptions(autoRemove: autoRemove || flags.management.remove),
                 kernel: kernel,
                 initImage: initImage
             )

@@ -1087,6 +1087,9 @@ enum RunCLI {
 /// `davit selftest` — exercises the XPC-backed service layer end to end against
 /// the live daemon: lists, volume create/delete, container run/stop/start/delete.
 enum SelfTest {
+    /// Verbatim from issue #24: a run option typed into the command field.
+    static let issue24Error = #"start test: internalError: "failed to start process test in container test (cause: "internalError: "failed to start process (cause: "internalError: "startProcess: failed to start process: internalError: "vmexec error: internalError: "failed to find target executable --platform"""")"")""#
+
     static func runBlocking() {
         let semaphore = DispatchSemaphore(value: 0)
         Task.detached {
@@ -1219,6 +1222,69 @@ enum SelfTest {
             }
             guard prefill.customEnv == ["FOO=bar"] else {
                 throw CLIError(command: "selftest", message: "customEnv reconstruction wrong: \(prefill.customEnv)")
+            }
+        }
+        await step("run options: one argv across every flag group (issue #25)") {
+            let split = Compose.shellSplit("--platform linux/arm64 --label 'note=two words' --ssh")
+            guard split == ["--platform", "linux/arm64", "--label", "note=two words", "--ssh"] else {
+                throw CLIError(command: "selftest", message: "shellSplit wrong: \(split)")
+            }
+            let flags = try ContainerService.parseRunFlags(
+                ["--env", "A=1", "--cpus", "1"] + split + ["--rm", "--cpus", "2", "--progress", "plain"])
+            guard flags.process.env == ["A=1"], flags.resource.cpus == 2,
+                  flags.management.platform == "linux/arm64", flags.management.labels == ["note=two words"],
+                  flags.management.ssh, flags.management.remove else {
+                throw CLIError(command: "selftest", message: "combined parse misrouted a flag")
+            }
+            // Typos and stray positionals fail with ArgumentParser's own message.
+            for bad in [["--platfrom", "linux/amd64"], ["--platform"], ["linux/amd64"]] {
+                do {
+                    _ = try ContainerService.parseRunFlags(bad)
+                    throw CLIError(command: "selftest", message: "accepted bad options \(bad)")
+                } catch let e as CLIError where e.command == "run" {
+                    guard !e.message.isEmpty else { throw CLIError(command: "selftest", message: "empty parse error for \(bad)") }
+                }
+            }
+        }
+        await step("run options reach the container config") {
+            let name = "davit-options-test"
+            try? await ContainerService.delete(name, force: true)
+            try await ContainerService.runContainer(
+                image: "alpine:latest", name: name,
+                processArgs: [], managementArgs: [], resourceArgs: [],
+                extraArgs: ["--label", "davit.selftest=options", "--platform", "linux/arm64"],
+                commandArgs: ["sleep", "60"])
+            defer { Task { try? await ContainerService.delete(name, force: true) } }
+            let record = try await ContainerService.listContainers().first { $0.id == name }
+            guard record?.configuration.labels?["davit.selftest"] == "options" else {
+                throw CLIError(command: "selftest", message: "label from extraArgs missing: \(String(describing: record?.configuration.labels))")
+            }
+        }
+        await step("error root cause (issue #24)") {
+            guard CLIError.rootCause(of: issue24Error) == "failed to find target executable --platform" else {
+                throw CLIError(command: "selftest", message: "rootCause(issue #24) = \(String(describing: CLIError.rootCause(of: issue24Error)))")
+            }
+            // Single-level and quoted-value messages are left alone.
+            for plain in [#"run x: notFound: "image "x" not found""#, "Unknown option '--foo'"] {
+                guard CLIError.rootCause(of: plain) == nil else {
+                    throw CLIError(command: "selftest", message: "rootCause should be nil for \(plain)")
+                }
+            }
+            // The issue's mistake reproduced live: a run option typed as the command.
+            let name = "davit-rootcause-test"
+            try? await ContainerService.delete(name, force: true)
+            defer { Task { try? await ContainerService.delete(name, force: true) } }
+            do {
+                try await ContainerService.runContainer(
+                    image: "alpine:latest", name: name,
+                    processArgs: [], managementArgs: [], resourceArgs: [],
+                    commandArgs: ["--platform", "linux/amd64"])
+                throw CLIError(command: "selftest", message: "run with '--platform' as the command succeeded")
+            } catch let e as CLIError where e.command != "selftest" {
+                guard let cause = CLIError.rootCause(of: e.message), cause.contains("--platform") else {
+                    throw CLIError(command: "selftest", message: "no root cause in live error: \(e.message)")
+                }
+                print("     live root cause: \(cause)")
             }
         }
         await step("config store round-trip") {

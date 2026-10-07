@@ -193,6 +193,61 @@ struct DetailCard<Content: View>: View {
     }
 }
 
+// MARK: - Error panel
+
+/// A failed action's error, never truncated: the root cause as the headline when
+/// the message is a nested platform error, and the full text below it —
+/// selectable, scrolling once it outgrows a few lines, and copyable (issue #24).
+struct ErrorPanel: View {
+    let message: String
+    var title = "Something went wrong"
+    /// false in the snapshot harness, which can't render a ScrollView.
+    var scrollable = true
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.octagon.fill")
+                .foregroundStyle(.red)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(CLIError.rootCause(of: message) ?? title)
+                    .font(.callout.weight(.semibold))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                if scrollable {
+                    ViewThatFits(in: .vertical) {
+                        fullText
+                        ScrollView { fullText }
+                    }
+                    .frame(maxHeight: 96)
+                } else {
+                    fullText
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(message, forType: .string)
+            } label: {
+                Image(systemName: "doc.on.doc")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("Copy error")
+        }
+        .padding(12)
+        .background(Color.red.opacity(0.08))
+    }
+
+    private var fullText: some View {
+        Text(message)
+            .font(.system(size: 11, design: .monospaced))
+            .foregroundStyle(.secondary)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
 // MARK: - Empty states
 
 struct EmptyState: View {
