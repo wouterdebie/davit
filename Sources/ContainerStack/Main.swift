@@ -1184,6 +1184,57 @@ enum SelfTest {
                 throw CLIError(command: "selftest", message: "file still present after delete")
             }
         }
+        await step("file browser on a mounted volume: upload → download (#27)") {
+            // The platform's copy can't see mounts (apple/container#1873): an upload
+            // "succeeded" into the rootfs under the mountpoint and a download failed.
+            let name = "davit-fs-mount-test"
+            let volume = "davit-selftest-fs-vol"
+            try? await ContainerService.delete(name, force: true)
+            try? await ContainerService.deleteVolume(volume)
+            try await ContainerService.createVolume(name: volume, size: nil)
+            try await ContainerService.runContainer(
+                image: "alpine:latest", name: name,
+                processArgs: [], managementArgs: ["--mount", "type=volume,source=\(volume),target=/data"],
+                resourceArgs: [], commandArgs: ["sleep", "120"])
+            defer {
+                Task {
+                    try? await ContainerService.delete(name, force: true)
+                    try? await ContainerService.deleteVolume(volume)
+                }
+            }
+
+            // Several 1 MiB chunks each way, and not a whole number of them.
+            let payload = Data((0..<(3 << 20) + 123).map { _ in UInt8.random(in: .min ... .max) })
+            let localURL = FileManager.default.temporaryDirectory.appendingPathComponent("davit-fs-\(UUID().uuidString).bin")
+            try payload.write(to: localURL)
+            defer { try? FileManager.default.removeItem(at: localURL) }
+            try await ContainerService.uploadFile(name, hostURL: localURL, toDirectory: "/data")
+            let uploaded = "/data/\(localURL.lastPathComponent)"
+            // What the container sees, not just what a listing says.
+            let seen = try await ContainerService.exec(name, ["/bin/sh", "-c", "wc -c < \"$1\"", "davit", uploaded])
+            guard seen.stdoutString.trimmingCharacters(in: .whitespacesAndNewlines) == String(payload.count) else {
+                throw CLIError(command: "selftest", message: "container sees \(seen.stdoutString.debugDescription) bytes at \(uploaded), want \(payload.count) (\(seen.stderr))")
+            }
+
+            let backURL = FileManager.default.temporaryDirectory.appendingPathComponent("davit-fs-back-\(UUID().uuidString).bin")
+            defer { try? FileManager.default.removeItem(at: backURL) }
+            try await ContainerService.downloadFile(name, containerPath: uploaded, to: backURL)
+            guard try Data(contentsOf: backURL) == payload else {
+                throw CLIError(command: "selftest", message: "download from the volume doesn't match the upload")
+            }
+
+            // A failed download must not leave a partial file behind.
+            let missingURL = FileManager.default.temporaryDirectory.appendingPathComponent("davit-fs-missing-\(UUID().uuidString).bin")
+            defer { try? FileManager.default.removeItem(at: missingURL) }
+            do {
+                try await ContainerService.downloadFile(name, containerPath: "/data/no-such-file", to: missingURL)
+                throw CLIError(command: "selftest", message: "download of a missing file on a volume succeeded")
+            } catch let error as CLIError where error.message.contains("no-such-file") {
+                guard !FileManager.default.fileExists(atPath: missingURL.path) else {
+                    throw CLIError(command: "selftest", message: "failed download left \(missingURL.path) behind")
+                }
+            }
+        }
         await step("container run→stats→stop→start→delete") {
             try await ContainerService.runContainer(
                 image: "alpine:latest",

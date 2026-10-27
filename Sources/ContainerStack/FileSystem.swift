@@ -42,25 +42,10 @@ extension ContainerService {
     /// With `timeout`, throws `ExecTimeout` once it elapses (see there — the
     /// process is abandoned, not killed).
     static func exec(_ id: String, _ argv: [String], timeout: Duration? = nil, asRoot: Bool = false) async throws -> ExecResult {
-        let client = ContainerClient()
-        let container = try await client.get(id: id)
-        var config = container.configuration.initProcess
-        config.executable = argv[0]
-        config.arguments = Array(argv.dropFirst())
-        config.terminal = false
-        config.workingDirectory = "/"
-        // /etc/hosts is root:root 644 — a container whose default user is non-root
-        // (e.g. the postgres image runs as `postgres`) can't write it as itself.
-        if asRoot { config.user = .id(uid: 0, gid: 0) }
-
         let outPipe = Pipe()
         let errPipe = Pipe()
-        let process = try await client.createProcess(
-            containerId: id,
-            processId: UUID().uuidString.lowercased(),
-            configuration: config,
-            stdio: [nil, outPipe.fileHandleForWriting, errPipe.fileHandleForWriting])
-        try await process.start()
+        let process = try await startProcess(
+            id, argv, stdio: [nil, outPipe.fileHandleForWriting, errPipe.fileHandleForWriting], asRoot: asRoot)
         // Close our copies of the write ends so pipe EOF arrives when the child exits;
         // the daemon holds its own dup'd fds (passed over XPC).
         try? outPipe.fileHandleForWriting.close()
@@ -91,6 +76,30 @@ extension ContainerService {
         let outData = await outTask.value
         let errData = await errTask.value
         return ExecResult(stdout: outData, stderr: String(decoding: errData, as: UTF8.self), exitCode: code)
+    }
+
+    /// Creates and starts `argv` in the container with the caller's stdio. Not a TTY.
+    private static func startProcess(
+        _ id: String, _ argv: [String], stdio: [FileHandle?], asRoot: Bool
+    ) async throws -> ClientProcess {
+        let client = ContainerClient()
+        let container = try await client.get(id: id)
+        var config = container.configuration.initProcess
+        config.executable = argv[0]
+        config.arguments = Array(argv.dropFirst())
+        config.terminal = false
+        config.workingDirectory = "/"
+        // /etc/hosts is root:root 644 — a container whose default user is non-root
+        // (e.g. the postgres image runs as `postgres`) can't write it as itself.
+        if asRoot { config.user = .id(uid: 0, gid: 0) }
+
+        let process = try await client.createProcess(
+            containerId: id,
+            processId: UUID().uuidString.lowercased(),
+            configuration: config,
+            stdio: stdio)
+        try await process.start()
+        return process
     }
 
     private static func readToEnd(_ handle: FileHandle) async -> Data {
@@ -179,7 +188,13 @@ extension ContainerService {
     /// Copies a file out of the container to a host path.
     static func downloadFile(_ id: String, containerPath: String, to hostURL: URL) async throws {
         do {
-            try await ContainerClient().copyOut(id: id, source: containerPath, destination: hostURL.path)
+            if try await isOnMount(id, containerPath) {
+                try await streamOut(id, containerPath: containerPath, to: hostURL)
+            } else {
+                try await ContainerClient().copyOut(id: id, source: containerPath, destination: hostURL.path)
+            }
+        } catch let error as CLIError {
+            throw error
         } catch {
             throw CLIError.wrap("download \(containerPath)", error)
         }
@@ -189,9 +204,113 @@ extension ContainerService {
     static func uploadFile(_ id: String, hostURL: URL, toDirectory dir: String) async throws {
         let dest = dir == "/" ? "/\(hostURL.lastPathComponent)" : "\(dir)/\(hostURL.lastPathComponent)"
         do {
-            try await ContainerClient().copyIn(id: id, source: hostURL.path, destination: dest)
+            if try await isOnMount(id, dest) {
+                try await streamIn(id, hostURL: hostURL, to: dest)
+            } else {
+                try await ContainerClient().copyIn(id: id, source: hostURL.path, destination: dest)
+            }
+        } catch let error as CLIError {
+            throw error
         } catch {
             throw CLIError.wrap("upload \(hostURL.lastPathComponent)", error)
+        }
+    }
+
+    /// apple/container's copy resolves paths against the container's rootfs from
+    /// outside the container, beneath its mounts (apple/container#1873): copying
+    /// out of a mounted path fails with "path not found", and copying in reports
+    /// success while the file lands in the rootfs under the mountpoint, where the
+    /// container never sees it. Paths on a mount (every path in the volume
+    /// browser) are therefore streamed through exec instead.
+    private static func isOnMount(_ id: String, _ path: String) async throws -> Bool {
+        let container = try await ContainerClient().get(id: id)
+        return container.configuration.mounts.contains { mount in
+            var target = mount.destination
+            while target.hasSuffix("/") { target.removeLast() }
+            return path == target || path.hasPrefix(target + "/")
+        }
+    }
+
+    /// Downloads through `cat`, drained from a pipe into the host file. Done means
+    /// the pipe's EOF, not the exit: the daemon can still be relaying output when
+    /// `wait()` returns. A failed download leaves no partial file behind.
+    private static func streamOut(_ id: String, containerPath: String, to hostURL: URL) async throws {
+        let operation = "download \(containerPath)"
+        guard FileManager.default.createFile(atPath: hostURL.path, contents: nil) else {
+            throw CLIError(command: operation, message: "can't write \(hostURL.path)")
+        }
+        do {
+            let file = try FileHandle(forWritingTo: hostURL)
+            defer { try? file.close() }
+            let outPipe = Pipe()
+            let errPipe = Pipe()
+            let process = try await startProcess(
+                id, ["/bin/sh", "-c", "cat < \"$1\"", "davit", containerPath],
+                stdio: [nil, outPipe.fileHandleForWriting, errPipe.fileHandleForWriting], asRoot: true)
+            try? outPipe.fileHandleForWriting.close()
+            try? errPipe.fileHandleForWriting.close()
+            let copied = Task { await drain(outPipe.fileHandleForReading, into: file) }
+            let errTask = Task { await readToEnd(errPipe.fileHandleForReading) }
+            let code = try await process.wait()
+            let writeError = await copied.value
+            let stderr = String(decoding: await errTask.value, as: UTF8.self)
+            try checkExit(code, stderr: stderr, operation: operation)
+            if let writeError { throw CLIError.wrap(operation, writeError) }
+        } catch {
+            try? FileManager.default.removeItem(at: hostURL)
+            throw error
+        }
+    }
+
+    /// Uploads through `cat`, fed from the host file in chunks over a pipe. Not the
+    /// file itself as stdin: the daemon reads stdin with `availableData`, which on a
+    /// plain file pulls the whole rest of it into memory at once.
+    private static func streamIn(_ id: String, hostURL: URL, to containerPath: String) async throws {
+        let operation = "upload \(hostURL.lastPathComponent)"
+        let file = try FileHandle(forReadingFrom: hostURL)
+        defer { try? file.close() }
+        let inPipe = Pipe()
+        let errPipe = Pipe()
+        // EPIPE rather than a SIGPIPE that kills the app, should the reader go away.
+        _ = fcntl(inPipe.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
+        // On failure the script still reads stdin to EOF, so the feed below never
+        // blocks on a full pipe nobody reads (e.g. a read-only mount).
+        let script = "cat > \"$1\" || { status=$?; cat > /dev/null; exit $status; }"
+        let process = try await startProcess(
+            id, ["/bin/sh", "-c", script, "davit", containerPath],
+            stdio: [inPipe.fileHandleForReading, nil, errPipe.fileHandleForWriting], asRoot: true)
+        try? inPipe.fileHandleForReading.close()
+        try? errPipe.fileHandleForWriting.close()
+        let fed = Task { await drain(file, into: inPipe.fileHandleForWriting, closingTarget: true) }
+        let errTask = Task { await readToEnd(errPipe.fileHandleForReading) }
+        let code = try await process.wait()
+        let feedError = await fed.value
+        let stderr = String(decoding: await errTask.value, as: UTF8.self)
+        try checkExit(code, stderr: stderr, operation: operation)
+        if let feedError { throw CLIError.wrap(operation, feedError) }
+    }
+
+    /// Copies `source` into `target` until EOF, in chunks. After a write error it
+    /// keeps reading (and discarding), so a process writing into `source` is never
+    /// left blocked on a full pipe.
+    private static func drain(_ source: FileHandle, into target: FileHandle, closingTarget: Bool = false) async -> Error? {
+        await withCheckedContinuation { cont in
+            DispatchQueue.global(qos: .userInitiated).async {
+                var failure: Error?
+                while let chunk = try? source.read(upToCount: 1 << 20), !chunk.isEmpty {
+                    guard failure == nil else { continue }
+                    do { try target.write(contentsOf: chunk) } catch { failure = error }
+                }
+                if closingTarget { try? target.close() }
+                cont.resume(returning: failure)
+            }
+        }
+    }
+
+    private static func checkExit(_ code: Int32, stderr: String, operation: String) throws {
+        guard code == 0 else {
+            let msg = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            throw CLIError(command: operation, message: msg.isEmpty ? "\(operation) failed (exit \(code))" : msg)
         }
     }
 
