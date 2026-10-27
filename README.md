@@ -232,3 +232,46 @@ GCLOUD_ACCOUNT=prutser@gmail.com GCLOUD_PROJECT=wouterdebie-personal \
 The script uploads images and CSS before HTML, sets HTML/CSS to revalidate,
 and never deletes bucket objects or touches the release-managed legacy
 `appcast.json`. No app release or load-balancer changes are needed.
+
+## Contributing
+
+Issues and pull requests are welcome. For anything bigger than a fix, open an
+issue first so we can agree on the shape before you build it.
+
+Before you open a pull request:
+
+- Run `swift build`, then `swift run ContainerStack selftest` with the platform
+  running. The selftest drives the live daemon end to end and creates (and
+  removes) `davit-*` containers and volumes. If you change the service layer,
+  add a step that covers it.
+- For UI changes, look at the result: `--snapshot <dir>` renders every screen to PNGs.
+- Move the apple/container version with `scripts/bump-container.sh <version>`,
+  never by hand. CI fails when the pins disagree (`scripts/check-pins.sh`).
+
+CI on a first-time contributor's pull request waits for a maintainer to approve the run.
+
+### Signed commits are required
+
+`main` only accepts signed commits, and the rule applies to maintainers too.
+GitHub won't merge a pull request that contains an unsigned commit, not even as
+a squash merge, so sign your commits before you open one. With an SSH key:
+
+```sh
+git config commit.gpgsign true
+git config gpg.format ssh
+git config user.signingkey ~/.ssh/id_ed25519.pub
+```
+
+Add the same public key to GitHub as a **signing** key (Settings → SSH and GPG
+keys → New SSH key → Key type: Signing Key); an authentication key doesn't
+verify signatures. GPG keys work too. Your commits then show **Verified** on GitHub.
+
+Already pushed unsigned commits? Re-sign the branch and force-push it:
+
+```sh
+git rebase --force-rebase --gpg-sign origin/main
+git push --force-with-lease
+```
+
+If a pull request does arrive unsigned, a maintainer may land it as a signed
+commit with you as the author and close the pull request instead of merging it.
