@@ -1820,11 +1820,19 @@ enum SelfTest {
             guard try plan.selecting(services: [], activeProfiles: ["*"]).services.count == 5 else {
                 throw CLIError(command: "selftest", message: "--profile '*' should enable every profile")
             }
-            // GUI import path: gated services drop out with a pointer at the CLI
-            let gui = try ComposeImport.parseFiltered(text: yaml, projectName: "ignored", baseDir: nil)
-            guard gui.services.map(\.service) == ["db", "init", "cache", "web"],
-                  gui.warnings.contains(where: { $0.contains("requires profile debugging") })
-            else { throw CLIError(command: "selftest", message: "GUI profile filter wrong: \(gui.services.map(\.service)) \(gui.warnings)") }
+            // GUI import picker (#31): gated services start unticked; ticks bring
+            // their dependencies; ticking a gated one activates its profile; no
+            // ticks is nothing, not everything
+            let file = try Compose.parse(text: yaml, projectName: "ignored", baseDir: nil)
+            let picks = ComposeImport.defaultPicks(file)
+            guard try ComposeImport.selection(file, picked: picks).services.map(\.service) == ["db", "init", "cache", "web"]
+            else { throw CLIError(command: "selftest", message: "GUI default picks wrong: \(picks.sorted())") }
+            let justWeb = try ComposeImport.selection(file, picked: ["web"])
+            guard justWeb.services.map(\.service) == ["db", "init", "web"], justWeb.volumes == ["dbdata", "webdata"]
+            else { throw CLIError(command: "selftest", message: "GUI pick of web wrong: \(justWeb.services.map(\.service)) \(justWeb.volumes)") }
+            guard try ComposeImport.selection(file, picked: picks.union(["debug"])).services.count == 5,
+                  try ComposeImport.selection(file, picked: []).services.isEmpty
+            else { throw CLIError(command: "selftest", message: "GUI picks of a gated service / of nothing wrong") }
             // naming a gated service auto-activates its own profile
             let named = try plan.selecting(services: ["debug"], activeProfiles: [])
             guard named.services.map(\.service) == ["db", "cache", "debug"] else {
@@ -1849,6 +1857,18 @@ enum SelfTest {
             } catch Compose.Error.inactiveProfile(service: "g", profile: "p") { /* expected */ }
             guard try gated.selecting(services: ["a"], activeProfiles: ["p"]).services.map(\.service) == ["g", "a"] else {
                 throw CLIError(command: "selftest", message: "--profile p should unlock the gated dependency")
+            }
+            // GUI picker: the same dead end, and the tick that gets out of it
+            do {
+                _ = try ComposeImport.selection(gated, picked: ["a"])
+                throw CLIError(command: "selftest", message: "GUI pick with an inactive-profile dependency not rejected")
+            } catch let error as Compose.Error {
+                guard ComposeImport.pickError(error).contains("Tick g too") else {
+                    throw CLIError(command: "selftest", message: "GUI pick error doesn't say what to tick: \(ComposeImport.pickError(error))")
+                }
+            }
+            guard try ComposeImport.selection(gated, picked: ["a", "g"]).services.map(\.service) == ["g", "a"] else {
+                throw CLIError(command: "selftest", message: "ticking the gated dependency should unlock it")
             }
         }
         await step("compose: file autodiscovery") {

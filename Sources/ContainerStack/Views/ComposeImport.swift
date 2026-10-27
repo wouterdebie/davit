@@ -2,14 +2,23 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Import a Docker Compose file: preview exactly what will be created (services
-/// in start order, volumes, networks, per-service CLI equivalents, and honest
-/// warnings for anything unsupported), then create & start the stack.
+/// Import a Docker Compose file: pick the services to bring up, preview exactly
+/// what will be created (services in start order, volumes, networks, per-service
+/// CLI equivalents, and honest warnings for anything unsupported), then create
+/// & start them.
 struct ComposeImportSheet: View {
     @EnvironmentObject var state: AppState
     @Environment(\.dismiss) private var dismiss
 
-    let plan: Compose.Plan
+    /// Every service in the file; the picker selects from these.
+    let file: Compose.Plan
+    /// Services ticked by the user. Their dependencies come along without a tick.
+    @State private var picked: Set<String>
+
+    init(file: Compose.Plan) {
+        self.file = file
+        _picked = State(initialValue: ComposeImport.defaultPicks(file))
+    }
 
     private enum Phase: Equatable {
         case ready
@@ -21,10 +30,30 @@ struct ComposeImportSheet: View {
     @State private var completed: Set<Compose.StepKind> = []
     @State private var runtimeWarnings: [String] = []  // from up's hosts sync
 
+    /// What the ticks bring up, or why they can't be (a dependency is gated
+    /// behind a profile nothing ticked activates).
+    private var selection: Result<Compose.Plan, Error> {
+        Result { try ComposeImport.selection(file, picked: picked) }
+    }
+
+    private var plan: Compose.Plan {
+        (try? selection.get()) ?? ComposeImport.empty(file)
+    }
+
+    /// Services the ticks bring up. While the ticks can't be resolved, just the
+    /// ticks, so the one that caused it stays visible (and untickable).
+    private var included: Set<String> {
+        (try? selection.get()).map { Set($0.services.map(\.service)) } ?? picked
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Import Compose — \(plan.project)")
-                .font(.title3.weight(.semibold))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Import Compose — \(file.project)")
+                    .font(.title3.weight(.semibold))
+                Text("Untick services you don't want. A ticked service brings its dependencies with it.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
@@ -40,7 +69,7 @@ struct ComposeImportSheet: View {
                         }
                     }
 
-                    ForEach(plan.services) { svc in
+                    ForEach(file.services) { svc in
                         serviceCard(svc)
                     }
 
@@ -61,7 +90,11 @@ struct ComposeImportSheet: View {
             }
             .frame(maxHeight: 420)
 
-            if case .failed(let message) = phase {
+            if case .failure(let error) = selection {
+                Text(ComposeImport.pickError(error))
+                    .font(.caption).foregroundStyle(.red)
+                    .textSelection(.enabled).lineLimit(4)
+            } else if case .failed(let message) = phase {
                 Text(message)
                     .font(.caption).foregroundStyle(.red)
                     .textSelection(.enabled).lineLimit(4)
@@ -80,7 +113,7 @@ struct ComposeImportSheet: View {
                     Text(buttonTitle)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(isRunning || phase == .done)
+                .disabled(isRunning || phase == .done || plan.services.isEmpty)
             }
         }
         .padding(20)
@@ -88,6 +121,31 @@ struct ComposeImportSheet: View {
     }
 
     private var isRunning: Bool { if case .running = phase { return true }; return false }
+
+    /// The tick for a service. A dependency of a ticked service shows ticked but
+    /// can't be unticked on its own: untick what needs it instead.
+    private func checkbox(_ svc: Compose.ServicePlan, included: Bool) -> some View {
+        let dependency = included && !picked.contains(svc.service)
+        return Toggle("", isOn: Binding(
+            get: { included },
+            set: { if $0 { picked.insert(svc.service) } else { picked.remove(svc.service) } }
+        ))
+        .toggleStyle(.checkbox)
+        .labelsHidden()
+        .disabled(dependency || isRunning || phase == .done)
+    }
+
+    /// Why a service is in or out beyond its own tick, if anything.
+    private func pickNote(_ svc: Compose.ServicePlan, included: Bool) -> String? {
+        if included && !picked.contains(svc.service) {
+            let dependents = plan.services.filter { $0.dependsOn[svc.service] != nil }.map(\.service)
+            return "Needed by \(dependents.joined(separator: ", "))"
+        }
+        if !included && !svc.profiles.isEmpty {
+            return "Profile \(svc.profiles.joined(separator: ", "))"
+        }
+        return nil
+    }
 
     private var buttonTitle: String {
         switch phase {
@@ -111,15 +169,24 @@ struct ComposeImportSheet: View {
     }
 
     private func serviceCard(_ svc: Compose.ServicePlan) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let included = self.included.contains(svc.service)
+        return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Image(systemName: completed.contains(.service(svc.service)) ? "checkmark.circle.fill" : "shippingbox")
-                    .foregroundStyle(completed.contains(.service(svc.service)) ? Color.green : Color.accentColor)
-                Text(svc.name).font(.body.weight(.medium))
-                Text(svc.image).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                checkbox(svc, included: included)
+                HStack(spacing: 8) {
+                    Image(systemName: completed.contains(.service(svc.service)) ? "checkmark.circle.fill" : "shippingbox")
+                        .foregroundStyle(completed.contains(.service(svc.service)) ? Color.green : Color.accentColor)
+                    Text(svc.name).font(.body.weight(.medium))
+                    Text(svc.image).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+                .opacity(included ? 1 : 0.5)
                 Spacer()
+                if let note = pickNote(svc, included: included) {
+                    Text(note).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
             }
             summaryRow(svc)
+                .opacity(included ? 1 : 0.5)
             DisclosureGroup {
                 Text(svc.cliPreview)
                     .font(.system(.caption, design: .monospaced))
@@ -195,8 +262,8 @@ struct ComposeImportSheet: View {
 // MARK: - File picking + parsing entry point
 
 enum ComposeImport {
-    /// Present an open panel, parse the chosen file, and hand back a plan
-    /// (or a user-visible error).
+    /// Present an open panel, parse the chosen file, and hand back every service
+    /// in it (or a user-visible error); the sheet picks from those.
     @MainActor
     static func pickAndParse() -> Result<Compose.Plan, CLIError>? {
         let panel = NSOpenPanel()
@@ -210,7 +277,7 @@ enum ComposeImport {
             let dir = url.deletingLastPathComponent()
             // The file's sibling .env participates automatically, like docker.
             let (environment, envWarnings) = try Compose.effectiveEnvironment(composeDir: dir.path)
-            var plan = try parseFiltered(
+            var plan = try Compose.parse(
                 text: text, projectName: dir.lastPathComponent, baseDir: dir.path, environment: environment)
             plan.warnings = envWarnings + plan.warnings
             return .success(plan)
@@ -220,19 +287,35 @@ enum ComposeImport {
         }
     }
 
-    /// Parse for the GUI import: the sheet has no profile picker (v1), so
-    /// profile-gated services are excluded like docker's default and surfaced
-    /// as info warnings pointing at the CLI.
-    static func parseFiltered(
-        text: String, projectName: String, baseDir: String?, environment: [String: String] = [:]
-    ) throws -> Compose.Plan {
-        let parsed = try Compose.parse(text: text, projectName: projectName, baseDir: baseDir, environment: environment)
-        var plan = try parsed.selecting(services: [], activeProfiles: [])
-        let kept = Set(plan.services.map(\.service))
-        for svc in parsed.services where !kept.contains(svc.service) {
-            let profile = svc.profiles.first ?? "?"
-            plan.warnings.append("service \(svc.service) requires profile \(profile) — import via CLI --profile \(profile)")
+    /// The sheet's initial ticks: what a bare `compose up` brings up, i.e. every
+    /// service no profile gates. Gated ones start unticked; ticking one activates
+    /// its own profiles, like naming it on the CLI does.
+    static func defaultPicks(_ file: Compose.Plan) -> Set<String> {
+        Set(file.services.filter { $0.profiles.isEmpty }.map(\.service))
+    }
+
+    /// What `picked` brings up: those services plus their depends_on closure,
+    /// as `compose up <service>…`. Nothing ticked is nothing, not `selecting`'s
+    /// "every enabled service".
+    static func selection(_ file: Compose.Plan, picked: Set<String>) throws -> Compose.Plan {
+        picked.isEmpty ? empty(file) : try file.selecting(services: picked.sorted(), activeProfiles: [])
+    }
+
+    /// A selection error, phrased for ticks rather than CLI flags: the sheet's way
+    /// to activate a profile is to tick a service it gates.
+    static func pickError(_ error: Error) -> String {
+        if case Compose.Error.inactiveProfile(service: let service, profile: let profile) = error {
+            return "A ticked service needs \(service), which only runs under profile \(profile). Tick \(service) too."
         }
+        return (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+    }
+
+    /// The file with nothing selected.
+    static func empty(_ file: Compose.Plan) -> Compose.Plan {
+        var plan = file
+        plan.volumes = []
+        plan.networks = []
+        plan.services = []
         return plan
     }
 }

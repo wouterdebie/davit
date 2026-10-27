@@ -109,7 +109,7 @@ struct ContainersView: View {
         }
         // Separate node from the run sheet — two .sheet on one node shadow each other.
         .sheet(item: $composePlan) { plan in
-            ComposeImportSheet(plan: plan)
+            ComposeImportSheet(file: plan)
         }
         .task {
             // Harness: `--pose-compose <file>` opens the import sheet on that file.
@@ -121,7 +121,7 @@ struct ContainersView: View {
                     let dir = url.deletingLastPathComponent()
                     let environment = (try? Compose.effectiveEnvironment(composeDir: dir.path))?.environment
                         ?? ProcessInfo.processInfo.environment  // .env may throw (${X:?}); degrade to process env, not empty
-                    composePlan = try? ComposeImport.parseFiltered(
+                    composePlan = try? Compose.parse(
                         text: text, projectName: dir.lastPathComponent, baseDir: dir.path,
                         environment: environment)
                     try? await Task.sleep(for: .seconds(1))
