@@ -90,6 +90,19 @@ open dist/Davit.app
 
 Plain `swift build` / `swift run` also works for development (no bundle, so no icon/menu-bar niceties).
 
+## Localization
+
+UI text lives in a String Catalog, `Localization/Localizable.xcstrings` (source
+language `en`; the keys are the English strings in the code). Write normal SwiftUI
+literals and run `scripts/localize.sh` to sync the catalog — it adds new strings,
+keeps existing translations, and removes keys that are no longer in the code.
+`scripts/localize.sh --check` verifies the catalog is in sync and that every
+translation keeps the same format specifiers; `--strict` additionally fails when a
+string is untranslated. Add a language to `LANGUAGES` in `scripts/localize.sh` and
+to `CFBundleLocalizations` in `scripts/bundle.sh` (the check fails when they
+disagree), run the sync, then fill in the catalog. `scripts/bundle.sh` compiles it
+into `Davit.app/Contents/Resources/<lang>.lproj`.
+
 ## What must still be installed
 
 The API removes the CLI dependency, **not** the platform dependency: `container-apiserver`

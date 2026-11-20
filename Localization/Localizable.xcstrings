@@ -1,0 +1,979 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "" : {
+
+    },
+    "%" : {
+
+    },
+    "%@ (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ (%2$@)"
+          }
+        }
+      }
+    },
+    "%@ CPU · %@ · %@ disk" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ CPU · %2$@ · %3$@ disk"
+          }
+        }
+      }
+    },
+    "%@ reclaimable" : {
+
+    },
+    "%@ · %lld platform variant%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$lld platform variant%3$@"
+          }
+        }
+      }
+    },
+    "%@ — %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ — %2$@"
+          }
+        }
+      }
+    },
+    "%@ — %@, needs %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ — %2$@, needs %3$@"
+          }
+        }
+      }
+    },
+    "%@ → %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ → %2$@"
+          }
+        }
+      }
+    },
+    "%lld" : {
+
+    },
+    "%lld CPU · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld CPU · %2$@"
+          }
+        }
+      }
+    },
+    "%lld container%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld container%2$@"
+          }
+        }
+      }
+    },
+    "%lld env" : {
+
+    },
+    "%lld layer%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld layer%2$@"
+          }
+        }
+      }
+    },
+    "%lld mount%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld mount%2$@"
+          }
+        }
+      }
+    },
+    "(%@)" : {
+
+    },
+    "/" : {
+
+    },
+    "/usr/local" : {
+
+    },
+    "/usr/local/bin/container already exists (system install) — nothing to do." : {
+
+    },
+    "200" : {
+
+    },
+    "2000" : {
+
+    },
+    "500" : {
+
+    },
+    "A lightweight VM booted from a container image, with your home directory mounted and a stable DNS name." : {
+
+    },
+    "A native UI for Apple's container platform" : {
+
+    },
+    "About" : {
+
+    },
+    "Actions for every container in “%@”" : {
+
+    },
+    "Add" : {
+
+    },
+    "Add Login…" : {
+
+    },
+    "Add Registry Login" : {
+
+    },
+    "Add another" : {
+
+    },
+    "Adds the `container` CLI to your shell, wired to the Davit-managed platform. Asks for administrator authorization once." : {
+
+    },
+    "Advanced" : {
+
+    },
+    "All" : {
+
+    },
+    "Already installed somewhere unusual? Enter the install root:" : {
+
+    },
+    "Any `container run` option. These go before the image; the command below goes after it." : {
+
+    },
+    "Appearance" : {
+
+    },
+    "Apple silicon (linux/arm64)" : {
+
+    },
+    "Boot" : {
+
+    },
+    "Boot log" : {
+
+    },
+    "Boot machine" : {
+
+    },
+    "Browse Files…" : {
+
+    },
+    "Build" : {
+
+    },
+    "Build Image" : {
+
+    },
+    "Build an image from a Dockerfile" : {
+
+    },
+    "Build args" : {
+
+    },
+    "Builder" : {
+
+    },
+    "Built %@" : {
+
+    },
+    "CPU %" : {
+
+    },
+    "CPU and memory default to half of your system resources." : {
+
+    },
+    "CPUs" : {
+
+    },
+    "Can't import compose file" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Changes apply after the machine is stopped and booted again." : {
+
+    },
+    "Changes apply on the next boot." : {
+
+    },
+    "Check Again" : {
+
+    },
+    "Check for Updates…" : {
+
+    },
+    "Choose a local image" : {
+
+    },
+    "Choose…" : {
+
+    },
+    "Clean Up…" : {
+
+    },
+    "Close" : {
+
+    },
+    "Collecting stats…" : {
+
+    },
+    "Command Failed" : {
+
+    },
+    "Command Line" : {
+
+    },
+    "Command override (optional, e.g. sleep infinity)" : {
+
+    },
+    "Configure Kernel" : {
+
+    },
+    "Container" : {
+
+    },
+    "Container Platform" : {
+
+    },
+    "Container name (optional)" : {
+
+    },
+    "Container platform (container-apiserver) not found" : {
+
+    },
+    "Container services running" : {
+
+    },
+    "Container services stopped" : {
+
+    },
+    "Containers" : {
+
+    },
+    "Containers join this domain (saved with these settings)" : {
+
+    },
+    "Context directory" : {
+
+    },
+    "Copy" : {
+
+    },
+    "Copy DNS Name (%@)" : {
+
+    },
+    "Copy ID" : {
+
+    },
+    "Copy IP (%@)" : {
+
+    },
+    "Copy Install Command" : {
+
+    },
+    "Copy JSON" : {
+
+    },
+    "Copy Path" : {
+
+    },
+    "Copy Reference" : {
+
+    },
+    "Copy Source Path" : {
+
+    },
+    "Copy Subnet (%@)" : {
+
+    },
+    "Copy command" : {
+
+    },
+    "Copy error" : {
+
+    },
+    "Create" : {
+
+    },
+    "Create & Boot" : {
+
+    },
+    "Create Machine" : {
+
+    },
+    "Create Network" : {
+
+    },
+    "Create Volume" : {
+
+    },
+    "Create a container machine" : {
+
+    },
+    "Create…" : {
+
+    },
+    "Creating or deleting a domain asks for administrator authorization (it writes /etc/resolver)." : {
+
+    },
+    "Dashboard" : {
+
+    },
+    "Davit" : {
+
+    },
+    "Davit is passing `--arch amd64` automatically. Performance will be lower than a native `arm64` image." : {
+
+    },
+    "Davit runs this over the API — the equivalent `container` command, for reference." : {
+
+    },
+    "Default" : {
+
+    },
+    "Defaults for New Containers" : {
+
+    },
+    "Delete" : {
+
+    },
+    "Delete Image" : {
+
+    },
+    "Delete Stopped Containers…" : {
+
+    },
+    "Dockerfile (e.g. Dockerfile, Dockerfile_t1)" : {
+
+    },
+    "Done" : {
+
+    },
+    "Double-click to download" : {
+
+    },
+    "Download" : {
+
+    },
+    "Downloads Apple's signed installer (v%@, ~180 MB), verifies it,\nand installs into your user Library. You can also use the [official installer](https://github.com/apple/container/releases)." : {
+
+    },
+    "Download…" : {
+
+    },
+    "Edit %@" : {
+
+    },
+    "Edit & Recreate…" : {
+
+    },
+    "Edit…" : {
+
+    },
+    "Effective configuration (JSON)" : {
+
+    },
+    "Equivalent command" : {
+
+    },
+    "Export Filesystem…" : {
+
+    },
+    "Filter containers" : {
+
+    },
+    "Filter images" : {
+
+    },
+    "Filter networks" : {
+
+    },
+    "Filter volumes" : {
+
+    },
+    "Follow" : {
+
+    },
+    "For Docker Hub, use an access token instead of your password." : {
+
+    },
+    "Force Delete" : {
+
+    },
+    "General" : {
+
+    },
+    "Group" : {
+
+    },
+    "Group by" : {
+
+    },
+    "Group containers by a label" : {
+
+    },
+    "Group: %@" : {
+
+    },
+    "Home directory" : {
+
+    },
+    "Image Reference" : {
+
+    },
+    "Images" : {
+
+    },
+    "Import Compose File…" : {
+
+    },
+    "Import Compose — %@" : {
+
+    },
+    "Install Container Platform" : {
+
+    },
+    "Install Rosetta with `softwareupdate --install-rosetta --agree-to-license`, then try again." : {
+
+    },
+    "Install in /usr/local/bin…" : {
+
+    },
+    "Installed at /usr/local/bin/container, pointing at the Davit-managed platform." : {
+
+    },
+    "Installing…" : {
+
+    },
+    "Intel (linux/amd64)" : {
+
+    },
+    "Internal (host-only, no outbound access)" : {
+
+    },
+    "KB/s" : {
+
+    },
+    "Keep in Dock when the window is closed" : {
+
+    },
+    "Kill" : {
+
+    },
+    "Launches Davit to the menu bar when you log in, so container services are ready." : {
+
+    },
+    "Layer %lld" : {
+
+    },
+    "Live stats always refresh every 2 seconds while containers run." : {
+
+    },
+    "Log In" : {
+
+    },
+    "Log Out" : {
+
+    },
+    "MB" : {
+
+    },
+    "Machine Name" : {
+
+    },
+    "Machines" : {
+
+    },
+    "Make Default" : {
+
+    },
+    "Max size (optional, e.g. 10G — default 512G)" : {
+
+    },
+    "Memory" : {
+
+    },
+    "More" : {
+
+    },
+    "Mounted read-only" : {
+
+    },
+    "Mounted read-write" : {
+
+    },
+    "Mounting volume…" : {
+
+    },
+    "Network" : {
+
+    },
+    "Network name" : {
+
+    },
+    "Networks" : {
+
+    },
+    "No cache" : {
+
+    },
+    "No grouping" : {
+
+    },
+    "No guest kernel configured" : {
+
+    },
+    "No host DNS domains. Create one (e.g. “test”) and containers become reachable at “name.test” from your Mac." : {
+
+    },
+    "No matches" : {
+
+    },
+    "No registry logins" : {
+
+    },
+    "No running containers" : {
+
+    },
+    "Not everything in the file is supported" : {
+
+    },
+    "Not mounted" : {
+
+    },
+    "Notifications" : {
+
+    },
+    "Notify when a container stops unexpectedly" : {
+
+    },
+    "OK" : {
+
+    },
+    "Off: closing the window leaves Davit only in the menu bar, like other menu bar utilities." : {
+
+    },
+    "Open" : {
+
+    },
+    "Open %@" : {
+
+    },
+    "Open Davit" : {
+
+    },
+    "Open Davit at login" : {
+
+    },
+    "Open Software Update" : {
+
+    },
+    "Open Terminal" : {
+
+    },
+    "Open in Browser" : {
+
+    },
+    "Open localhost:%@ in Browser" : {
+
+    },
+    "Open shell in Terminal" : {
+
+    },
+    "Open shells in" : {
+
+    },
+    "Overrides are written to ~/.config/container/config.toml" : {
+
+    },
+    "Overview" : {
+
+    },
+    "Parent directory" : {
+
+    },
+    "Password or access token" : {
+
+    },
+    "Platform" : {
+
+    },
+    "Prune Stopped Containers" : {
+
+    },
+    "Prune Unused Images" : {
+
+    },
+    "Prune Unused Networks" : {
+
+    },
+    "Prune Unused Volumes" : {
+
+    },
+    "Pull" : {
+
+    },
+    "Pull Image" : {
+
+    },
+    "Pull Latest" : {
+
+    },
+    "Pull an image from a registry" : {
+
+    },
+    "Pull complete" : {
+
+    },
+    "Pull failed" : {
+
+    },
+    "Quit Davit" : {
+
+    },
+    "Re-pull base images" : {
+
+    },
+    "Recreate" : {
+
+    },
+    "Recreate Container" : {
+
+    },
+    "Refresh" : {
+
+    },
+    "Refresh every %llds" : {
+
+    },
+    "Registries" : {
+
+    },
+    "Registry" : {
+
+    },
+    "Registry & DNS" : {
+
+    },
+    "Registry Logins" : {
+
+    },
+    "Reload" : {
+
+    },
+    "Remove" : {
+
+    },
+    "Remove from /usr/local/bin" : {
+
+    },
+    "Replace the stored password or token (e.g. after rotating it)" : {
+
+    },
+    "Resolved" : {
+
+    },
+    "Resources" : {
+
+    },
+    "Restart" : {
+
+    },
+    "Restart All" : {
+
+    },
+    "Restart Services" : {
+
+    },
+    "Reveal in Finder" : {
+
+    },
+    "Rosetta (x86-64 builds)" : {
+
+    },
+    "Run" : {
+
+    },
+    "Run Container" : {
+
+    },
+    "Run a container from this image" : {
+
+    },
+    "Run a new container" : {
+
+    },
+    "Run options (optional, e.g. --platform linux/amd64 --ssh)" : {
+
+    },
+    "Running" : {
+
+    },
+    "Running Containers" : {
+
+    },
+    "Run…" : {
+
+    },
+    "Save" : {
+
+    },
+    "Search Docker Hub or enter a reference (nginx, ghcr.io/org/app:tag)" : {
+
+    },
+    "Search containers, images, volumes, networks, machines…" : {
+
+    },
+    "Searching Docker Hub…" : {
+
+    },
+    "Search…" : {
+
+    },
+    "Services running" : {
+
+    },
+    "Services stopped" : {
+
+    },
+    "Set as Default" : {
+
+    },
+    "Set as default machine" : {
+
+    },
+    "Show All Groups" : {
+
+    },
+    "Show Only This Group" : {
+
+    },
+    "Showing only “%@”" : {
+
+    },
+    "Sign in to a registry to pull private images. Credentials are verified and stored in your login keychain (shared with the `container` CLI)." : {
+
+    },
+    "Start" : {
+
+    },
+    "Start All" : {
+
+    },
+    "Start Services" : {
+
+    },
+    "Start container services" : {
+
+    },
+    "Start services to manage containers" : {
+
+    },
+    "Start when Davit Opens" : {
+
+    },
+    "Startup" : {
+
+    },
+    "Status unknown" : {
+
+    },
+    "Stop" : {
+
+    },
+    "Stop All" : {
+
+    },
+    "Stop All Running" : {
+
+    },
+    "Stop Services" : {
+
+    },
+    "Stop container services" : {
+
+    },
+    "Stop machine" : {
+
+    },
+    "Stopped" : {
+
+    },
+    "Stops you trigger in Davit (incl. compose down) stay quiet; crashes and external stops notify." : {
+
+    },
+    "Subnet (optional, e.g. 192.168.100.0/24)" : {
+
+    },
+    "Tag" : {
+
+    },
+    "Tag (e.g. myapp:latest)" : {
+
+    },
+    "Tag Image" : {
+
+    },
+    "Tag…" : {
+
+    },
+    "Tail" : {
+
+    },
+    "Terminal" : {
+
+    },
+    "The VM that runs your containers needs a Linux kernel, and none is set for this Mac. Containers won't start until one is installed." : {
+
+    },
+    "The download continues in the background if you close." : {
+
+    },
+    "This image only ships `linux/amd64` and Rosetta isn't installed." : {
+
+    },
+    "This image only ships `linux/amd64`. It will run under Rosetta translation on Apple silicon." : {
+
+    },
+    "Time" : {
+
+    },
+    "Type to search Docker Hub, or enter a full reference (e.g. ghcr.io/org/app:tag)." : {
+
+    },
+    "Untick services you don't want. A ticked service brings its dependencies with it." : {
+
+    },
+    "Unusable" : {
+
+    },
+    "Update" : {
+
+    },
+    "Update Registry Login" : {
+
+    },
+    "Update…" : {
+
+    },
+    "Upload" : {
+
+    },
+    "Upload files here" : {
+
+    },
+    "Used by container machine commands when no machine name is specified." : {
+
+    },
+    "Used by “Open Terminal” on containers. Only installed terminals are listed." : {
+
+    },
+    "Username" : {
+
+    },
+    "Version %@" : {
+
+    },
+    "View kernel log" : {
+
+    },
+    "View log" : {
+
+    },
+    "Volume name" : {
+
+    },
+    "Volume: %@" : {
+
+    },
+    "Volumes" : {
+
+    },
+    "`container` command" : {
+
+    },
+    "apple/container on GitHub" : {
+
+    },
+    "built-in" : {
+
+    },
+    "davit.app" : {
+
+    },
+    "default" : {
+
+    },
+    "dir" : {
+
+    },
+    "e.g. alpine" : {
+
+    },
+    "e.g. alpine:3.22, ubuntu:latest" : {
+
+    },
+    "in use" : {
+
+    },
+    "new-name:tag" : {
+
+    },
+    "nginx:latest" : {
+
+    },
+    "replaces “%@”" : {
+
+    },
+    "streaming" : {
+
+    },
+    "test" : {
+
+    },
+    "total %@" : {
+
+    },
+    "—" : {
+
+    }
+  },
+  "version" : "1.0"
+}

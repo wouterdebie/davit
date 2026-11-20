@@ -43,6 +43,14 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleShortVersionString</key><string>$VERSION</string>
     <key>CFBundleVersion</key><string>$VERSION</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
+    <key>CFBundleDevelopmentRegion</key><string>en</string>
+    <!-- English is the source language; the rest are the mandatory
+         translations from scripts/localize.sh (keep the two in sync). -->
+    <key>CFBundleLocalizations</key>
+    <array>
+      <string>en</string>
+      <string>uk</string>
+    </array>
     <key>LSMinimumSystemVersion</key><string>15.0</string>
     <key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
     <key>NSHighResolutionCapable</key><true/>
@@ -82,6 +90,19 @@ cp "$ROOT/icon/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 cp "$ROOT/icon/menubar/DavitTemplate.png" \
    "$ROOT/icon/menubar/DavitTemplate@2x.png" \
    "$ROOT/icon/menubar/DavitTemplate@3x.png" "$APP/Contents/Resources/"
+
+echo "==> Compiling localization catalog"
+# SwiftUI finds the strings in Bundle.main (this app is the package's
+# executable), so the compiled <lang>.lproj has to be in Resources already when
+# sign.sh seals the bundle. Refuse to build silently without translations.
+CATALOG="$ROOT/Localization/Localizable.xcstrings"
+[ -f "$CATALOG" ] || { echo "error: $CATALOG is missing" >&2; exit 1; }
+if ! command -v xcrun >/dev/null 2>&1 \
+   || ! XCSTRINGSTOOL="$(xcrun --find xcstringstool 2>/dev/null)"; then
+  echo "error: xcstringstool not found — install Xcode (or run xcode-select)" >&2
+  exit 1
+fi
+"$XCSTRINGSTOOL" compile "$CATALOG" --output-directory "$APP/Contents/Resources"
 
 if [ "${1:-}" = "--vendor" ]; then
   if [ -d "$ROOT/Vendor/container" ]; then
