@@ -7,6 +7,15 @@ enum AggregateMetric: String, CaseIterable, Identifiable {
     case diskIO = "Disk I/O"
     var id: String { rawValue }
 
+    /// The segmented control's label; `rawValue` is the chart series title.
+    var title: LocalizedStringResource {
+        switch self {
+        case .cpu: "CPU"
+        case .memory: "Memory"
+        case .diskIO: "Disk I/O"
+        }
+    }
+
     var axisLabel: String {
         switch self {
         case .cpu: return "%"
@@ -87,7 +96,7 @@ struct DashboardView: View {
                     Text("Start services to manage containers").font(.caption).foregroundStyle(.secondary)
                 }
                 if let binary = state.resolvedBinary {
-                    Text("\(binary.path) (\(binary.label))")
+                    Text(verbatim: "\(binary.path) (\(binary.label))")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
@@ -99,7 +108,9 @@ struct DashboardView: View {
                 if state.busyIDs.contains("system") {
                     ProgressView().controlSize(.small).frame(width: 60)
                 } else {
-                    Text(state.systemState.isRunning ? "Stop" : "Start").frame(width: 60)
+                    Text(state.systemState.isRunning ? "Stop" : "Start",
+                         comment: "Button that stops or starts the container platform services.")
+                        .frame(width: 60)
                 }
             }
             .buttonStyle(.borderedProminent)
@@ -115,13 +126,14 @@ struct DashboardView: View {
         DetailCard(title: "Resources", icon: "square.grid.2x2") {
             VStack(spacing: 10) {
                 CountRow(icon: "shippingbox.fill", tint: .green, label: "Containers",
-                         value: "\(state.runningContainers.count) running · \(state.containers.count) total")
+                         value: Text("\(state.runningContainers.count) running · \(state.containers.count) total",
+                                     comment: "Resource summary — the first number is running containers, the second is the total."))
                 CountRow(icon: "square.stack.3d.down.forward.fill", tint: .blue, label: "Images",
-                         value: "\(state.images.count) (\(formatBytes(state.images.map(\.totalSize).reduce(0, +))))")
+                         value: Text(verbatim: "\(state.images.count) (\(formatBytes(state.images.map(\.totalSize).reduce(0, +))))"))
                 CountRow(icon: "externaldrive.fill", tint: .purple, label: "Volumes",
-                         value: "\(state.volumes.count)")
+                         value: Text(verbatim: "\(state.volumes.count)"))
                 CountRow(icon: "network", tint: .teal, label: "Networks",
-                         value: "\(state.networks.count)")
+                         value: Text(verbatim: "\(state.networks.count)"))
             }
         }
     }
@@ -133,7 +145,7 @@ struct DashboardView: View {
             if let df = state.diskUsage {
                 DiskUsageContent(df: df)
             } else {
-                Text("—").foregroundStyle(.secondary)
+                Text(verbatim: "—").foregroundStyle(.secondary)
             }
         }
     }
@@ -168,8 +180,10 @@ struct DashboardView: View {
         DetailCard(title: "All Running Containers", icon: "chart.xyaxis.line") {
             HStack {
                 Spacer()
-                Picker("", selection: $aggMetric) {
-                    ForEach(AggregateMetric.allCases) { Text($0.rawValue).tag($0) }
+                Picker(selection: $aggMetric) {
+                    ForEach(AggregateMetric.allCases) { Text($0.title).tag($0) }
+                } label: {
+                    EmptyView()
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
@@ -281,7 +295,8 @@ struct DiskUsageContent: View {
 
     private var cleanupRow: some View {
         HStack {
-            Text("\(formatBytes(reclaimable)) reclaimable")
+            Text("\(formatBytes(reclaimable)) reclaimable",
+                 comment: "Disk cleanup row — the value is the amount of disk space that pruning can free.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -354,7 +369,8 @@ struct DashboardContainerRow: View {
             }
             Spacer()
             if let s = state.latestSample(for: container.id) {
-                Text("\(String(format: "%.0f%%", s.cpuPercent)) CPU · \(formatBytes(s.memoryBytes)) · \(formatBytes(s.diskUsageBytes)) disk")
+                Text("\(s.cpuPercent.formatted(.number.precision(.fractionLength(0))))% CPU · \(formatBytes(s.memoryBytes)) · \(formatBytes(s.diskUsageBytes)) disk",
+                     comment: "Live row summary — the first value is CPU usage, then memory, then disk usage.")
                     .font(.system(.caption, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
@@ -365,7 +381,7 @@ struct DashboardContainerRow: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help("Open Terminal")
+            .help(Text("Open Terminal", comment: "Tooltip for the button that opens a shell in the container."))
             Button {
                 state.stopContainer(container)
             } label: {
@@ -373,7 +389,7 @@ struct DashboardContainerRow: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help("Stop")
+            .help(Text("Stop", comment: "Tooltip for the button that stops this container."))
             Image(systemName: "chevron.right")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.tertiary)
@@ -387,15 +403,15 @@ struct DashboardContainerRow: View {
         )
         .onHover { hovering = $0 }
         .onTapGesture { state.pendingContainerOpen = container.id }
-        .help("Open \(container.id)")
+        .help(Text("Open \(container.id)", comment: "Tooltip for a container row — the value is the container name."))
     }
 }
 
 struct CountRow: View {
     let icon: String
     let tint: Color
-    let label: String
-    let value: String
+    let label: LocalizedStringKey
+    let value: Text
 
     var body: some View {
         HStack(spacing: 10) {
@@ -404,13 +420,13 @@ struct CountRow: View {
                 .frame(width: 22)
             Text(label).font(.callout)
             Spacer()
-            Text(value).font(.callout).foregroundStyle(.secondary)
+            value.font(.callout).foregroundStyle(.secondary)
         }
     }
 }
 
 struct DiskRow: View {
-    let label: String
+    let label: LocalizedStringKey
     let section: DiskUsage.Section?
     let tint: Color
     let maxSize: Int64

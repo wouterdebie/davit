@@ -12,6 +12,16 @@ struct ContainerDetailView: View {
         case stats = "Stats"
         case files = "Files"
         case inspect = "Inspect"
+
+        var title: LocalizedStringResource {
+            switch self {
+            case .overview: "Overview"
+            case .logs: "Logs"
+            case .stats: "Stats"
+            case .files: "Files"
+            case .inspect: "Inspect"
+            }
+        }
     }
     @State private var tab: Tab = {
         let args = ProcessInfo.processInfo.arguments
@@ -42,7 +52,7 @@ struct ContainerDetailView: View {
         }
         // Name lives in the principal toolbar item; an empty title avoids
         // repeating it inline next to the back button.
-        .navigationTitle("")
+        .navigationTitle(Text(verbatim: ""))
         .onAppear {
             if ProcessInfo.processInfo.arguments.contains(where: { $0.hasPrefix("--probe") }) {
                 FileHandle.standardError.write(Data("DBG detail-view-shown \(containerID)\n".utf8))
@@ -73,17 +83,17 @@ struct ContainerDetailView: View {
                     if container.isRunning {
                         Button { state.stopContainer(container) } label: {
                             Label("Stop", systemImage: "stop.fill")
-                        }.help("Stop")
+                        }.help(Text("Stop", comment: "Tooltip for the toolbar button that stops this container."))
                         Button { state.restartContainer(container) } label: {
                             Label("Restart", systemImage: "arrow.clockwise")
-                        }.help("Restart")
+                        }.help(Text("Restart", comment: "Tooltip for the toolbar button that restarts this container."))
                         Button { TerminalLauncher.openShell(containerID: container.id) } label: {
                             Label("Terminal", systemImage: "terminal")
-                        }.help("Open shell in Terminal")
+                        }.help(Text("Open shell in Terminal", comment: "Tooltip for the toolbar button that opens a container shell in the user's terminal."))
                     } else {
                         Button { state.startContainer(container) } label: {
                             Label("Start", systemImage: "play.fill")
-                        }.help("Start")
+                        }.help(Text("Start", comment: "Tooltip for the toolbar button that starts this container."))
                     }
                     Menu {
                         ContainerActions(container: container)
@@ -106,8 +116,10 @@ struct ContainerDetailView: View {
                 StateChip(state: c.state)
                 Spacer()
             }
-            Picker("", selection: $tab) {
-                ForEach(Tab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            Picker(selection: $tab) {
+                ForEach(Tab.allCases, id: \.self) { Text($0.title).tag($0) }
+            } label: {
+                EmptyView()
             }
             .pickerStyle(.segmented)
             .labelsHidden()
@@ -183,7 +195,8 @@ struct ContainerOverviewTab: View {
                     }
                     if let res = container.configuration.resources {
                         InfoRow(label: "Resources",
-                                value: "\(res.cpus ?? 0) CPUs · \(formatBytes(res.memoryInBytes)) memory")
+                                value: String(localized: "\(res.cpus ?? 0) CPUs · \(formatBytes(res.memoryInBytes)) memory",
+                                             comment: "Resource summary — the first value is the CPU count, the second is the memory limit."))
                     }
                 }
 
@@ -236,7 +249,7 @@ struct ContainerOverviewTab: View {
                                     .padding(.vertical, 2)
                                     .background(.purple.opacity(0.12), in: Capsule())
                                     .foregroundStyle(.purple)
-                                Text("\(m.displaySource) → \(m.destination ?? "—")")
+                                Text(verbatim: "\(m.displaySource) → \(m.destination ?? "—")")
                                     .font(.system(.callout, design: .monospaced))
                                     .textSelection(.enabled)
                             }
@@ -257,7 +270,7 @@ struct ContainerOverviewTab: View {
                 if let labels = container.configuration.labels, !labels.isEmpty {
                     DetailCard(title: "Labels", icon: "tag") {
                         ForEach(labels.sorted(by: { $0.key < $1.key }), id: \.key) { k, v in
-                            InfoRow(label: k, value: v, monospaced: true)
+                            InfoRow(rawLabel: k, value: v, monospaced: true)
                         }
                     }
                 }
@@ -274,12 +287,10 @@ struct ContainerOverviewTab: View {
     /// limit — the common "why did it just die?" case (see the kernel log).
     private func oomBanner(process: String?) -> some View {
         let limit = container.configuration.resources?.memoryInBytes ?? 0
-        let who = process.map { "“\($0)” " } ?? "A process "
-        let limitText = limit > 0 ? " of \(formatBytes(limit))" : ""
         return stopBanner(
             icon: "memorychip",
             title: "Stopped: out of memory",
-            message: "\(who)exceeded this container's memory limit\(limitText) and was killed by the kernel. Give it more memory and recreate it."
+            message: oomMessage(process: process, limit: limit)
         ) {
             Button("Edit & Recreate…") { state.recreateTarget = container }
                 .controlSize(.small)
@@ -290,15 +301,32 @@ struct ContainerOverviewTab: View {
         }
     }
 
+    /// Four sentences because the process name and the limit are both optional;
+    /// gluing the pieces would leave translators with sentence fragments.
+    private func oomMessage(process: String?, limit: Int64) -> Text {
+        switch (process, limit > 0) {
+        case let (process?, true):
+            return Text("“\(process)” exceeded this container's memory limit of \(formatBytes(limit)) and was killed by the kernel. Give it more memory and recreate it.",
+                        comment: "Why the container stopped — the first value is the killed process, the second is the memory limit.")
+        case let (process?, false):
+            return Text("“\(process)” exceeded this container's memory limit and was killed by the kernel. Give it more memory and recreate it.",
+                        comment: "Why the container stopped — the value is the killed process.")
+        case (nil, true):
+            return Text("A process exceeded this container's memory limit of \(formatBytes(limit)) and was killed by the kernel. Give it more memory and recreate it.",
+                        comment: "Why the container stopped — the value is the memory limit.")
+        case (nil, false):
+            return Text("A process exceeded this container's memory limit and was killed by the kernel. Give it more memory and recreate it.")
+        }
+    }
+
     /// Shown when an amd64 image failed under Rosetta because Rosetta is too
     /// old for the aux-vector entry the guest passes (see issue #14). Fixed by
     /// updating macOS (Rosetta ships with the OS) or using an arm64 image.
     private func rosettaBanner(vectorType: String?) -> some View {
-        let detail = vectorType.map { " (auxiliary vector type \($0))" } ?? ""
-        return stopBanner(
+        stopBanner(
             icon: "cpu",
             title: "Stopped: Rosetta couldn't run this image",
-            message: "This amd64 image needs a newer Rosetta than your macOS provides\(detail). Rosetta ships with macOS, so a software update usually fixes it; otherwise run an arm64 image."
+            message: rosettaMessage(vectorType)
         ) {
             Button("Open Software Update") {
                 NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Software-Update-Settings.extension")!)
@@ -311,9 +339,17 @@ struct ContainerOverviewTab: View {
         }
     }
 
+    private func rosettaMessage(_ vectorType: String?) -> Text {
+        if let vectorType {
+            return Text("This amd64 image needs a newer Rosetta than your macOS provides (auxiliary vector type \(vectorType)). Rosetta ships with macOS, so a software update usually fixes it; otherwise run an arm64 image.",
+                        comment: "Why the container stopped — the value is the kernel auxiliary vector type Rosetta did not support.")
+        }
+        return Text("This amd64 image needs a newer Rosetta than your macOS provides. Rosetta ships with macOS, so a software update usually fixes it; otherwise run an arm64 image.")
+    }
+
     /// Shared orange "here's why it stopped" banner shell.
     private func stopBanner<Actions: View>(
-        icon: String, title: String, message: String, @ViewBuilder actions: () -> Actions
+        icon: String, title: LocalizedStringKey, message: Text, @ViewBuilder actions: () -> Actions
     ) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
@@ -321,7 +357,7 @@ struct ContainerOverviewTab: View {
                 .foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.headline)
-                Text(message)
+                message
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -368,9 +404,9 @@ struct ContainerLogsTab: View {
                 Toggle("Boot log", isOn: $bootLogs)
                     .toggleStyle(.checkbox)
                 Picker("Tail", selection: $tailCount) {
-                    Text("200").tag(200)
-                    Text("500").tag(500)
-                    Text("2000").tag(2000)
+                    Text(verbatim: "200").tag(200)
+                    Text(verbatim: "500").tag(500)
+                    Text(verbatim: "2000").tag(2000)
                     Text("All").tag(0)
                 }
                 .pickerStyle(.menu)
@@ -379,7 +415,7 @@ struct ContainerLogsTab: View {
                 if streamer.isRunning {
                     HStack(spacing: 5) {
                         ProgressView().controlSize(.mini)
-                        Text("streaming").font(.caption).foregroundStyle(.secondary)
+                        Text("streaming", comment: "Live log status: new lines keep arriving.").font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 Button {
@@ -427,14 +463,14 @@ struct ContainerStatsTab: View {
     let statsID: String
     let isRunning: Bool
     let cpusAllocated: Int
-    let kindLabel: String
+    private let isMachine: Bool
     var scrollable = true
 
     init(container: ContainerRecord, scrollable: Bool = true) {
         self.statsID = container.id
         self.isRunning = container.isRunning
         self.cpusAllocated = Int(container.configuration.resources?.cpus ?? 0)
-        self.kindLabel = "container"
+        self.isMachine = false
         self.scrollable = scrollable
     }
 
@@ -443,7 +479,7 @@ struct ContainerStatsTab: View {
         self.statsID = backing
         self.isRunning = machine.isRunning
         self.cpusAllocated = machine.cpus
-        self.kindLabel = "machine"
+        self.isMachine = true
     }
 
     private var history: [StatsSample] { state.statsHistory[statsID] ?? [] }
@@ -452,7 +488,9 @@ struct ContainerStatsTab: View {
     var body: some View {
         if !isRunning {
             EmptyState(icon: "chart.xyaxis.line", title: "Not running",
-                       message: "Start the \(kindLabel) to see live resource usage.")
+                       message: isMachine
+                        ? "Start the machine to see live resource usage."
+                        : "Start the container to see live resource usage.")
         } else if history.count < 2 {
             VStack(spacing: 10) {
                 ProgressView()
@@ -470,11 +508,13 @@ struct ContainerStatsTab: View {
                 VStack(spacing: 14) {
                     HStack(spacing: 14) {
                         StatTile(title: "CPU",
-                                 value: String(format: "%.1f%%", latest?.cpuPercent ?? 0),
-                                 subtitle: "\(cpusAllocated) CPUs allocated")
+                                 value: (latest?.cpuPercent ?? 0).formatted(.number.precision(.fractionLength(1))) + "%",
+                                 subtitle: String(localized: "\(cpusAllocated) CPUs allocated",
+                                                  comment: "Stats tile subtitle — the value is the number of CPUs assigned to the container."))
                         StatTile(title: "Memory",
                                  value: formatBytes(latest?.memoryBytes),
-                                 subtitle: "limit \(formatBytes(latest?.memoryLimit))")
+                                 subtitle: String(localized: "limit \(formatBytes(latest?.memoryLimit))",
+                                                  comment: "Stats tile subtitle — the value is the container's memory limit."))
                         StatTile(title: "Disk",
                                  value: formatBytes(latest?.diskUsageBytes),
                                  subtitle: "↓\(rate(latest?.diskReadRate)) ↑\(rate(latest?.diskWriteRate))")
@@ -483,7 +523,8 @@ struct ContainerStatsTab: View {
                                  subtitle: "↑ \(formatBytes(latest?.txBytes))")
                         StatTile(title: "Processes",
                                  value: "\(latest?.processes ?? 0)",
-                                 subtitle: "running")
+                                 subtitle: String(localized: "running",
+                                                  comment: "Stats tile subtitle: the number above is the count of running processes."))
                     }
 
                     DetailCard(title: "CPU Usage", icon: "cpu") { cpuChart }
@@ -497,21 +538,23 @@ struct ContainerStatsTab: View {
     /// per sample, a gradient and stroke style get built for every point in the
     /// history on each 2s stats tick.
     private var cpuChart: some View {
-        Chart {
+        let valueLabel = LocalizedStringResource("CPU %",
+                                                 comment: "Chart value label: CPU usage in percent of one core; % is the unit.")
+        return Chart {
             ForEach(history) { sample in
-                LineMark(x: .value("Time", sample.time), y: .value("CPU %", sample.cpuPercent))
+                LineMark(x: .value("Time", sample.time), y: .value(valueLabel, sample.cpuPercent))
             }
             .interpolationMethod(.monotone)
 
             ForEach(history) { sample in
-                AreaMark(x: .value("Time", sample.time), y: .value("CPU %", sample.cpuPercent))
+                AreaMark(x: .value("Time", sample.time), y: .value(valueLabel, sample.cpuPercent))
             }
             .interpolationMethod(.monotone)
             .foregroundStyle(.linearGradient(
                 colors: [.accentColor.opacity(0.25), .clear],
                 startPoint: .top, endPoint: .bottom))
         }
-        .chartYAxisLabel("%")
+        .chartYAxisLabel { Text(verbatim: "%") }
         .chartYScale(domain: 0...max(10, (history.map(\.cpuPercent).max() ?? 10) * 1.2))
         .frame(height: 160)
     }
@@ -539,11 +582,15 @@ struct ContainerStatsTab: View {
     }
 
     private var diskChart: some View {
-        Chart {
+        // A chart series identifier, not UI text: the legend uses the values.
+        let seriesKey = "dir"
+        let readLabel = String(localized: "Read", comment: "Disk I/O chart legend: read throughput.")
+        let writeLabel = String(localized: "Write", comment: "Disk I/O chart legend: write throughput.")
+        return Chart {
             ForEach(history) { sample in
                 LineMark(x: .value("Time", sample.time),
                          y: .value("KB/s", sample.diskReadRate / 1024),
-                         series: .value("dir", "Read"))
+                         series: .value(seriesKey, readLabel))
             }
             .foregroundStyle(.orange)
             .interpolationMethod(.monotone)
@@ -551,12 +598,12 @@ struct ContainerStatsTab: View {
             ForEach(history) { sample in
                 LineMark(x: .value("Time", sample.time),
                          y: .value("KB/s", sample.diskWriteRate / 1024),
-                         series: .value("dir", "Write"))
+                         series: .value(seriesKey, writeLabel))
             }
             .foregroundStyle(.teal)
             .interpolationMethod(.monotone)
         }
-        .chartForegroundStyleScale(["Read": Color.orange, "Write": Color.teal])
+        .chartForegroundStyleScale([readLabel: Color.orange, writeLabel: Color.teal])
         .chartYAxisLabel("KB/s")
         // Explicit floor so an idle container draws flat zero lines instead of
         // an empty-looking plot.
@@ -573,7 +620,7 @@ struct ContainerStatsTab: View {
 }
 
 struct StatTile: View {
-    let title: String
+    let title: LocalizedStringKey
     let value: String
     let subtitle: String
 
@@ -622,7 +669,9 @@ struct InspectTab: View {
         }
         .task(id: id) {
             loading = true
-            json = (try? await ContainerService.inspectRaw(kind, id)) ?? "Failed to inspect \(id)"
+            json = (try? await ContainerService.inspectRaw(kind, id))
+                ?? String(localized: "Failed to inspect \(id)",
+                          comment: "Placeholder shown when the inspect JSON could not be read — the value is the resource id.")
             loading = false
         }
         .toolbar {

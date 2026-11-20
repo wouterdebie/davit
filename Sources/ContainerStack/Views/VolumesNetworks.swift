@@ -126,7 +126,7 @@ struct VolumeRow: View {
                             .foregroundStyle(.green)
                     }
                 }
-                Text([volume.format, volume.sizeInBytes.map { "max \(formatBytes($0))" }].compactMap { $0 }.joined(separator: " · "))
+                Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
@@ -139,6 +139,16 @@ struct VolumeRow: View {
             }
         }
         .padding(.vertical, 5)
+    }
+
+    private var subtitle: String {
+        var parts: [String] = []
+        if let format = volume.format { parts.append(format) }
+        if let size = volume.sizeInBytes {
+            parts.append(String(localized: "max \(formatBytes(size))",
+                                comment: "Volume size limit — the value is the maximum size."))
+        }
+        return parts.joined(separator: " · ")
     }
 }
 
@@ -203,9 +213,12 @@ struct NetworkListContent: View {
             }
             .contextMenu {
                 if let subnet = network.subnet {
-                    Button("Copy Subnet (\(subnet))") {
+                    Button {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(subnet, forType: .string)
+                    } label: {
+                        Text("Copy Subnet (\(subnet))",
+                             comment: "Context menu action — the value is the network's subnet.")
                     }
                 }
                 if !network.isBuiltin {
@@ -254,7 +267,8 @@ struct NetworkRow: View {
             }
             Spacer()
             if attachedCount > 0 {
-                Text("\(attachedCount) container\(attachedCount == 1 ? "" : "s")")
+                Text("\(attachedCount) containers",
+                     comment: "Network row — the value is the number of containers attached to the network.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -280,7 +294,9 @@ struct VolumeBrowserSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Volume: \(volume.name)").font(.title3.weight(.semibold))
+                Text("Volume: \(volume.name)",
+                     comment: "Volume browser sheet title — the value is the volume name.")
+                    .font(.title3.weight(.semibold))
                 Spacer()
                 Button("Done") { dismiss() }
             }
@@ -288,7 +304,7 @@ struct VolumeBrowserSheet: View {
             Divider()
             Group {
                 if let error {
-                    EmptyState(icon: "exclamationmark.triangle", title: "Couldn't open volume", message: error)
+                    EmptyState(icon: "exclamationmark.triangle", title: "Couldn't open volume", errorMessage: error)
                 } else if let helperID {
                     ContainerFilesTab(
                         containerID: helperID, isRunning: true,

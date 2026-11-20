@@ -72,8 +72,16 @@ struct ContainersView: View {
                             }
                             .pickerStyle(.inline)
                         } label: {
-                            Label(groupBy.isEmpty ? "Group" : "Group: \(ContainerGrouping.friendlyName(groupBy))",
-                                  systemImage: "rectangle.3.group")
+                            Label {
+                                if groupBy.isEmpty {
+                                    Text("Group", comment: "Toolbar button that opens the container grouping menu.")
+                                } else {
+                                    Text("Group: \(ContainerGrouping.friendlyName(groupBy))",
+                                         comment: "Toolbar button showing the current container grouping — the value is the group name.")
+                                }
+                            } icon: {
+                                Image(systemName: "rectangle.3.group")
+                            }
                         }
                         .help("Group containers by a label")
                     }
@@ -164,7 +172,8 @@ struct ContainersView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "line.3.horizontal.decrease.circle.fill")
                         .foregroundStyle(.tint)
-                    Text("Showing only “\(focusedGroup)”").font(.callout)
+                    Text("Showing only “\(focusedGroup)”",
+                         comment: "Banner when the container list is filtered to one group — the value is the group name.").font(.callout)
                     Spacer()
                     Button("Show All Groups") { self.focusedGroup = nil }
                         .controlSize(.small)
@@ -231,7 +240,19 @@ enum ContainerGrouping {
     }
 
     static func friendlyName(_ key: String) -> String {
-        projectKeys.contains(key) ? "Project" : key
+        projectKeys.contains(key)
+            ? String(localized: "Project", comment: "Friendly name for compose project label keys in the grouping menu.")
+            : key
+    }
+
+    /// The synthetic bucket for containers without the grouping label.
+    static let ungroupedTitle = "Ungrouped"
+
+    /// A group title is a label value (data); only the synthetic bucket is UI text.
+    static func displayTitle(_ title: String) -> Text {
+        title == ungroupedTitle
+            ? Text("Ungrouped", comment: "Group of containers that lack the label the list is grouped by.")
+            : Text(verbatim: title)
     }
 
     /// Group by the value of `key`; containers missing it fall into "Ungrouped"
@@ -246,7 +267,7 @@ enum ContainerGrouping {
             else { ungrouped.append(c) }
         }
         var result = byValue.keys.sorted().map { (title: $0, containers: byValue[$0]!) }
-        if !ungrouped.isEmpty { result.append((title: "Ungrouped", containers: ungrouped)) }
+        if !ungrouped.isEmpty { result.append((title: ungroupedTitle, containers: ungrouped)) }
         return result
     }
 }
@@ -356,8 +377,8 @@ struct GroupHeader: View {
 
     private var titleLabel: some View {
         HStack(spacing: 6) {
-            Text(title).font(.subheadline.weight(.semibold))
-            Text("\(count)")
+            ContainerGrouping.displayTitle(title).font(.subheadline.weight(.semibold))
+            Text(verbatim: "\(count)")
                 .font(.caption).foregroundStyle(.secondary)
                 .padding(.horizontal, 6).padding(.vertical, 1)
                 .background(.secondary.opacity(0.15), in: Capsule())
@@ -382,7 +403,8 @@ struct GroupHeader: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("Actions for every container in “\(title)”")
+        .help(Text("Actions for every container in “\(title)”",
+                   comment: "Tooltip for a group's actions menu — the value is the group name."))
     }
 }
 
@@ -416,7 +438,7 @@ struct ContainerRow: View {
 
             if container.isRunning, let sample = state.latestSample(for: container.id) {
                 HStack(spacing: 14) {
-                    MiniStat(label: "CPU", value: String(format: "%.0f%%", sample.cpuPercent))
+                    MiniStat(label: "CPU", value: sample.cpuPercent.formatted(.number.precision(.fractionLength(0))) + "%")
                     MiniStat(label: "MEM", value: formatBytes(sample.memoryBytes))
                     if let ip = container.primaryIPv4 {
                         MiniStat(label: "IP", value: ip)
@@ -447,7 +469,7 @@ struct ContainerRow: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help("Stop")
+            .help(Text("Stop", comment: "Tooltip for the button that stops this container."))
         } else {
             Button {
                 state.startContainer(container)
@@ -456,13 +478,13 @@ struct ContainerRow: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.green)
-            .help("Start")
+            .help(Text("Start", comment: "Tooltip for the button that starts this container."))
         }
     }
 }
 
 struct MiniStat: View {
-    let label: String
+    let label: LocalizedStringKey
     let value: String
 
     var body: some View {
@@ -482,17 +504,28 @@ struct ContainerActions: View {
 
     var body: some View {
         if container.isRunning {
-            Button("Stop") { state.stopContainer(container) }
-            Button("Restart") { state.restartContainer(container) }
-            Button("Kill") { state.killContainer(container) }
+            Button { state.stopContainer(container) } label: {
+                Text("Stop", comment: "Context menu action that stops the container.")
+            }
+            Button { state.restartContainer(container) } label: {
+                Text("Restart", comment: "Context menu action that restarts the container.")
+            }
+            Button { state.killContainer(container) } label: {
+                Text("Kill", comment: "Context menu action that force-kills the container process.")
+            }
             Button("Open Terminal") { TerminalLauncher.openShell(containerID: container.id) }
             if let port = container.configuration.publishedPorts?.first?.hostPort {
-                Button("Open localhost:\(String(port)) in Browser") {
+                Button {
                     NSWorkspace.shared.open(URL(string: "http://localhost:\(port)")!)
+                } label: {
+                    Text("Open localhost:\(String(port)) in Browser",
+                         comment: "Context menu action — the value is the published host port.")
                 }
             }
         } else {
-            Button("Start") { state.startContainer(container) }
+            Button { state.startContainer(container) } label: {
+                Text("Start", comment: "Context menu action that starts the container.")
+            }
         }
         Button("Edit & Recreate…") { state.recreateTarget = container }
         Button("Export Filesystem…") { exportFilesystem() }
@@ -506,21 +539,27 @@ struct ContainerActions: View {
             NSPasteboard.general.setString(container.id, forType: .string)
         }
         if let ip = container.primaryIPv4 {
-            Button("Copy IP (\(ip))") {
+            Button {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(ip, forType: .string)
+            } label: {
+                Text("Copy IP (\(ip))",
+                     comment: "Context menu action — the value is the container's IP address.")
             }
         }
         Divider()
-        Button(container.isRunning ? "Force Delete" : "Delete", role: .destructive) {
+        Button(role: .destructive) {
             state.deleteContainer(container)
+        } label: {
+            Text(container.isRunning ? "Force Delete" : "Delete",
+                 comment: "Context menu action — force-deletes a running container, or deletes a stopped one.")
         }
     }
 
     /// Export the container's filesystem to a tar archive the user picks.
     private func exportFilesystem() {
         let panel = NSSavePanel()
-        panel.title = "Export Container Filesystem"
+        panel.title = String(localized: "Export Container Filesystem", comment: "Save panel title for exporting a container's filesystem to a tar archive.")
         panel.nameFieldStringValue = "\(container.id).tar"
         panel.allowedContentTypes = [.init(filenameExtension: "tar") ?? .data]
         panel.canCreateDirectories = true

@@ -283,6 +283,23 @@ struct ResolvedBinary: Equatable {
         case system = "system install"
         case homebrew = "Homebrew"
         case bundled = "bundled"
+
+        /// `rawValue` is printed by `davit platform status`, so it stays put;
+        /// the GUI label is resolved separately.
+        var displayName: String {
+            switch self {
+            case .userConfigured:
+                return String(localized: "custom path", comment: "Where the container platform was found: a path the user configured.")
+            case .managed:
+                return String(localized: "installed by Davit", comment: "Where the container platform was found: Davit installed it.")
+            case .system:
+                return String(localized: "system install", comment: "Where the container platform was found: a system-wide install.")
+            case .homebrew:
+                return String(localized: "Homebrew", comment: "Where the container platform was found: a Homebrew installation.")
+            case .bundled:
+                return String(localized: "bundled", comment: "Where the container platform was found: bundled with the app.")
+            }
+        }
     }
     let installRoot: String
     let apiserverPath: String
@@ -291,7 +308,7 @@ struct ResolvedBinary: Equatable {
     var version: PlatformVersion?
     var path: String { apiserverPath }
     /// "installed by Davit · 1.3.1" — source plus version, for the UI.
-    var label: String { version.map { "\(source.rawValue) · \($0)" } ?? source.rawValue }
+    var label: String { version.map { "\(source.displayName) · \($0)" } ?? source.displayName }
 }
 
 // MARK: - Errors
@@ -1069,7 +1086,8 @@ enum TerminalApp: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .systemDefault: return "System Default"
+        case .systemDefault:
+            return String(localized: "System Default", comment: "Terminal choice that opens shell scripts with the default .command handler.")
         case .terminal: return "Terminal"
         case .iterm: return "iTerm2"
         case .ghostty: return "Ghostty"
@@ -1311,8 +1329,10 @@ final class PullProgressModel: ObservableObject {
         isRunning = true
         task = Task {
             do {
-                try await ContainerService.pullImage(reference) { [weak self] events in
-                    await self?.consume(events)
+                // Strong self on purpose: the task is stored in `self`, so weak
+                // capture would only add churn (and a mismatched-ownership warning).
+                try await ContainerService.pullImage(reference) { events in
+                    await self.consume(events)
                 }
                 self.lines.append("✓ pull complete")
                 self.fraction = 1
@@ -1949,22 +1969,44 @@ enum StopNotifier {
         let content = UNMutableNotificationContent()
         switch reason {
         case .outOfMemory(let process):
-            content.title = "Container ran out of memory"
-            let who = process.map { "\($0) " } ?? ""
-            let limit = limitBytes > 0 ? " (limit \(formatBytes(limitBytes)))" : ""
-            content.body = "\(id): \(who)was killed for exceeding its memory limit\(limit). Increase memory with Edit & Recreate."
+            content.title = String(localized: "Container ran out of memory",
+                                   comment: "Notification title when a container was killed for exceeding its memory limit.")
+            content.body = memoryBody(id: id, process: process, limitBytes: limitBytes)
         case .rosettaIncompatible:
-            content.title = "Rosetta couldn't run this image"
-            content.body = "\(id): this amd64 image needs a newer Rosetta than your macOS provides. Update macOS, or run an arm64 image."
+            content.title = String(localized: "Rosetta couldn't run this image",
+                                   comment: "Notification title when an amd64 image could not run under Rosetta.")
+            content.body = String(localized: "\(id): this amd64 image needs a newer Rosetta than your macOS provides. Update macOS, or run an arm64 image.",
+                                  comment: "Notification body — the value is the container name.")
         case .none:
-            content.title = "Container stopped"
-            content.body = "\(id) stopped unexpectedly."
+            content.title = String(localized: "Container stopped",
+                                   comment: "Notification title when a container stopped unexpectedly.")
+            content.body = String(localized: "\(id) stopped unexpectedly.",
+                                  comment: "Notification body — the value is the container name.")
         }
         content.sound = .default
         let request = UNNotificationRequest(
             identifier: "container-stopped-\(id)-\(UUID().uuidString)",
             content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
+    }
+
+    /// Four sentences because the killed process and the limit are both optional —
+    /// gluing fragments would leave translators with half-sentences.
+    private static func memoryBody(id: String, process: String?, limitBytes: Int64) -> String {
+        switch (process, limitBytes > 0) {
+        case let (process?, true):
+            return String(localized: "\(id): \(process) was killed for exceeding its memory limit (limit \(formatBytes(limitBytes))). Increase memory with Edit & Recreate.",
+                          comment: "Notification body — the first value is the container name, the second the killed process, the third the memory limit.")
+        case let (process?, false):
+            return String(localized: "\(id): \(process) was killed for exceeding its memory limit. Increase memory with Edit & Recreate.",
+                          comment: "Notification body — the first value is the container name, the second the killed process.")
+        case (nil, true):
+            return String(localized: "\(id): was killed for exceeding its memory limit (limit \(formatBytes(limitBytes))). Increase memory with Edit & Recreate.",
+                          comment: "Notification body — the first value is the container name, the second the memory limit.")
+        case (nil, false):
+            return String(localized: "\(id): was killed for exceeding its memory limit. Increase memory with Edit & Recreate.",
+                          comment: "Notification body — the value is the container name.")
+        }
     }
 }
 

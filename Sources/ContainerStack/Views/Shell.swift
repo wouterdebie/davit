@@ -3,14 +3,20 @@ import SwiftUI
 enum SidebarSection: String, Hashable, CaseIterable {
     case dashboard, containers, images, volumes, networks, machines
 
-    var title: String {
+    var title: LocalizedStringResource {
         switch self {
-        case .dashboard: return "Dashboard"
-        case .containers: return "Containers"
-        case .images: return "Images"
-        case .volumes: return "Volumes"
-        case .networks: return "Networks"
-        case .machines: return "Machines"
+        case .dashboard:
+            return LocalizedStringResource("Dashboard", comment: "Sidebar section: the overview dashboard.")
+        case .containers:
+            return LocalizedStringResource("Containers", comment: "Sidebar section: the list of containers (noun).")
+        case .images:
+            return LocalizedStringResource("Images", comment: "Sidebar section: the list of images (noun).")
+        case .volumes:
+            return LocalizedStringResource("Volumes", comment: "Sidebar section: the list of volumes (noun).")
+        case .networks:
+            return LocalizedStringResource("Networks", comment: "Sidebar section: the list of networks (noun).")
+        case .machines:
+            return LocalizedStringResource("Machines", comment: "Sidebar section: the list of container machines (noun).")
         }
     }
     var icon: String {
@@ -127,7 +133,7 @@ struct MainWindow: View {
         .overlay(alignment: .bottom) {
             if let status = state.exportStatus {
                 HStack(spacing: 8) {
-                    if status.hasPrefix("Exported") {
+                    if state.exportFinished {
                         Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                     } else {
                         ProgressView().controlSize(.small)
@@ -169,7 +175,7 @@ struct MainWindow: View {
 
     private func sidebarRow(_ section: SidebarSection, badge: Int? = nil) -> some View {
         Label(section.title, systemImage: section.icon)
-            .badge(badge.map { $0 > 0 ? Text("\($0)") : nil } ?? nil)
+            .badge(badge.map { $0 > 0 ? Text(verbatim: "\($0)") : nil } ?? nil)
             .tag(section)
     }
 
@@ -199,7 +205,9 @@ struct MainWindow: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help(state.systemState.isRunning ? "Stop container services" : "Start container services")
+            .help(state.systemState.isRunning
+                  ? Text("Stop container services", comment: "Tooltip for the button that stops the container platform services.")
+                  : Text("Start container services", comment: "Tooltip for the button that starts the container platform services."))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -232,7 +240,7 @@ struct OnboardingView: View {
     /// /usr/local used to be picked anyway, and every Start failed against it.
     private var incompatible: [ResolvedBinary] { state.incompatibleInstalls }
 
-    private var title: String {
+    private var title: LocalizedStringResource {
         guard let found = incompatible.first, let version = found.version else {
             return "Apple container platform not found"
         }
@@ -241,18 +249,21 @@ struct OnboardingView: View {
             : "Installed container platform is too new"
     }
 
-    private var subtitle: String {
+    private var subtitle: LocalizedStringResource {
         guard let found = incompatible.first else {
             return """
                 Davit talks directly to Apple's open-source container services.
                 Install them once — no administrator rights needed — and you're set.
                 """
         }
-        return """
-            Davit found container \(found.version?.description ?? "(unknown version)") at \(found.installRoot), \
+        let foundVersion = found.version?.description
+            ?? String(localized: "(unknown version)", comment: "Placeholder for a container platform whose version could not be read.")
+        return LocalizedStringResource("""
+            Davit found container \(foundVersion) at \(found.installRoot), \
             which speaks a protocol Davit \(PlatformInstaller.pinnedVersion) can't drive.
             Install Davit's own copy — no administrator rights, and that install is left untouched.
-            """
+            """,
+            comment: "Onboarding text for an incompatible platform install — the first value is its version, the second its path, the third the version Davit needs.")
     }
 
     var body: some View {
@@ -291,7 +302,8 @@ struct OnboardingView: View {
                         Task { await state.refreshAll() }
                     }
                 }
-                Text("Downloads Apple's signed installer (v\(PlatformInstaller.pinnedVersion), ~180 MB), verifies it,\nand installs into your user Library. You can also use the [official installer](https://github.com/apple/container/releases).")
+                Text("Downloads Apple's signed installer (v\(PlatformInstaller.pinnedVersion), ~180 MB), verifies it,\nand installs into your user Library. You can also use the [official installer](https://github.com/apple/container/releases).",
+                     comment: "Onboarding note under the install button — the value is the pinned platform version.")
                     .font(.caption)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.tertiary)
@@ -310,7 +322,7 @@ struct OnboardingView: View {
                     Text("Already installed somewhere unusual? Enter the install root:")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    TextField("/usr/local", text: $binaryPath)
+                    TextField(text: $binaryPath, prompt: Text(verbatim: "/usr/local")) { EmptyView() }
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 340)
                         .onSubmit { Task { await state.refreshAll() } }
@@ -332,7 +344,7 @@ struct OnboardingView: View {
                         installFraction = fraction
                     }
                 }
-                installStage = "Starting container services…"
+                installStage = String(localized: "Starting container services…", comment: "Progress text while the just-installed platform services start.")
                 installFraction = nil
                 try await ContainerService.systemStart()
             } catch {

@@ -1,0 +1,5113 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@ reclaimable" : {
+      "comment" : "Disk cleanup row — the value is the amount of disk space that pruning can free.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "можна звільнити %@"
+          }
+        }
+      }
+    },
+    "%@ stopped unexpectedly." : {
+      "comment" : "Notification body — the value is the container name.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Контейнер %@ несподівано зупинився."
+          }
+        }
+      }
+    },
+    "%@ · %lld platform variants" : {
+      "comment" : "Image header — the first value is the image size, the second is the number of platform variants.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ · %2$lld platform variant"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$@ · %2$lld platform variants"
+                }
+              }
+            }
+          }
+        },
+        "uk" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%@ · %lld варіанти платформи"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%@ · %lld варіантів платформи"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%@ · %lld варіант платформи"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%@ · %lld варіанта платформи"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%@ — %@, needs %@" : {
+      "comment" : "An unusable platform install — the first value is its path, the second its source and version, the third the version Davit needs.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ — %2$@, needs %3$@"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ — %2$@, потрібна версія %3$@"
+          }
+        }
+      }
+    },
+    "%@%% CPU · %@ · %@ disk" : {
+      "comment" : "Live row summary — the first value is CPU usage, then memory, then disk usage.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@%% CPU · %2$@ · %3$@ disk"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@%% CPU · %2$@ · диск %3$@"
+          }
+        }
+      }
+    },
+    "%@.%@ must be a positive integer (got “%@”)" : {
+      "comment" : "Validation error — the first two values are the config section and key, the third is the typed value.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@.%2$@ must be a positive integer (got “%3$@”)"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@.%2$@ має бути додатним цілим числом (отримано «%3$@»)"
+          }
+        }
+      }
+    },
+    "%@: %@ was killed for exceeding its memory limit (limit %@). Increase memory with Edit & Recreate." : {
+      "comment" : "Notification body — the first value is the container name, the second the killed process, the third the memory limit.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@ was killed for exceeding its memory limit (limit %3$@). Increase memory with Edit & Recreate."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: %2$@ примусово зупинено через перевищення ліміту пам’яті (ліміт %3$@). Збільште пам’ять через «Редагувати й перестворити»."
+          }
+        }
+      }
+    },
+    "%@: %@ was killed for exceeding its memory limit. Increase memory with Edit & Recreate." : {
+      "comment" : "Notification body — the first value is the container name, the second the killed process.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@ was killed for exceeding its memory limit. Increase memory with Edit & Recreate."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: %2$@ примусово зупинено через перевищення ліміту пам’яті. Збільште пам’ять через «Редагувати й перестворити»."
+          }
+        }
+      }
+    },
+    "%@: this amd64 image needs a newer Rosetta than your macOS provides. Update macOS, or run an arm64 image." : {
+      "comment" : "Notification body — the value is the container name.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: цьому образу amd64 потрібна новіша версія Rosetta, ніж має ваш macOS. Оновіть macOS або запустіть образ arm64."
+          }
+        }
+      }
+    },
+    "%@: was killed for exceeding its memory limit (limit %@). Increase memory with Edit & Recreate." : {
+      "comment" : "Notification body — the first value is the container name, the second the memory limit.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: was killed for exceeding its memory limit (limit %2$@). Increase memory with Edit & Recreate."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: примусово зупинено через перевищення ліміту пам’яті (ліміт %2$@). Збільште пам’ять через «Редагувати й перестворити»."
+          }
+        }
+      }
+    },
+    "%@: was killed for exceeding its memory limit. Increase memory with Edit & Recreate." : {
+      "comment" : "Notification body — the value is the container name.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: примусово зупинено через перевищення ліміту пам’яті. Збільште пам’ять через «Редагувати й перестворити»."
+          }
+        }
+      }
+    },
+    "%lld CPU · %@" : {
+      "comment" : "Machine row — the first value is the CPU count, the second is the memory size.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld CPU · %2$@"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld CPU · %2$@"
+          }
+        }
+      }
+    },
+    "%lld CPUs allocated" : {
+      "comment" : "Stats tile subtitle — the value is the number of CPUs assigned to the container.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld CPU allocated"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld CPUs allocated"
+                }
+              }
+            }
+          }
+        },
+        "uk" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ядра виділено"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ядер виділено"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ядро виділено"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ядра виділено"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld CPUs · %@ memory" : {
+      "comment" : "Resource summary — the first value is the CPU count, the second is the memory limit.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$lld CPU · %2$@ memory"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$lld CPUs · %2$@ memory"
+                }
+              }
+            }
+          }
+        },
+        "uk" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$lld ядра · %2$@ пам’яті"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$lld ядер · %2$@ пам’яті"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$lld ядро · %2$@ пам’яті"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%1$lld ядра · %2$@ пам’яті"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld containers" : {
+      "comment" : "Network row — the value is the number of containers attached to the network.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld container"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld containers"
+                }
+              }
+            }
+          }
+        },
+        "uk" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld контейнери"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld контейнерів"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld контейнер"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld контейнера"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld env" : {
+      "comment" : "Compose service summary — the value is the number of environment variables.",
+      "localizations" : {
+        "uk" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld змінні"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld змінних"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld змінна"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld змінної"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld layers" : {
+      "comment" : "Layers tab heading — the value is the number of image layers.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld layer"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld layers"
+                }
+              }
+            }
+          }
+        },
+        "uk" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld шари"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld шарів"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld шар"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld шара"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld mounts" : {
+      "comment" : "Compose service summary — the value is the number of volume mounts.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld mount"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld mounts"
+                }
+              }
+            }
+          }
+        },
+        "uk" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld монтування"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld монтувань"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld монтування"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld монтування"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld running · %lld total" : {
+      "comment" : "Resource summary — the first number is running containers, the second is the total.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld running · %2$lld total"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld запущено · %2$lld усього"
+          }
+        }
+      }
+    },
+    "(unknown version)" : {
+      "comment" : "Placeholder for a container platform whose version could not be read.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "(невідома версія)"
+          }
+        }
+      }
+    },
+    "/usr/local/bin/container already exists (system install) — nothing to do." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Файл /usr/local/bin/container уже існує (системна інсталяція) — нічого робити."
+          }
+        }
+      }
+    },
+    "A container machine is a lightweight VM you can use like a tiny Linux box — with your home directory mounted." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Машина-контейнер — це легка віртуальна машина, яку можна використовувати як крихітну Linux-систему зі змонтованим домашнім каталогом."
+          }
+        }
+      }
+    },
+    "A lightweight VM booted from a container image, with your home directory mounted and a stable DNS name." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Легка віртуальна машина, завантажена з образу контейнера, зі змонтованим домашнім каталогом і стабільним DNS-ім’ям."
+          }
+        }
+      }
+    },
+    "A native UI for Apple's container platform" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нативний інтерфейс для платформи контейнерів Apple"
+          }
+        }
+      }
+    },
+    "A process exceeded this container's memory limit and was killed by the kernel. Give it more memory and recreate it." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Процес перевищив ліміт пам’яті цього контейнера, і ядро примусово його зупинило. Збільште пам’ять і перестворіть контейнер."
+          }
+        }
+      }
+    },
+    "A process exceeded this container's memory limit of %@ and was killed by the kernel. Give it more memory and recreate it." : {
+      "comment" : "Why the container stopped — the value is the memory limit.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Процес перевищив ліміт пам’яті цього контейнера (%@), і ядро примусово його зупинило. Збільште пам’ять і перестворіть контейнер."
+          }
+        }
+      }
+    },
+    "A ticked service needs %@, which only runs under profile %@. Tick %@ too." : {
+      "comment" : "Compose import error — the first and third values are the service name, the second is the profile name.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "A ticked service needs %1$@, which only runs under profile %2$@. Tick %3$@ too."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Позначеному сервісу потрібен %1$@, який працює лише в профілі %2$@. Позначте й %3$@."
+          }
+        }
+      }
+    },
+    "About" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Про програму"
+          }
+        }
+      }
+    },
+    "Actions for every container in “%@”" : {
+      "comment" : "Tooltip for a group's actions menu — the value is the group name.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Дії для всіх контейнерів у групі «%@»"
+          }
+        }
+      }
+    },
+    "Add" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додати"
+          }
+        }
+      }
+    },
+    "Add Login…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додати вхід…"
+          }
+        }
+      }
+    },
+    "Add Registry Login" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додати вхід до реєстру"
+          }
+        }
+      }
+    },
+    "Add another" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додати ще"
+          }
+        }
+      }
+    },
+    "Adds the `container` CLI to your shell, wired to the Davit-managed platform. Asks for administrator authorization once." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додає CLI `container` до вашої оболонки, підключений до платформи, якою керує Davit. Один раз попросить авторизацію адміністратора."
+          }
+        }
+      }
+    },
+    "Advanced" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додатково"
+          }
+        }
+      }
+    },
+    "All" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Усі"
+          }
+        }
+      }
+    },
+    "All Running Containers" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Усі запущені контейнери"
+          }
+        }
+      }
+    },
+    "Already installed somewhere unusual? Enter the install root:" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Уже встановлено в незвичному місці? Введіть кореневий каталог інсталяції:"
+          }
+        }
+      }
+    },
+    "Any `container run` option. These go before the image; the command below goes after it." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Будь-який параметр `container run`. Параметри йдуть перед образом; команда нижче — після нього."
+          }
+        }
+      }
+    },
+    "Appearance" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вигляд"
+          }
+        }
+      }
+    },
+    "Apple container platform not found" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Платформу контейнерів Apple не знайдено"
+          }
+        }
+      }
+    },
+    "Apple silicon (linux/arm64)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple silicon (linux/arm64)"
+          }
+        }
+      }
+    },
+    "Backing container" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Опорний контейнер"
+          }
+        }
+      }
+    },
+    "Boot" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завантажити"
+          }
+        }
+      }
+    },
+    "Boot log" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Журнал завантаження"
+          }
+        }
+      }
+    },
+    "Boot machine" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завантажити машину"
+          }
+        }
+      }
+    },
+    "Browse Files…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оглянути файли…"
+          }
+        }
+      }
+    },
+    "Build" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зібрати"
+          }
+        }
+      }
+    },
+    "Build Image" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зібрати образ"
+          }
+        }
+      }
+    },
+    "Build an image from a Dockerfile" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зібрати образ з Dockerfile"
+          }
+        }
+      }
+    },
+    "Build args" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Аргументи збірки"
+          }
+        }
+      }
+    },
+    "Builder" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Збирач"
+          }
+        }
+      }
+    },
+    "Builder image" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Образ збирача"
+          }
+        }
+      }
+    },
+    "Building %@…" : {
+      "comment" : "Compose import progress — the value is the service name.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Збирання %@…"
+          }
+        }
+      }
+    },
+    "Built %@" : {
+      "comment" : "Build result — the value is the built image reference.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зібрано %@"
+          }
+        }
+      }
+    },
+    "CPU" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CPU"
+          }
+        }
+      }
+    },
+    "CPU %" : {
+      "comment" : "Chart value label: CPU usage in percent of one core; % is the unit.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CPU %"
+          }
+        }
+      }
+    },
+    "CPU Usage" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Використання CPU"
+          }
+        }
+      }
+    },
+    "CPU and memory default to half of your system resources." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "За замовчуванням CPU і пам’ять отримують половину ресурсів системи."
+          }
+        }
+      }
+    },
+    "CPUs" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ядра"
+          }
+        }
+      }
+    },
+    "Can't import compose file" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося імпортувати файл compose"
+          }
+        }
+      }
+    },
+    "Can't read this directory" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося прочитати цей каталог"
+          }
+        }
+      }
+    },
+    "Cancel" : {
+      "comment" : "Confirmation button that keeps the file.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скасувати"
+          }
+        }
+      }
+    },
+    "Changes apply after the machine is stopped and booted again." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зміни застосуються після зупинки та повторного завантаження машини."
+          }
+        }
+      }
+    },
+    "Changes apply on the next boot." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зміни застосуються під час наступного завантаження."
+          }
+        }
+      }
+    },
+    "Check Again" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перевірити ще раз"
+          }
+        }
+      }
+    },
+    "Check for Updates…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перевірити оновлення…"
+          }
+        }
+      }
+    },
+    "Choose Build Context" : {
+      "comment" : "Open panel title for choosing an image build context directory.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Виберіть контекст збірки"
+          }
+        }
+      }
+    },
+    "Choose Dockerfile" : {
+      "comment" : "Open panel title for choosing a Dockerfile.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Виберіть Dockerfile"
+          }
+        }
+      }
+    },
+    "Choose a local image" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Виберіть локальний образ"
+          }
+        }
+      }
+    },
+    "Choose…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вибрати…"
+          }
+        }
+      }
+    },
+    "Clean Up…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Очистити…"
+          }
+        }
+      }
+    },
+    "Close" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закрити"
+          }
+        }
+      }
+    },
+    "Collecting stats…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Збирання статистики…"
+          }
+        }
+      }
+    },
+    "Command" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Команда"
+          }
+        }
+      }
+    },
+    "Command Failed" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Помилка команди"
+          }
+        }
+      }
+    },
+    "Command Line" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Командний рядок"
+          }
+        }
+      }
+    },
+    "Command line" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Командний рядок"
+          }
+        }
+      }
+    },
+    "Command override (optional, e.g. sleep infinity)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перевизначення команди (необов’язково, напр. sleep infinity)"
+          }
+        }
+      }
+    },
+    "Compatibility" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сумісність"
+          }
+        }
+      }
+    },
+    "Configuration unavailable" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Конфігурація недоступна"
+          }
+        }
+      }
+    },
+    "Configure Kernel" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Налаштувати ядро"
+          }
+        }
+      }
+    },
+    "Container" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Контейнер"
+          }
+        }
+      }
+    },
+    "Container Platform" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Платформа контейнерів"
+          }
+        }
+      }
+    },
+    "Container name (optional)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Назва контейнера (необов’язково)"
+          }
+        }
+      }
+    },
+    "Container not running" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Контейнер не запущено"
+          }
+        }
+      }
+    },
+    "Container path" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Шлях у контейнері"
+          }
+        }
+      }
+    },
+    "Container platform (container-apiserver) not found" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Платформу контейнерів (container-apiserver) не знайдено"
+          }
+        }
+      }
+    },
+    "Container port" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Порт контейнера"
+          }
+        }
+      }
+    },
+    "Container ran out of memory" : {
+      "comment" : "Notification title when a container was killed for exceeding its memory limit.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Контейнеру не вистачило пам’яті"
+          }
+        }
+      }
+    },
+    "Container removed" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Контейнер видалено"
+          }
+        }
+      }
+    },
+    "Container services are stopped" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Служби контейнерів зупинено"
+          }
+        }
+      }
+    },
+    "Container services running" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Служби контейнерів працюють"
+          }
+        }
+      }
+    },
+    "Container services stopped" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Служби контейнерів зупинено"
+          }
+        }
+      }
+    },
+    "Container stopped" : {
+      "comment" : "Notification title when a container stopped unexpectedly.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Контейнер зупинився"
+          }
+        }
+      }
+    },
+    "Containers" : {
+      "comment" : "Sidebar section: the list of containers (noun).",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Контейнери"
+          }
+        }
+      }
+    },
+    "Containers join this domain (saved with these settings)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Контейнери приєднуються до цього домену (зберігається з цими параметрами)"
+          }
+        }
+      }
+    },
+    "Context directory" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Каталог контексту"
+          }
+        }
+      }
+    },
+    "Copy" : {
+      "comment" : "Tooltip for the button that copies a detail row's value.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Копіювати"
+          }
+        }
+      }
+    },
+    "Copy DNS Name (%@)" : {
+      "comment" : "Context menu action — the value is the machine's DNS name.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Копіювати DNS-ім’я (%@)"
+          }
+        }
+      }
+    },
+    "Copy ID" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Копіювати ID"
+          }
+        }
+      }
+    },
+    "Copy IP (%@)" : {
+      "comment" : "Context menu action — the value is the container's IP address.\nContext menu action — the value is the machine's IP address.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Копіювати IP (%@)"
+          }
+        }
+      }
+    },
+    "Copy Install Command" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Копіювати команду інсталяції"
+          }
+        }
+      }
+    },
+    "Copy JSON" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Копіювати JSON"
+          }
+        }
+      }
+    },
+    "Copy Path" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Копіювати шлях"
+          }
+        }
+      }
+    },
+    "Copy Reference" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Копіювати посилання"
+          }
+        }
+      }
+    },
+    "Copy Source Path" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Копіювати вихідний шлях"
+          }
+        }
+      }
+    },
+    "Copy Subnet (%@)" : {
+      "comment" : "Context menu action — the value is the network's subnet.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Копіювати підмережу (%@)"
+          }
+        }
+      }
+    },
+    "Copy command" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Копіювати команду"
+          }
+        }
+      }
+    },
+    "Copy error" : {
+      "comment" : "Tooltip for the button that copies an error message.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Копіювати помилку"
+          }
+        }
+      }
+    },
+    "Could not load configuration: %@" : {
+      "comment" : "Frame around a platform error — the value is the error text.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося завантажити конфігурацію: %@"
+          }
+        }
+      }
+    },
+    "Couldn't open volume" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося відкрити том"
+          }
+        }
+      }
+    },
+    "Couldn't read layers" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося прочитати шари"
+          }
+        }
+      }
+    },
+    "Couldn’t recreate the container" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося перестворити контейнер"
+          }
+        }
+      }
+    },
+    "Couldn’t run the container" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося запустити контейнер"
+          }
+        }
+      }
+    },
+    "Create" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Створити"
+          }
+        }
+      }
+    },
+    "Create & Boot" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Створити й завантажити"
+          }
+        }
+      }
+    },
+    "Create & Start %lld Services" : {
+      "comment" : "Compose import button — the value is the number of services to create.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Create & Start %lld Service"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Create & Start %lld Services"
+                }
+              }
+            }
+          }
+        },
+        "uk" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Створити й запустити %lld сервіси"
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Створити й запустити %lld сервісів"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Створити й запустити %lld сервіс"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Створити й запустити %lld сервіса"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Create Machine" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Створити машину"
+          }
+        }
+      }
+    },
+    "Create Machine…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Створити машину…"
+          }
+        }
+      }
+    },
+    "Create Network" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Створити мережу"
+          }
+        }
+      }
+    },
+    "Create Volume" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Створити том"
+          }
+        }
+      }
+    },
+    "Create Volume…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Створити том…"
+          }
+        }
+      }
+    },
+    "Create a container machine" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Створити машину-контейнер"
+          }
+        }
+      }
+    },
+    "Created" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Створено"
+          }
+        }
+      }
+    },
+    "Create…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Створити…"
+          }
+        }
+      }
+    },
+    "Creating container… (pulls the image on first run)" : {
+      "comment" : "Progress text while the run sheet creates a container.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Створення контейнера… (під час першого запуску завантажиться образ)"
+          }
+        }
+      }
+    },
+    "Creating network %@…" : {
+      "comment" : "Compose import progress — the value is the network name.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Створення мережі %@…"
+          }
+        }
+      }
+    },
+    "Creating or deleting a domain asks for administrator authorization (it writes /etc/resolver)." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Створення чи видалення домену потребує авторизації адміністратора (записує /etc/resolver)."
+          }
+        }
+      }
+    },
+    "Creating volume %@…" : {
+      "comment" : "Compose import progress — the value is the volume name.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Створення тому %@…"
+          }
+        }
+      }
+    },
+    "DNS name" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS-ім’я"
+          }
+        }
+      }
+    },
+    "Dashboard" : {
+      "comment" : "Sidebar section: the overview dashboard.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Панель"
+          }
+        }
+      }
+    },
+    "Davit" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Davit"
+          }
+        }
+      }
+    },
+    "Davit found container %@ at %@, which speaks a protocol Davit %@ can't drive.\nInstall Davit's own copy — no administrator rights, and that install is left untouched." : {
+      "comment" : "Onboarding text for an incompatible platform install — the first value is its version, the second its path, the third the version Davit needs.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Davit found container %1$@ at %2$@, which speaks a protocol Davit %3$@ can't drive.\nInstall Davit's own copy — no administrator rights, and that install is left untouched."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Davit знайшов container %1$@ у %2$@, але Davit %3$@ не вміє працювати з його протоколом.\nУстановіть власну копію платформи від Davit — без прав адміністратора; наявна інсталяція залишиться недоторканою."
+          }
+        }
+      }
+    },
+    "Davit is passing `--arch amd64` automatically. Performance will be lower than a native `arm64` image." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Davit автоматично передає `--arch amd64`. Продуктивність буде нижчою, ніж у нативного образу `arm64`."
+          }
+        }
+      }
+    },
+    "Davit runs this over the API — the equivalent `container` command, for reference." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Davit виконує це через API — еквівалентна команда `container` для довідки."
+          }
+        }
+      }
+    },
+    "Davit talks directly to Apple's open-source container services.\nInstall them once — no administrator rights needed — and you're set." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Davit працює безпосередньо з відкритими службами контейнерів Apple.\nУстановіть їх один раз — без прав адміністратора — і все готово."
+          }
+        }
+      }
+    },
+    "Default" : {
+      "comment" : "Badge on the machine that container machine commands use by default.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Типова"
+          }
+        }
+      }
+    },
+    "Default registry" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Типовий реєстр"
+          }
+        }
+      }
+    },
+    "Defaults for New Containers" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Типові параметри нових контейнерів"
+          }
+        }
+      }
+    },
+    "Delete" : {
+      "comment" : "Confirmation button that deletes the file.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видалити"
+          }
+        }
+      }
+    },
+    "Delete Image" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видалити образ"
+          }
+        }
+      }
+    },
+    "Delete Stopped Containers…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видалити зупинені контейнери…"
+          }
+        }
+      }
+    },
+    "Delete “%@”?" : {
+      "comment" : "Confirmation title — the value is the file name.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видалити «%@»?"
+          }
+        }
+      }
+    },
+    "Digest" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Дайджест"
+          }
+        }
+      }
+    },
+    "Disk" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Диск"
+          }
+        }
+      }
+    },
+    "Disk I/O" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Дисковий ввід-вивід"
+          }
+        }
+      }
+    },
+    "Disk Usage" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Використання диска"
+          }
+        }
+      }
+    },
+    "Disk used" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Використано на диску"
+          }
+        }
+      }
+    },
+    "Dockerfile (e.g. Dockerfile, Dockerfile_t1)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dockerfile (напр. Dockerfile, Dockerfile_t1)"
+          }
+        }
+      }
+    },
+    "Done" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Готово"
+          }
+        }
+      }
+    },
+    "Double-click to download" : {
+      "comment" : "Tooltip for a file row in the container file browser.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Двічі клацніть, щоб завантажити"
+          }
+        }
+      }
+    },
+    "Download" : {
+      "comment" : "Tooltip for the button that downloads a file from the container.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завантажити"
+          }
+        }
+      }
+    },
+    "Downloads Apple's signed installer (v%@, ~180 MB), verifies it,\nand installs into your user Library. You can also use the [official installer](https://github.com/apple/container/releases)." : {
+      "comment" : "Onboarding note under the install button — the value is the pinned platform version.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завантажує підписаний інсталятор Apple (v%@, ~180 МБ), перевіряє його\nта встановлює у вашу бібліотеку користувача. Можна також скористатися [офіційним інсталятором](https://github.com/apple/container/releases)."
+          }
+        }
+      }
+    },
+    "Download…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завантажити…"
+          }
+        }
+      }
+    },
+    "Edit %@" : {
+      "comment" : "Machine edit sheet title — the value is the machine name.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Редагувати %@"
+          }
+        }
+      }
+    },
+    "Edit & Recreate…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Редагувати й перестворити…"
+          }
+        }
+      }
+    },
+    "Edit…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Редагувати…"
+          }
+        }
+      }
+    },
+    "Effective configuration (JSON)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фактична конфігурація (JSON)"
+          }
+        }
+      }
+    },
+    "Empty" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Порожньо"
+          }
+        }
+      }
+    },
+    "Environment" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Середовище"
+          }
+        }
+      }
+    },
+    "Equivalent command" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Еквівалентна команда"
+          }
+        }
+      }
+    },
+    "Export Container Filesystem" : {
+      "comment" : "Save panel title for exporting a container's filesystem to a tar archive.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Експортувати файлову систему контейнера"
+          }
+        }
+      }
+    },
+    "Export Filesystem…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Експортувати файлову систему…"
+          }
+        }
+      }
+    },
+    "Exported %@" : {
+      "comment" : "Bottom HUD when a container filesystem export has finished — the value is the container name.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Експортовано %@"
+          }
+        }
+      }
+    },
+    "Exporting %@…" : {
+      "comment" : "Bottom HUD while a container filesystem export runs — the value is the container name.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Експортування %@…"
+          }
+        }
+      }
+    },
+    "Exporting %@… %@" : {
+      "comment" : "Bottom HUD while a container filesystem export runs — the first value is the container name, the second the bytes written so far.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Exporting %1$@… %2$@"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Експортування %1$@… %2$@"
+          }
+        }
+      }
+    },
+    "Failed to inspect %@" : {
+      "comment" : "Placeholder shown when the inspect JSON could not be read — the value is the resource id.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося інспектувати %@"
+          }
+        }
+      }
+    },
+    "Files" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Файли"
+          }
+        }
+      }
+    },
+    "Filter containers" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фільтрувати контейнери"
+          }
+        }
+      }
+    },
+    "Filter images" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фільтрувати образи"
+          }
+        }
+      }
+    },
+    "Filter networks" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фільтрувати мережі"
+          }
+        }
+      }
+    },
+    "Filter volumes" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Фільтрувати томи"
+          }
+        }
+      }
+    },
+    "Follow" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Стежити"
+          }
+        }
+      }
+    },
+    "For Docker Hub, use an access token instead of your password." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Для Docker Hub використовуйте токен доступу замість пароля."
+          }
+        }
+      }
+    },
+    "Force Delete" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Примусово видалити"
+          }
+        }
+      }
+    },
+    "Gateway" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Шлюз"
+          }
+        }
+      }
+    },
+    "General" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загальні"
+          }
+        }
+      }
+    },
+    "Group" : {
+      "comment" : "Toolbar button that opens the container grouping menu.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Групування"
+          }
+        }
+      }
+    },
+    "Group by" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Групувати за"
+          }
+        }
+      }
+    },
+    "Group containers by a label" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Групувати контейнери за міткою"
+          }
+        }
+      }
+    },
+    "Group: %@" : {
+      "comment" : "Toolbar button showing the current container grouping — the value is the group name.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Групування: %@"
+          }
+        }
+      }
+    },
+    "Home Directory" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Домашній каталог"
+          }
+        }
+      }
+    },
+    "Home directory" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Домашній каталог"
+          }
+        }
+      }
+    },
+    "Home mount" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Монтування домашнього каталогу"
+          }
+        }
+      }
+    },
+    "Homebrew" : {
+      "comment" : "Where the container platform was found: a Homebrew installation.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Homebrew"
+          }
+        }
+      }
+    },
+    "Host port" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Порт хоста"
+          }
+        }
+      }
+    },
+    "Hostname" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ім’я хоста"
+          }
+        }
+      }
+    },
+    "ID" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ID"
+          }
+        }
+      }
+    },
+    "IP" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "IP"
+          }
+        }
+      }
+    },
+    "IPv4" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "IPv4"
+          }
+        }
+      }
+    },
+    "Image" : {
+      "comment" : "Window title fallback when the image no longer exists.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Образ"
+          }
+        }
+      }
+    },
+    "Image & Name" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Образ і назва"
+          }
+        }
+      }
+    },
+    "Image Reference" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Посилання на образ"
+          }
+        }
+      }
+    },
+    "Image removed" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Образ видалено"
+          }
+        }
+      }
+    },
+    "Images" : {
+      "comment" : "Sidebar section: the list of images (noun).",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Образи"
+          }
+        }
+      }
+    },
+    "Import Compose File" : {
+      "comment" : "Open panel title for choosing a compose file to import.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Імпортувати файл compose"
+          }
+        }
+      }
+    },
+    "Import Compose File…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Імпортувати файл compose…"
+          }
+        }
+      }
+    },
+    "Import Compose — %@" : {
+      "comment" : "Compose import sheet title — the value is the project name.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Імпорт compose — %@"
+          }
+        }
+      }
+    },
+    "Init image (vminit)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Початковий образ (vminit)"
+          }
+        }
+      }
+    },
+    "Inspect" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Інспекція"
+          }
+        }
+      }
+    },
+    "Install Container Platform" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установити платформу контейнерів"
+          }
+        }
+      }
+    },
+    "Install Rosetta with `softwareupdate --install-rosetta --agree-to-license`, then try again." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установіть Rosetta командою `softwareupdate --install-rosetta --agree-to-license`, потім спробуйте ще раз."
+          }
+        }
+      }
+    },
+    "Install in /usr/local/bin…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установити в /usr/local/bin…"
+          }
+        }
+      }
+    },
+    "Install root" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Кореневий каталог інсталяції"
+          }
+        }
+      }
+    },
+    "Installed at /usr/local/bin/container, pointing at the Davit-managed platform." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установлено в /usr/local/bin/container із посиланням на платформу, якою керує Davit."
+          }
+        }
+      }
+    },
+    "Installed container platform is too new" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установлена платформа контейнерів занадто нова"
+          }
+        }
+      }
+    },
+    "Installed container platform is too old" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установлена платформа контейнерів занадто стара"
+          }
+        }
+      }
+    },
+    "Installing…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Установлення…"
+          }
+        }
+      }
+    },
+    "Intel (linux/amd64)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intel (linux/amd64)"
+          }
+        }
+      }
+    },
+    "Internal (host-only, no outbound access)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Внутрішня (лише хост, без вихідного доступу)"
+          }
+        }
+      }
+    },
+    "KB/s" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "КБ/с"
+          }
+        }
+      }
+    },
+    "KEY" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "KEY"
+          }
+        }
+      }
+    },
+    "Keep in Dock when the window is closed" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Залишати в Dock, коли вікно закрито"
+          }
+        }
+      }
+    },
+    "Kernel URL" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "URL ядра"
+          }
+        }
+      }
+    },
+    "Kernel binary path" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Шлях до бінарника ядра"
+          }
+        }
+      }
+    },
+    "Kill" : {
+      "comment" : "Context menu action that force-kills the container process.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Примусово зупинити"
+          }
+        }
+      }
+    },
+    "Labels" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мітки"
+          }
+        }
+      }
+    },
+    "Launches Davit to the menu bar when you log in, so container services are ready." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запускає Davit у рядку меню під час входу, щоб служби контейнерів були готові."
+          }
+        }
+      }
+    },
+    "Layer %lld" : {
+      "comment" : "Image layer heading — the value is the layer number.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Шар %lld"
+          }
+        }
+      }
+    },
+    "Layers" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Шари"
+          }
+        }
+      }
+    },
+    "Live stats always refresh every 2 seconds while containers run." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Поточна статистика оновлюється кожні 2 секунди, поки працюють контейнери."
+          }
+        }
+      }
+    },
+    "Local DNS domain" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Локальний DNS-домен"
+          }
+        }
+      }
+    },
+    "Log In" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Увійти"
+          }
+        }
+      }
+    },
+    "Log Out" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вийти"
+          }
+        }
+      }
+    },
+    "Logs" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Журнал"
+          }
+        }
+      }
+    },
+    "MAC" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MAC"
+          }
+        }
+      }
+    },
+    "MB" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "МБ"
+          }
+        }
+      }
+    },
+    "MEM" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ПАМ."
+          }
+        }
+      }
+    },
+    "Machine CPUs" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ядра машини"
+          }
+        }
+      }
+    },
+    "Machine Name" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Назва машини"
+          }
+        }
+      }
+    },
+    "Machine memory" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пам’ять машини"
+          }
+        }
+      }
+    },
+    "Machine removed" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Машину видалено"
+          }
+        }
+      }
+    },
+    "Machines" : {
+      "comment" : "Sidebar section: the list of container machines (noun).",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Машини"
+          }
+        }
+      }
+    },
+    "Make Default" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зробити типовою"
+          }
+        }
+      }
+    },
+    "Max size (optional, e.g. 10G — default 512G)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Максимальний розмір (необов’язково, напр. 10G — типово 512G)"
+          }
+        }
+      }
+    },
+    "Memory" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пам’ять"
+          }
+        }
+      }
+    },
+    "Memory Usage" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Використання пам’яті"
+          }
+        }
+      }
+    },
+    "More" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Більше"
+          }
+        }
+      }
+    },
+    "Mounted read-only" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Змонтовано лише для читання"
+          }
+        }
+      }
+    },
+    "Mounted read-write" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Змонтовано для читання й запису"
+          }
+        }
+      }
+    },
+    "Mounting volume…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Монтування тому…"
+          }
+        }
+      }
+    },
+    "Mounts" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Монтування"
+          }
+        }
+      }
+    },
+    "Needed by %@" : {
+      "comment" : "Why an unticked service is brought up — the value is the list of services that depend on it.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Потрібен для %@"
+          }
+        }
+      }
+    },
+    "Network" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мережа"
+          }
+        }
+      }
+    },
+    "Network name" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Назва мережі"
+          }
+        }
+      }
+    },
+    "Networks" : {
+      "comment" : "Sidebar section: the list of networks (noun).",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Мережі"
+          }
+        }
+      }
+    },
+    "New domain" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Новий домен"
+          }
+        }
+      }
+    },
+    "No cache" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Без кешу"
+          }
+        }
+      }
+    },
+    "No containers" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Немає контейнерів"
+          }
+        }
+      }
+    },
+    "No grouping" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Без групування"
+          }
+        }
+      }
+    },
+    "No guest kernel configured" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Гостьове ядро не налаштовано"
+          }
+        }
+      }
+    },
+    "No host DNS domains. Create one (e.g. “test”) and containers become reachable at “name.test” from your Mac." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Немає DNS-доменів хоста. Створіть один (напр. «test»), і контейнери стануть доступними за адресою «name.test» з вашого Mac."
+          }
+        }
+      }
+    },
+    "No images" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Немає образів"
+          }
+        }
+      }
+    },
+    "No log output" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Немає виводу журналу"
+          }
+        }
+      }
+    },
+    "No machines" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Немає машин"
+          }
+        }
+      }
+    },
+    "No matches" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Немає збігів"
+          }
+        }
+      }
+    },
+    "No registry logins" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Немає входів до реєстру"
+          }
+        }
+      }
+    },
+    "No running containers" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Немає запущених контейнерів"
+          }
+        }
+      }
+    },
+    "No stats" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Немає статистики"
+          }
+        }
+      }
+    },
+    "No volumes" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Немає томів"
+          }
+        }
+      }
+    },
+    "Not everything in the file is supported" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не все у файлі підтримується"
+          }
+        }
+      }
+    },
+    "Not mounted" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не змонтовано"
+          }
+        }
+      }
+    },
+    "Not running" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не запущено"
+          }
+        }
+      }
+    },
+    "Nothing in %@." : {
+      "comment" : "Empty directory state — the value is the container path.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "У %@ нічого немає."
+          }
+        }
+      }
+    },
+    "Nothing in the log yet." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "У журналі поки нічого немає."
+          }
+        }
+      }
+    },
+    "Notifications" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сповіщення"
+          }
+        }
+      }
+    },
+    "Notify when a container stops unexpectedly" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сповіщати, коли контейнер несподівано зупиняється"
+          }
+        }
+      }
+    },
+    "OK" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        }
+      }
+    },
+    "Off: closing the window leaves Davit only in the menu bar, like other menu bar utilities." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вимкнено: після закриття вікна Davit залишається лише в рядку меню, як інші утиліти рядка меню."
+          }
+        }
+      }
+    },
+    "Open" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкрити"
+          }
+        }
+      }
+    },
+    "Open %@" : {
+      "comment" : "Tooltip for a container row — the value is the container name.\nTooltip for a folder row — the value is the folder name.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкрити %@"
+          }
+        }
+      }
+    },
+    "Open Davit" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкрити Davit"
+          }
+        }
+      }
+    },
+    "Open Davit at login" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкривати Davit під час входу"
+          }
+        }
+      }
+    },
+    "Open Software Update" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкрити «Оновлення ПЗ»"
+          }
+        }
+      }
+    },
+    "Open Terminal" : {
+      "comment" : "Tooltip for the button that opens a shell in the container.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкрити Terminal"
+          }
+        }
+      }
+    },
+    "Open a shell" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкрити оболонку"
+          }
+        }
+      }
+    },
+    "Open in Browser" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкрити у браузері"
+          }
+        }
+      }
+    },
+    "Open localhost:%@ in Browser" : {
+      "comment" : "Context menu action — the value is the published host port.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкрити localhost:%@ у браузері"
+          }
+        }
+      }
+    },
+    "Open shell in Terminal" : {
+      "comment" : "Tooltip for the toolbar button that opens a container shell in the user's terminal.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкрити оболонку в Terminal"
+          }
+        }
+      }
+    },
+    "Open shells in" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкривати оболонки в"
+          }
+        }
+      }
+    },
+    "Options" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Параметри"
+          }
+        }
+      }
+    },
+    "Overrides are written to ~/.config/container/config.toml" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перевизначення записуються в ~/.config/container/config.toml"
+          }
+        }
+      }
+    },
+    "Overview" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Огляд"
+          }
+        }
+      }
+    },
+    "Parent directory" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Батьківський каталог"
+          }
+        }
+      }
+    },
+    "Password or access token" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пароль або токен доступу"
+          }
+        }
+      }
+    },
+    "Platform" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Платформа"
+          }
+        }
+      }
+    },
+    "Platform Variants" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Варіанти платформи"
+          }
+        }
+      }
+    },
+    "Ports" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Порти"
+          }
+        }
+      }
+    },
+    "Processes" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Процеси"
+          }
+        }
+      }
+    },
+    "Profile %@" : {
+      "comment" : "Why a service is not brought up — the value is the profile name that gates it.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Профіль %@"
+          }
+        }
+      }
+    },
+    "Project" : {
+      "comment" : "Friendly name for compose project label keys in the grouping menu.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Проєкт"
+          }
+        }
+      }
+    },
+    "Prune Stopped Containers" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Очистити зупинені контейнери"
+          }
+        }
+      }
+    },
+    "Prune Unused Images" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Очистити невикористані образи"
+          }
+        }
+      }
+    },
+    "Prune Unused Networks" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Очистити невикористані мережі"
+          }
+        }
+      }
+    },
+    "Prune Unused Volumes" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Очистити невикористані томи"
+          }
+        }
+      }
+    },
+    "Published Ports" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Опубліковані порти"
+          }
+        }
+      }
+    },
+    "Pull" : {
+      "comment" : "Button that starts downloading the entered image (verb).",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завантажити"
+          }
+        }
+      }
+    },
+    "Pull Image" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завантажити образ"
+          }
+        }
+      }
+    },
+    "Pull Image…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завантажити образ…"
+          }
+        }
+      }
+    },
+    "Pull Latest" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оновити до останньої"
+          }
+        }
+      }
+    },
+    "Pull an image from a registry" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завантажити образ із реєстру"
+          }
+        }
+      }
+    },
+    "Pull an image from a registry to get started." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Щоб почати, завантажте образ із реєстру."
+          }
+        }
+      }
+    },
+    "Pull complete" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завантаження завершено"
+          }
+        }
+      }
+    },
+    "Pull failed" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося завантажити"
+          }
+        }
+      }
+    },
+    "Quit Davit" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завершити Davit"
+          }
+        }
+      }
+    },
+    "Re-pull base images" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повторно завантажити базові образи"
+          }
+        }
+      }
+    },
+    "Read" : {
+      "comment" : "Disk I/O chart legend: read throughput.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Читання"
+          }
+        }
+      }
+    },
+    "Recreate" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перестворити"
+          }
+        }
+      }
+    },
+    "Recreate Container" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перестворити контейнер"
+          }
+        }
+      }
+    },
+    "Reference" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Посилання"
+          }
+        }
+      }
+    },
+    "Refresh" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оновити"
+          }
+        }
+      }
+    },
+    "Refresh every %llds" : {
+      "comment" : "Automatic refresh interval — the value is the number of seconds.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оновлювати кожні %lld с"
+          }
+        }
+      }
+    },
+    "Registries" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Реєстри"
+          }
+        }
+      }
+    },
+    "Registry" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Реєстр"
+          }
+        }
+      }
+    },
+    "Registry & DNS" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Реєстр і DNS"
+          }
+        }
+      }
+    },
+    "Registry Logins" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Входи до реєстру"
+          }
+        }
+      }
+    },
+    "Reload" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перезавантажити"
+          }
+        }
+      }
+    },
+    "Remove" : {
+      "comment" : "Tooltip for the button that removes a key-value row.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видалити"
+          }
+        }
+      }
+    },
+    "Remove from /usr/local/bin" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видалити з /usr/local/bin"
+          }
+        }
+      }
+    },
+    "Replace the stored password or token (e.g. after rotating it)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Замінити збережений пароль або токен (напр. після зміни)"
+          }
+        }
+      }
+    },
+    "Resolved" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Знайдено"
+          }
+        }
+      }
+    },
+    "Resources" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ресурси"
+          }
+        }
+      }
+    },
+    "Resources & Network" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ресурси й мережа"
+          }
+        }
+      }
+    },
+    "Restart" : {
+      "comment" : "Context menu action that restarts the container.\nTooltip for the toolbar button that restarts this container.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перезапустити"
+          }
+        }
+      }
+    },
+    "Restart All" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перезапустити все"
+          }
+        }
+      }
+    },
+    "Restart Services" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перезапустити служби"
+          }
+        }
+      }
+    },
+    "Retry Remaining" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повторити решту"
+          }
+        }
+      }
+    },
+    "Reveal in Finder" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показати у Finder"
+          }
+        }
+      }
+    },
+    "Rosetta (x86-64 builds)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rosetta (збірки x86-64)"
+          }
+        }
+      }
+    },
+    "Rosetta couldn't run this image" : {
+      "comment" : "Notification title when an amd64 image could not run under Rosetta.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rosetta не змогла запустити цей образ"
+          }
+        }
+      }
+    },
+    "Run" : {
+      "comment" : "Toolbar button that opens the run sheet for this image (verb).",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запустити"
+          }
+        }
+      }
+    },
+    "Run Container" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запустити контейнер"
+          }
+        }
+      }
+    },
+    "Run Container…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запустити контейнер…"
+          }
+        }
+      }
+    },
+    "Run a container from an image to get started." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Щоб почати, запустіть контейнер з образу."
+          }
+        }
+      }
+    },
+    "Run a container from this image" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запустити контейнер із цього образу"
+          }
+        }
+      }
+    },
+    "Run a new container" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запустити новий контейнер"
+          }
+        }
+      }
+    },
+    "Run options (optional, e.g. --platform linux/amd64 --ssh)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Параметри запуску (необов’язково, напр. --platform linux/amd64 --ssh)"
+          }
+        }
+      }
+    },
+    "Running" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запущено"
+          }
+        }
+      }
+    },
+    "Running Containers" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запущені контейнери"
+          }
+        }
+      }
+    },
+    "Run…" : {
+      "comment" : "Context menu action that opens the run sheet for this image (verb).",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запустити…"
+          }
+        }
+      }
+    },
+    "Save" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зберегти"
+          }
+        }
+      }
+    },
+    "Saved. Container defaults, registry and DNS apply to new operations immediately; builder, kernel, machine and init-image changes apply after a service restart." : {
+      "comment" : "Status after saving the platform configuration.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Збережено. Типові параметри контейнерів, реєстр і DNS діють негайно; зміни збирача, ядра, машини й початкового образу — після перезапуску служби."
+          }
+        }
+      }
+    },
+    "Search Docker Hub or enter a reference (nginx, ghcr.io/org/app:tag)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пошук у Docker Hub або введіть посилання (nginx, ghcr.io/org/app:tag)"
+          }
+        }
+      }
+    },
+    "Search containers, images, volumes, networks, machines…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пошук контейнерів, образів, томів, мереж, машин…"
+          }
+        }
+      }
+    },
+    "Searching Docker Hub…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пошук у Docker Hub…"
+          }
+        }
+      }
+    },
+    "Search…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пошук…"
+          }
+        }
+      }
+    },
+    "Services running" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Служби працюють"
+          }
+        }
+      }
+    },
+    "Services stopped" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Служби зупинено"
+          }
+        }
+      }
+    },
+    "Set as Default" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зробити типовою"
+          }
+        }
+      }
+    },
+    "Set as default machine" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зробити типовою машиною"
+          }
+        }
+      }
+    },
+    "Shell" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оболонка"
+          }
+        }
+      }
+    },
+    "Show All Groups" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показати всі групи"
+          }
+        }
+      }
+    },
+    "Show Only This Group" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показати лише цю групу"
+          }
+        }
+      }
+    },
+    "Showing only “%@”" : {
+      "comment" : "Banner when the container list is filtered to one group — the value is the group name.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показано лише «%@»"
+          }
+        }
+      }
+    },
+    "Sign in to a registry to pull private images. Credentials are verified and stored in your login keychain (shared with the `container` CLI)." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Увійдіть до реєстру, щоб завантажувати приватні образи. Облікові дані перевіряються й зберігаються у вашій «Зв’язці ключів» (спільній із CLI `container`)."
+          }
+        }
+      }
+    },
+    "Something went wrong" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Щось пішло не так"
+          }
+        }
+      }
+    },
+    "Start" : {
+      "comment" : "Context menu action that starts the container.\nTooltip for the button that starts this container.\nTooltip for the toolbar button that starts this container.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запустити"
+          }
+        }
+      }
+    },
+    "Start All" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запустити все"
+          }
+        }
+      }
+    },
+    "Start Apple's container services to manage containers, images and more." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запустіть служби контейнерів Apple, щоб керувати контейнерами, образами тощо."
+          }
+        }
+      }
+    },
+    "Start Services" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запустити служби"
+          }
+        }
+      }
+    },
+    "Start container services" : {
+      "comment" : "Tooltip for the button that starts the container platform services.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запустити служби контейнерів"
+          }
+        }
+      }
+    },
+    "Start services to manage containers" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запустіть служби, щоб керувати контейнерами"
+          }
+        }
+      }
+    },
+    "Start the container to browse its files." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запустіть контейнер, щоб оглянути його файли."
+          }
+        }
+      }
+    },
+    "Start the container to see live resource usage." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запустіть контейнер, щоб побачити поточне використання ресурсів."
+          }
+        }
+      }
+    },
+    "Start the machine to see live resource usage." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запустіть машину, щоб побачити поточне використання ресурсів."
+          }
+        }
+      }
+    },
+    "Start when Davit Opens" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запускати після відкриття Davit"
+          }
+        }
+      }
+    },
+    "Started" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запущено"
+          }
+        }
+      }
+    },
+    "Starting %@… (pulls the image if needed)" : {
+      "comment" : "Compose import progress — the value is the service name.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запуск %@… (за потреби завантажиться образ)"
+          }
+        }
+      }
+    },
+    "Starting container services…" : {
+      "comment" : "Progress text while the just-installed platform services start.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запуск служб контейнерів…"
+          }
+        }
+      }
+    },
+    "Starting…" : {
+      "comment" : "Compose import progress while the plan starts.\nProgress text while a new machine boots.\nProgress text while a newly created container starts.\nProgress text while an image build starts.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запуск…"
+          }
+        }
+      }
+    },
+    "Startup" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Під час входу"
+          }
+        }
+      }
+    },
+    "Stats" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Статистика"
+          }
+        }
+      }
+    },
+    "Status unknown" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Стан невідомий"
+          }
+        }
+      }
+    },
+    "Stop" : {
+      "comment" : "Context menu action that stops the container.\nTooltip for the button that stops this container.\nTooltip for the toolbar button that stops this container.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зупинити"
+          }
+        }
+      }
+    },
+    "Stop All" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зупинити все"
+          }
+        }
+      }
+    },
+    "Stop All Running" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зупинити всі запущені"
+          }
+        }
+      }
+    },
+    "Stop Services" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зупинити служби"
+          }
+        }
+      }
+    },
+    "Stop container services" : {
+      "comment" : "Tooltip for the button that stops the container platform services.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зупинити служби контейнерів"
+          }
+        }
+      }
+    },
+    "Stop machine" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зупинити машину"
+          }
+        }
+      }
+    },
+    "Stopped" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зупинено"
+          }
+        }
+      }
+    },
+    "Stopped: Rosetta couldn't run this image" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зупинено: Rosetta не змогла запустити цей образ"
+          }
+        }
+      }
+    },
+    "Stopped: out of memory" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зупинено: не вистачило пам’яті"
+          }
+        }
+      }
+    },
+    "Stopping" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зупинення"
+          }
+        }
+      }
+    },
+    "Stops you trigger in Davit (incl. compose down) stay quiet; crashes and external stops notify." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зупинки, які ви запускаєте в Davit (зокрема compose down), не сповіщаються; аварії та зовнішні зупинки — сповіщаються."
+          }
+        }
+      }
+    },
+    "Subnet (optional, e.g. 192.168.100.0/24)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Підмережа (необов’язково, напр. 192.168.100.0/24)"
+          }
+        }
+      }
+    },
+    "System Default" : {
+      "comment" : "Terminal choice that opens shell scripts with the default .command handler.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Типовий для системи"
+          }
+        }
+      }
+    },
+    "Tag" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додати тег"
+          }
+        }
+      }
+    },
+    "Tag (e.g. myapp:latest)" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Тег (напр. myapp:latest)"
+          }
+        }
+      }
+    },
+    "Tag Image" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додати тег образу"
+          }
+        }
+      }
+    },
+    "Tag…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додати тег…"
+          }
+        }
+      }
+    },
+    "Tail" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Останні рядки"
+          }
+        }
+      }
+    },
+    "Terminal" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminal"
+          }
+        }
+      }
+    },
+    "The VM that runs your containers needs a Linux kernel, and none is set for this Mac. Containers won't start until one is installed." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Віртуальній машині, яка запускає ваші контейнери, потрібне ядро Linux, але для цього Mac його не задано. Контейнери не запускатимуться, доки ядро не встановлено."
+          }
+        }
+      }
+    },
+    "The download continues in the background if you close." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Якщо закрити, завантаження продовжиться у фоновому режимі."
+          }
+        }
+      }
+    },
+    "The helper container stopped." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Допоміжний контейнер зупинився."
+          }
+        }
+      }
+    },
+    "This amd64 image needs a newer Rosetta than your macOS provides (auxiliary vector type %@). Rosetta ships with macOS, so a software update usually fixes it; otherwise run an arm64 image." : {
+      "comment" : "Why the container stopped — the value is the kernel auxiliary vector type Rosetta did not support.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Цьому образу amd64 потрібна новіша версія Rosetta, ніж має ваш macOS (тип допоміжного вектора %@). Rosetta входить до macOS, тож оновлення ПЗ зазвичай це виправляє; інакше запустіть образ arm64."
+          }
+        }
+      }
+    },
+    "This amd64 image needs a newer Rosetta than your macOS provides. Rosetta ships with macOS, so a software update usually fixes it; otherwise run an arm64 image." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Цьому образу amd64 потрібна новіша версія Rosetta, ніж має ваш macOS. Rosetta входить до macOS, тож оновлення ПЗ зазвичай це виправляє; інакше запустіть образ arm64."
+          }
+        }
+      }
+    },
+    "This container no longer exists." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Цього контейнера більше не існує."
+          }
+        }
+      }
+    },
+    "This image no longer exists." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Цього образу більше не існує."
+          }
+        }
+      }
+    },
+    "This image only ships `linux/amd64` and Rosetta isn't installed." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Цей образ постачається лише для `linux/amd64`, а Rosetta не встановлено."
+          }
+        }
+      }
+    },
+    "This image only ships `linux/amd64`. It will run under Rosetta translation on Apple silicon." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Цей образ постачається лише для `linux/amd64`. Він працюватиме через трансляцію Rosetta на Apple silicon."
+          }
+        }
+      }
+    },
+    "This machine has no backing container yet." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ця машина ще не має опорного контейнера."
+          }
+        }
+      }
+    },
+    "This machine no longer exists." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Цієї машини більше не існує."
+          }
+        }
+      }
+    },
+    "This permanently removes it from the container filesystem." : {
+      "comment" : "Body of the confirmation for deleting a file.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Це остаточно видалить його з файлової системи контейнера."
+          }
+        }
+      }
+    },
+    "Time" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Час"
+          }
+        }
+      }
+    },
+    "Total size" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Загальний розмір"
+          }
+        }
+      }
+    },
+    "Type to search Docker Hub, or enter a full reference (e.g. ghcr.io/org/app:tag)." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Введіть запит для пошуку в Docker Hub або повне посилання (напр. ghcr.io/org/app:tag)."
+          }
+        }
+      }
+    },
+    "Ungrouped" : {
+      "comment" : "Group of containers that lack the label the list is grouped by.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Без групи"
+          }
+        }
+      }
+    },
+    "Unknown" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Невідомо"
+          }
+        }
+      }
+    },
+    "Untick services you don't want. A ticked service brings its dependencies with it." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зніміть позначки із сервісів, які вам не потрібні. Позначений сервіс тягне за собою залежності."
+          }
+        }
+      }
+    },
+    "Unusable" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Непридатна"
+          }
+        }
+      }
+    },
+    "Update" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оновити"
+          }
+        }
+      }
+    },
+    "Update Registry Login" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оновити вхід до реєстру"
+          }
+        }
+      }
+    },
+    "Update…" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оновити…"
+          }
+        }
+      }
+    },
+    "Upload" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вивантажити"
+          }
+        }
+      }
+    },
+    "Upload files here" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вивантажте файли сюди"
+          }
+        }
+      }
+    },
+    "Used By" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Використовується"
+          }
+        }
+      }
+    },
+    "Used by container machine commands when no machine name is specified." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Використовується командами машини-контейнера, якщо не вказано назву машини."
+          }
+        }
+      }
+    },
+    "Used by “Open Terminal” on containers. Only installed terminals are listed." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Використовується для «Відкрити Terminal» на контейнерах. Показано лише встановлені термінали."
+          }
+        }
+      }
+    },
+    "Username" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ім’я користувача"
+          }
+        }
+      }
+    },
+    "Version %@" : {
+      "comment" : "About panel — the value is the app version.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Версія %@"
+          }
+        }
+      }
+    },
+    "View kernel log" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переглянути журнал ядра"
+          }
+        }
+      }
+    },
+    "View log" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переглянути журнал"
+          }
+        }
+      }
+    },
+    "Volume name" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Назва тому"
+          }
+        }
+      }
+    },
+    "Volume name or host path" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Назва тому або шлях хоста"
+          }
+        }
+      }
+    },
+    "Volume: %@" : {
+      "comment" : "Volume browser sheet title — the value is the volume name.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Том: %@"
+          }
+        }
+      }
+    },
+    "Volumes" : {
+      "comment" : "Sidebar section: the list of volumes (noun).",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Томи"
+          }
+        }
+      }
+    },
+    "Volumes provide persistent storage for containers." : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Томи забезпечують постійне сховище для контейнерів."
+          }
+        }
+      }
+    },
+    "Waiting for %@ (%@)…" : {
+      "comment" : "Compose import progress — the first value is the service name, the second its health condition.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Waiting for %1$@ (%2$@)…"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Очікування %1$@ (%2$@)…"
+          }
+        }
+      }
+    },
+    "Write" : {
+      "comment" : "Disk I/O chart legend: write throughput.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запис"
+          }
+        }
+      }
+    },
+    "`container` command" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "команда `container`"
+          }
+        }
+      }
+    },
+    "apple/container on GitHub" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "apple/container на GitHub"
+          }
+        }
+      }
+    },
+    "bind" : {
+      "comment" : "Mount type: a host directory bind-mounted into the container.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "bind-монтування"
+          }
+        }
+      }
+    },
+    "block" : {
+      "comment" : "Mount type: a block device mounted into the container.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "блоковий пристрій"
+          }
+        }
+      }
+    },
+    "built-in" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "вбудована"
+          }
+        }
+      }
+    },
+    "bundled" : {
+      "comment" : "Where the container platform was found: bundled with the app.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "у комплекті"
+          }
+        }
+      }
+    },
+    "custom path" : {
+      "comment" : "Where the container platform was found: a path the user configured.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "власний шлях"
+          }
+        }
+      }
+    },
+    "default" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "за замовчуванням"
+          }
+        }
+      }
+    },
+    "e.g. alpine" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "напр. alpine"
+          }
+        }
+      }
+    },
+    "e.g. alpine:3.22, ubuntu:latest" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "напр. alpine:3.22, ubuntu:latest"
+          }
+        }
+      }
+    },
+    "in use" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "використовується"
+          }
+        }
+      }
+    },
+    "installed by Davit" : {
+      "comment" : "Where the container platform was found: Davit installed it.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "установлено Davit"
+          }
+        }
+      }
+    },
+    "limit %@" : {
+      "comment" : "Stats tile subtitle — the value is the container's memory limit.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ліміт %@"
+          }
+        }
+      }
+    },
+    "max %@" : {
+      "comment" : "Volume size limit — the value is the maximum size.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "макс. %@"
+          }
+        }
+      }
+    },
+    "network" : {
+      "comment" : "Command palette subtitle for a network without a subnet (noun).",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "мережа"
+          }
+        }
+      }
+    },
+    "not mounted" : {
+      "comment" : "The machine has no host home directory mounted.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "не змонтовано"
+          }
+        }
+      }
+    },
+    "off" : {
+      "comment" : "A boolean platform default is disabled.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "вимкнено"
+          }
+        }
+      }
+    },
+    "on" : {
+      "comment" : "A boolean platform default is enabled.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "увімкнено"
+          }
+        }
+      }
+    },
+    "replaces “%@”" : {
+      "comment" : "Run sheet subtitle when recreating — the value is the container name.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "замінює «%@»"
+          }
+        }
+      }
+    },
+    "running" : {
+      "comment" : "Stats tile subtitle: the number above is the count of running processes.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "працює"
+          }
+        }
+      }
+    },
+    "streaming" : {
+      "comment" : "Live log status: new lines keep arriving.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "у реальному часі"
+          }
+        }
+      }
+    },
+    "system install" : {
+      "comment" : "Where the container platform was found: a system-wide install.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "системна інсталяція"
+          }
+        }
+      }
+    },
+    "total %@" : {
+      "comment" : "Layers tab — the value is the total size of all layers.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "усього %@"
+          }
+        }
+      }
+    },
+    "value" : {
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "значення"
+          }
+        }
+      }
+    },
+    "volume" : {
+      "comment" : "Command palette subtitle for a volume when there is no other detail (noun).\nMount type: a container volume mounted into the container.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "том"
+          }
+        }
+      }
+    },
+    "~/ mounted %@" : {
+      "comment" : "Where the host home directory is mounted in the machine — the value is the mount path.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "~/ змонтовано в %@"
+          }
+        }
+      }
+    },
+    "“%@” exceeded this container's memory limit and was killed by the kernel. Give it more memory and recreate it." : {
+      "comment" : "Why the container stopped — the value is the killed process.",
+      "localizations" : {
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%@» перевищив ліміт пам’яті цього контейнера, і ядро примусово його зупинило. Збільште пам’ять і перестворіть контейнер."
+          }
+        }
+      }
+    },
+    "“%@” exceeded this container's memory limit of %@ and was killed by the kernel. Give it more memory and recreate it." : {
+      "comment" : "Why the container stopped — the first value is the killed process, the second is the memory limit.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@” exceeded this container's memory limit of %2$@ and was killed by the kernel. Give it more memory and recreate it."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«%1$@» перевищив ліміт пам’яті цього контейнера (%2$@), і ядро примусово його зупинило. Збільште пам’ять і перестворіть контейнер."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

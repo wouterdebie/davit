@@ -88,7 +88,14 @@ enum ContainerState: String {
         case .unknown: return .yellow
         }
     }
-    var label: String { rawValue.capitalized }
+    var label: LocalizedStringResource {
+        switch self {
+        case .running: "Running"
+        case .stopped: "Stopped"
+        case .stopping: "Stopping"
+        case .unknown: "Unknown"
+        }
+    }
 }
 
 struct ContainerStatus: Hashable, Encodable {
@@ -155,7 +162,14 @@ struct MountRecord: Hashable, Encodable {
         }
     }
 
-    var kindLabel: String { kind }
+    var kindLabel: LocalizedStringResource {
+        switch kind {
+        case "bind": LocalizedStringResource("bind", comment: "Mount type: a host directory bind-mounted into the container.")
+        case "volume": LocalizedStringResource("volume", comment: "Mount type: a container volume mounted into the container.")
+        case "block": LocalizedStringResource("block", comment: "Mount type: a block device mounted into the container.")
+        default: LocalizedStringResource(stringLiteral: kind)
+        }
+    }
     var displaySource: String { volumeName ?? source ?? "—" }
 }
 

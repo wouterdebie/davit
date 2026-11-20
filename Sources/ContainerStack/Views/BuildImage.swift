@@ -56,8 +56,13 @@ struct BuildImageSheet: View {
             .font(.callout)
 
             if let builtImage {
-                Label("Built \(builtImage)", systemImage: "checkmark.circle.fill")
-                    .font(.callout).foregroundStyle(.green)
+                Label {
+                    Text("Built \(builtImage)",
+                         comment: "Build result — the value is the built image reference.")
+                } icon: {
+                    Image(systemName: "checkmark.circle.fill")
+                }
+                .font(.callout).foregroundStyle(.green)
             }
             if let errorText {
                 Text(errorText).font(.caption).foregroundStyle(.red)
@@ -70,7 +75,12 @@ struct BuildImageSheet: View {
                     Text(progressText).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer()
-                Button(builtImage != nil ? "Close" : "Cancel") { dismiss() }
+                Button {
+                    dismiss()
+                } label: {
+                    Text(builtImage != nil ? "Close" : "Cancel",
+                         comment: "Build sheet button: closes after a successful build, or cancels a build in progress.")
+                }
                 Button {
                     build()
                 } label: {
@@ -86,7 +96,7 @@ struct BuildImageSheet: View {
 
     private func chooseContext() {
         let panel = NSOpenPanel()
-        panel.title = "Choose Build Context"
+        panel.title = String(localized: "Choose Build Context", comment: "Open panel title for choosing an image build context directory.")
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
@@ -104,7 +114,7 @@ struct BuildImageSheet: View {
     /// Dockerfile_t1); starts in the context dir when one is set.
     private func chooseDockerfile() {
         let panel = NSOpenPanel()
-        panel.title = "Choose Dockerfile"
+        panel.title = String(localized: "Choose Dockerfile", comment: "Open panel title for choosing a Dockerfile.")
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
@@ -120,7 +130,7 @@ struct BuildImageSheet: View {
     private func build() {
         working = true
         errorText = nil
-        progressText = "Starting…"
+        progressText = String(localized: "Starting…", comment: "Progress text while an image build starts.")
         let request = BuildService.Request(
             contextDir: (contextDir as NSString).expandingTildeInPath,
             dockerfilePath: dockerfile.isEmpty
