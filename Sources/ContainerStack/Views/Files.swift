@@ -6,7 +6,7 @@ struct ContainerFilesTab: View {
     @EnvironmentObject var state: AppState
     let containerID: String
     let isRunning: Bool
-    var notRunningMessage = "Start the container to browse its files."
+    var notRunningMessage: LocalizedStringKey = "Start the container to browse its files."
 
     init(container: ContainerRecord) {
         self.containerID = container.id
@@ -14,7 +14,7 @@ struct ContainerFilesTab: View {
     }
     /// Browse an arbitrary running container by id (used by volume browsing,
     /// where the container is a throwaway that mounts the volume).
-    init(containerID: String, isRunning: Bool, notRunningMessage: String) {
+    init(containerID: String, isRunning: Bool, notRunningMessage: LocalizedStringKey) {
         self.containerID = containerID
         self.isRunning = isRunning
         self.notRunningMessage = notRunningMessage
@@ -88,7 +88,7 @@ struct ContainerFilesTab: View {
                         .foregroundStyle(idx == segments.count - 1 ? Color.primary : Color.secondary)
                     // Root's label is already "/" — only separate later segments.
                     if idx > 0 && idx < segments.count - 1 {
-                        Text("/").foregroundStyle(.tertiary)
+                        Text(verbatim: "/").foregroundStyle(.tertiary)
                     }
                 }
             }
@@ -113,9 +113,11 @@ struct ContainerFilesTab: View {
         if loading && entries.isEmpty {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error {
-            EmptyState(icon: "exclamationmark.triangle", title: "Can't read this directory", message: error)
+            EmptyState(icon: "exclamationmark.triangle", title: "Can't read this directory", errorMessage: error)
         } else if entries.isEmpty {
-            EmptyState(icon: "folder", title: "Empty", message: "Nothing in \(path).")
+            EmptyState(icon: "folder", title: "Empty",
+                       message: Text("Nothing in \(path).",
+                                     comment: "Empty directory state — the value is the container path."))
         } else {
             ScrollView {
                 LazyVStack(spacing: 1) {
@@ -213,11 +215,13 @@ struct ContainerFilesTab: View {
 
     private func delete(_ entry: FileEntry) async {
         let alert = NSAlert()
-        alert.messageText = "Delete “\(entry.name)”?"
-        alert.informativeText = "This permanently removes it from the container filesystem."
+        alert.messageText = String(localized: "Delete “\(entry.name)”?",
+                                   comment: "Confirmation title — the value is the file name.")
+        alert.informativeText = String(localized: "This permanently removes it from the container filesystem.",
+                                       comment: "Body of the confirmation for deleting a file.")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "Delete")
-        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: String(localized: "Delete", comment: "Confirmation button that deletes the file."))
+        alert.addButton(withTitle: String(localized: "Cancel", comment: "Confirmation button that keeps the file."))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         busy = true
         defer { busy = false }
@@ -273,7 +277,9 @@ private struct FileRow: View {
         .onHover { hovering = $0 }
         // Directories open on double-click; files download on double-click.
         .onTapGesture(count: 2) { isNavigable ? onOpen() : onDownload() }
-        .help(isNavigable ? "Open \(entry.name)" : "Double-click to download")
+        .help(isNavigable
+              ? Text("Open \(entry.name)", comment: "Tooltip for a folder row — the value is the folder name.")
+              : Text("Double-click to download", comment: "Tooltip for a file row in the container file browser."))
     }
 
     @ViewBuilder
@@ -293,7 +299,7 @@ private struct FileRow: View {
                     .foregroundStyle(hovering ? Color.accentColor : .secondary)
             }
             .buttonStyle(.plain)
-            .help("Download")
+            .help(Text("Download", comment: "Tooltip for the button that downloads a file from the container."))
         }
     }
 

@@ -1,56 +1,25 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "" : {
-
-    },
-    "%" : {
-
-    },
-    "%@ (%@)" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ (%2$@)"
-          }
-        }
-      }
-    },
-    "%@ CPU · %@ · %@ disk" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ CPU · %2$@ · %3$@ disk"
-          }
-        }
-      }
-    },
     "%@ reclaimable" : {
-
+      "comment" : "Disk cleanup row — the value is the amount of disk space that pruning can free."
     },
-    "%@ · %lld platform variant%@" : {
+    "%@ stopped unexpectedly." : {
+      "comment" : "Notification body — the value is the container name."
+    },
+    "%@ · %lld platform variants" : {
+      "comment" : "Image header — the first value is the image size, the second is the number of platform variants.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$@ · %2$lld platform variant%3$@"
-          }
-        }
-      }
-    },
-    "%@ — %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ — %2$@"
+            "value" : "%1$@ · %2$lld platform variants"
           }
         }
       }
     },
     "%@ — %@, needs %@" : {
+      "comment" : "An unusable platform install — the first value is its path, the second its source and version, the third the version Davit needs.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -60,20 +29,69 @@
         }
       }
     },
-    "%@ → %@" : {
+    "%@%% CPU · %@ · %@ disk" : {
+      "comment" : "Live row summary — the first value is CPU usage, then memory, then disk usage.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$@ → %2$@"
+            "value" : "%1$@%% CPU · %2$@ · %3$@ disk"
           }
         }
       }
     },
-    "%lld" : {
-
+    "%@.%@ must be a positive integer (got “%@”)" : {
+      "comment" : "Validation error — the first two values are the config section and key, the third is the typed value.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@.%2$@ must be a positive integer (got “%3$@”)"
+          }
+        }
+      }
+    },
+    "%@: %@ was killed for exceeding its memory limit (limit %@). Increase memory with Edit & Recreate." : {
+      "comment" : "Notification body — the first value is the container name, the second the killed process, the third the memory limit.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@ was killed for exceeding its memory limit (limit %3$@). Increase memory with Edit & Recreate."
+          }
+        }
+      }
+    },
+    "%@: %@ was killed for exceeding its memory limit. Increase memory with Edit & Recreate." : {
+      "comment" : "Notification body — the first value is the container name, the second the killed process.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@ was killed for exceeding its memory limit. Increase memory with Edit & Recreate."
+          }
+        }
+      }
+    },
+    "%@: this amd64 image needs a newer Rosetta than your macOS provides. Update macOS, or run an arm64 image." : {
+      "comment" : "Notification body — the value is the container name."
+    },
+    "%@: was killed for exceeding its memory limit (limit %@). Increase memory with Edit & Recreate." : {
+      "comment" : "Notification body — the first value is the container name, the second the memory limit.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: was killed for exceeding its memory limit (limit %2$@). Increase memory with Edit & Recreate."
+          }
+        }
+      }
+    },
+    "%@: was killed for exceeding its memory limit. Increase memory with Edit & Recreate." : {
+      "comment" : "Notification body — the value is the container name."
     },
     "%lld CPU · %@" : {
+      "comment" : "Machine row — the first value is the CPU count, the second is the memory size.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -83,58 +101,50 @@
         }
       }
     },
-    "%lld container%@" : {
+    "%lld CPUs allocated" : {
+      "comment" : "Stats tile subtitle — the value is the number of CPUs assigned to the container."
+    },
+    "%lld CPUs · %@ memory" : {
+      "comment" : "Resource summary — the first value is the CPU count, the second is the memory limit.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$lld container%2$@"
+            "value" : "%1$lld CPUs · %2$@ memory"
           }
         }
       }
+    },
+    "%lld containers" : {
+      "comment" : "Network row — the value is the number of containers attached to the network."
     },
     "%lld env" : {
-
+      "comment" : "Compose service summary — the value is the number of environment variables."
     },
-    "%lld layer%@" : {
+    "%lld layers" : {
+      "comment" : "Layers tab heading — the value is the number of image layers."
+    },
+    "%lld mounts" : {
+      "comment" : "Compose service summary — the value is the number of volume mounts."
+    },
+    "%lld running · %lld total" : {
+      "comment" : "Resource summary — the first number is running containers, the second is the total.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$lld layer%2$@"
+            "value" : "%1$lld running · %2$lld total"
           }
         }
       }
     },
-    "%lld mount%@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$lld mount%2$@"
-          }
-        }
-      }
-    },
-    "(%@)" : {
-
-    },
-    "/" : {
-
-    },
-    "/usr/local" : {
-
+    "(unknown version)" : {
+      "comment" : "Placeholder for a container platform whose version could not be read."
     },
     "/usr/local/bin/container already exists (system install) — nothing to do." : {
 
     },
-    "200" : {
-
-    },
-    "2000" : {
-
-    },
-    "500" : {
+    "A container machine is a lightweight VM you can use like a tiny Linux box — with your home directory mounted." : {
 
     },
     "A lightweight VM booted from a container image, with your home directory mounted and a stable DNS name." : {
@@ -143,11 +153,28 @@
     "A native UI for Apple's container platform" : {
 
     },
+    "A process exceeded this container's memory limit and was killed by the kernel. Give it more memory and recreate it." : {
+
+    },
+    "A process exceeded this container's memory limit of %@ and was killed by the kernel. Give it more memory and recreate it." : {
+      "comment" : "Why the container stopped — the value is the memory limit."
+    },
+    "A ticked service needs %@, which only runs under profile %@. Tick %@ too." : {
+      "comment" : "Compose import error — the first and third values are the service name, the second is the profile name.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "A ticked service needs %1$@, which only runs under profile %2$@. Tick %3$@ too."
+          }
+        }
+      }
+    },
     "About" : {
 
     },
     "Actions for every container in “%@”" : {
-
+      "comment" : "Tooltip for a group's actions menu — the value is the group name."
     },
     "Add" : {
 
@@ -170,6 +197,9 @@
     "All" : {
 
     },
+    "All Running Containers" : {
+
+    },
     "Already installed somewhere unusual? Enter the install root:" : {
 
     },
@@ -179,7 +209,13 @@
     "Appearance" : {
 
     },
+    "Apple container platform not found" : {
+
+    },
     "Apple silicon (linux/arm64)" : {
+
+    },
+    "Backing container" : {
 
     },
     "Boot" : {
@@ -209,10 +245,22 @@
     "Builder" : {
 
     },
+    "Builder image" : {
+
+    },
+    "Building %@…" : {
+      "comment" : "Compose import progress — the value is the service name."
+    },
     "Built %@" : {
+      "comment" : "Build result — the value is the built image reference."
+    },
+    "CPU" : {
 
     },
     "CPU %" : {
+      "comment" : "Chart value label: CPU usage in percent of one core; % is the unit."
+    },
+    "CPU Usage" : {
 
     },
     "CPU and memory default to half of your system resources." : {
@@ -224,8 +272,11 @@
     "Can't import compose file" : {
 
     },
-    "Cancel" : {
+    "Can't read this directory" : {
 
+    },
+    "Cancel" : {
+      "comment" : "Confirmation button that keeps the file."
     },
     "Changes apply after the machine is stopped and booted again." : {
 
@@ -238,6 +289,12 @@
     },
     "Check for Updates…" : {
 
+    },
+    "Choose Build Context" : {
+      "comment" : "Open panel title for choosing an image build context directory."
+    },
+    "Choose Dockerfile" : {
+      "comment" : "Open panel title for choosing a Dockerfile."
     },
     "Choose a local image" : {
 
@@ -254,13 +311,25 @@
     "Collecting stats…" : {
 
     },
+    "Command" : {
+
+    },
     "Command Failed" : {
 
     },
     "Command Line" : {
 
     },
+    "Command line" : {
+
+    },
     "Command override (optional, e.g. sleep infinity)" : {
+
+    },
+    "Compatibility" : {
+
+    },
+    "Configuration unavailable" : {
 
     },
     "Configure Kernel" : {
@@ -275,7 +344,25 @@
     "Container name (optional)" : {
 
     },
+    "Container not running" : {
+
+    },
+    "Container path" : {
+
+    },
     "Container platform (container-apiserver) not found" : {
+
+    },
+    "Container port" : {
+
+    },
+    "Container ran out of memory" : {
+      "comment" : "Notification title when a container was killed for exceeding its memory limit."
+    },
+    "Container removed" : {
+
+    },
+    "Container services are stopped" : {
 
     },
     "Container services running" : {
@@ -284,8 +371,11 @@
     "Container services stopped" : {
 
     },
+    "Container stopped" : {
+      "comment" : "Notification title when a container stopped unexpectedly."
+    },
     "Containers" : {
-
+      "comment" : "Sidebar section: the list of containers (noun)."
     },
     "Containers join this domain (saved with these settings)" : {
 
@@ -294,16 +384,16 @@
 
     },
     "Copy" : {
-
+      "comment" : "Tooltip for the button that copies a detail row's value."
     },
     "Copy DNS Name (%@)" : {
-
+      "comment" : "Context menu action — the value is the machine's DNS name."
     },
     "Copy ID" : {
 
     },
     "Copy IP (%@)" : {
-
+      "comment" : "Context menu action — the value is the container's IP address.\nContext menu action — the value is the machine's IP address."
     },
     "Copy Install Command" : {
 
@@ -321,12 +411,27 @@
 
     },
     "Copy Subnet (%@)" : {
-
+      "comment" : "Context menu action — the value is the network's subnet."
     },
     "Copy command" : {
 
     },
     "Copy error" : {
+      "comment" : "Tooltip for the button that copies an error message."
+    },
+    "Could not load configuration: %@" : {
+      "comment" : "Frame around a platform error — the value is the error text."
+    },
+    "Couldn't open volume" : {
+
+    },
+    "Couldn't read layers" : {
+
+    },
+    "Couldn’t recreate the container" : {
+
+    },
+    "Couldn’t run the container" : {
 
     },
     "Create" : {
@@ -335,7 +440,13 @@
     "Create & Boot" : {
 
     },
+    "Create & Start %lld Services" : {
+      "comment" : "Compose import button — the value is the number of services to create."
+    },
     "Create Machine" : {
+
+    },
+    "Create Machine…" : {
 
     },
     "Create Network" : {
@@ -344,20 +455,49 @@
     "Create Volume" : {
 
     },
+    "Create Volume…" : {
+
+    },
     "Create a container machine" : {
+
+    },
+    "Created" : {
 
     },
     "Create…" : {
 
     },
+    "Creating container… (pulls the image on first run)" : {
+      "comment" : "Progress text while the run sheet creates a container."
+    },
+    "Creating network %@…" : {
+      "comment" : "Compose import progress — the value is the network name."
+    },
     "Creating or deleting a domain asks for administrator authorization (it writes /etc/resolver)." : {
 
     },
-    "Dashboard" : {
+    "Creating volume %@…" : {
+      "comment" : "Compose import progress — the value is the volume name."
+    },
+    "DNS name" : {
 
+    },
+    "Dashboard" : {
+      "comment" : "Sidebar section: the overview dashboard."
     },
     "Davit" : {
 
+    },
+    "Davit found container %@ at %@, which speaks a protocol Davit %@ can't drive.\nInstall Davit's own copy — no administrator rights, and that install is left untouched." : {
+      "comment" : "Onboarding text for an incompatible platform install — the first value is its version, the second its path, the third the version Davit needs.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Davit found container %1$@ at %2$@, which speaks a protocol Davit %3$@ can't drive.\nInstall Davit's own copy — no administrator rights, and that install is left untouched."
+          }
+        }
+      }
     },
     "Davit is passing `--arch amd64` automatically. Performance will be lower than a native `arm64` image." : {
 
@@ -365,19 +505,43 @@
     "Davit runs this over the API — the equivalent `container` command, for reference." : {
 
     },
+    "Davit talks directly to Apple's open-source container services.\nInstall them once — no administrator rights needed — and you're set." : {
+
+    },
     "Default" : {
+      "comment" : "Badge on the machine that container machine commands use by default."
+    },
+    "Default registry" : {
 
     },
     "Defaults for New Containers" : {
 
     },
     "Delete" : {
-
+      "comment" : "Confirmation button that deletes the file."
     },
     "Delete Image" : {
 
     },
     "Delete Stopped Containers…" : {
+
+    },
+    "Delete “%@”?" : {
+      "comment" : "Confirmation title — the value is the file name."
+    },
+    "Digest" : {
+
+    },
+    "Disk" : {
+
+    },
+    "Disk I/O" : {
+
+    },
+    "Disk Usage" : {
+
+    },
+    "Disk used" : {
 
     },
     "Dockerfile (e.g. Dockerfile, Dockerfile_t1)" : {
@@ -387,19 +551,19 @@
 
     },
     "Double-click to download" : {
-
+      "comment" : "Tooltip for a file row in the container file browser."
     },
     "Download" : {
-
+      "comment" : "Tooltip for the button that downloads a file from the container."
     },
     "Downloads Apple's signed installer (v%@, ~180 MB), verifies it,\nand installs into your user Library. You can also use the [official installer](https://github.com/apple/container/releases)." : {
-
+      "comment" : "Onboarding note under the install button — the value is the pinned platform version."
     },
     "Download…" : {
 
     },
     "Edit %@" : {
-
+      "comment" : "Machine edit sheet title — the value is the machine name."
     },
     "Edit & Recreate…" : {
 
@@ -410,10 +574,42 @@
     "Effective configuration (JSON)" : {
 
     },
+    "Empty" : {
+
+    },
+    "Environment" : {
+
+    },
     "Equivalent command" : {
 
     },
+    "Export Container Filesystem" : {
+      "comment" : "Save panel title for exporting a container's filesystem to a tar archive."
+    },
     "Export Filesystem…" : {
+
+    },
+    "Exported %@" : {
+      "comment" : "Bottom HUD when a container filesystem export has finished — the value is the container name."
+    },
+    "Exporting %@…" : {
+      "comment" : "Bottom HUD while a container filesystem export runs — the value is the container name."
+    },
+    "Exporting %@… %@" : {
+      "comment" : "Bottom HUD while a container filesystem export runs — the first value is the container name, the second the bytes written so far.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Exporting %1$@… %2$@"
+          }
+        }
+      }
+    },
+    "Failed to inspect %@" : {
+      "comment" : "Placeholder shown when the inspect JSON could not be read — the value is the resource id."
+    },
+    "Files" : {
 
     },
     "Filter containers" : {
@@ -437,11 +633,14 @@
     "Force Delete" : {
 
     },
+    "Gateway" : {
+
+    },
     "General" : {
 
     },
     "Group" : {
-
+      "comment" : "Toolbar button that opens the container grouping menu."
     },
     "Group by" : {
 
@@ -450,21 +649,63 @@
 
     },
     "Group: %@" : {
+      "comment" : "Toolbar button showing the current container grouping — the value is the group name."
+    },
+    "Home Directory" : {
 
     },
     "Home directory" : {
 
     },
+    "Home mount" : {
+
+    },
+    "Homebrew" : {
+      "comment" : "Where the container platform was found: a Homebrew installation."
+    },
+    "Host port" : {
+
+    },
+    "Hostname" : {
+
+    },
+    "ID" : {
+
+    },
+    "IP" : {
+
+    },
+    "IPv4" : {
+
+    },
+    "Image" : {
+      "comment" : "Window title fallback when the image no longer exists."
+    },
+    "Image & Name" : {
+
+    },
     "Image Reference" : {
 
     },
-    "Images" : {
+    "Image removed" : {
 
+    },
+    "Images" : {
+      "comment" : "Sidebar section: the list of images (noun)."
+    },
+    "Import Compose File" : {
+      "comment" : "Open panel title for choosing a compose file to import."
     },
     "Import Compose File…" : {
 
     },
     "Import Compose — %@" : {
+      "comment" : "Compose import sheet title — the value is the project name."
+    },
+    "Init image (vminit)" : {
+
+    },
+    "Inspect" : {
 
     },
     "Install Container Platform" : {
@@ -476,7 +717,16 @@
     "Install in /usr/local/bin…" : {
 
     },
+    "Install root" : {
+
+    },
     "Installed at /usr/local/bin/container, pointing at the Davit-managed platform." : {
+
+    },
+    "Installed container platform is too new" : {
+
+    },
+    "Installed container platform is too old" : {
 
     },
     "Installing…" : {
@@ -491,19 +741,37 @@
     "KB/s" : {
 
     },
+    "KEY" : {
+
+    },
     "Keep in Dock when the window is closed" : {
 
     },
+    "Kernel URL" : {
+
+    },
+    "Kernel binary path" : {
+
+    },
     "Kill" : {
+      "comment" : "Context menu action that force-kills the container process."
+    },
+    "Labels" : {
 
     },
     "Launches Davit to the menu bar when you log in, so container services are ready." : {
 
     },
     "Layer %lld" : {
+      "comment" : "Image layer heading — the value is the layer number."
+    },
+    "Layers" : {
 
     },
     "Live stats always refresh every 2 seconds while containers run." : {
+
+    },
+    "Local DNS domain" : {
 
     },
     "Log In" : {
@@ -512,14 +780,32 @@
     "Log Out" : {
 
     },
+    "Logs" : {
+
+    },
+    "MAC" : {
+
+    },
     "MB" : {
+
+    },
+    "MEM" : {
+
+    },
+    "Machine CPUs" : {
 
     },
     "Machine Name" : {
 
     },
-    "Machines" : {
+    "Machine memory" : {
 
+    },
+    "Machine removed" : {
+
+    },
+    "Machines" : {
+      "comment" : "Sidebar section: the list of container machines (noun)."
     },
     "Make Default" : {
 
@@ -528,6 +814,9 @@
 
     },
     "Memory" : {
+
+    },
+    "Memory Usage" : {
 
     },
     "More" : {
@@ -542,6 +831,12 @@
     "Mounting volume…" : {
 
     },
+    "Mounts" : {
+
+    },
+    "Needed by %@" : {
+      "comment" : "Why an unticked service is brought up — the value is the list of services that depend on it."
+    },
     "Network" : {
 
     },
@@ -549,9 +844,15 @@
 
     },
     "Networks" : {
+      "comment" : "Sidebar section: the list of networks (noun)."
+    },
+    "New domain" : {
 
     },
     "No cache" : {
+
+    },
+    "No containers" : {
 
     },
     "No grouping" : {
@@ -563,6 +864,15 @@
     "No host DNS domains. Create one (e.g. “test”) and containers become reachable at “name.test” from your Mac." : {
 
     },
+    "No images" : {
+
+    },
+    "No log output" : {
+
+    },
+    "No machines" : {
+
+    },
     "No matches" : {
 
     },
@@ -572,10 +882,25 @@
     "No running containers" : {
 
     },
+    "No stats" : {
+
+    },
+    "No volumes" : {
+
+    },
     "Not everything in the file is supported" : {
 
     },
     "Not mounted" : {
+
+    },
+    "Not running" : {
+
+    },
+    "Nothing in %@." : {
+      "comment" : "Empty directory state — the value is the container path."
+    },
+    "Nothing in the log yet." : {
 
     },
     "Notifications" : {
@@ -594,7 +919,7 @@
 
     },
     "Open %@" : {
-
+      "comment" : "Tooltip for a container row — the value is the container name.\nTooltip for a folder row — the value is the folder name."
     },
     "Open Davit" : {
 
@@ -606,18 +931,24 @@
 
     },
     "Open Terminal" : {
+      "comment" : "Tooltip for the button that opens a shell in the container."
+    },
+    "Open a shell" : {
 
     },
     "Open in Browser" : {
 
     },
     "Open localhost:%@ in Browser" : {
-
+      "comment" : "Context menu action — the value is the published host port."
     },
     "Open shell in Terminal" : {
-
+      "comment" : "Tooltip for the toolbar button that opens a container shell in the user's terminal."
     },
     "Open shells in" : {
+
+    },
+    "Options" : {
 
     },
     "Overrides are written to ~/.config/container/config.toml" : {
@@ -635,6 +966,21 @@
     "Platform" : {
 
     },
+    "Platform Variants" : {
+
+    },
+    "Ports" : {
+
+    },
+    "Processes" : {
+
+    },
+    "Profile %@" : {
+      "comment" : "Why a service is not brought up — the value is the profile name that gates it."
+    },
+    "Project" : {
+      "comment" : "Friendly name for compose project label keys in the grouping menu."
+    },
     "Prune Stopped Containers" : {
 
     },
@@ -647,16 +993,25 @@
     "Prune Unused Volumes" : {
 
     },
-    "Pull" : {
+    "Published Ports" : {
 
     },
+    "Pull" : {
+      "comment" : "Button that starts downloading the entered image (verb)."
+    },
     "Pull Image" : {
+
+    },
+    "Pull Image…" : {
 
     },
     "Pull Latest" : {
 
     },
     "Pull an image from a registry" : {
+
+    },
+    "Pull an image from a registry to get started." : {
 
     },
     "Pull complete" : {
@@ -671,17 +1026,23 @@
     "Re-pull base images" : {
 
     },
+    "Read" : {
+      "comment" : "Disk I/O chart legend: read throughput."
+    },
     "Recreate" : {
 
     },
     "Recreate Container" : {
 
     },
+    "Reference" : {
+
+    },
     "Refresh" : {
 
     },
     "Refresh every %llds" : {
-
+      "comment" : "Automatic refresh interval — the value is the number of seconds."
     },
     "Registries" : {
 
@@ -699,7 +1060,7 @@
 
     },
     "Remove" : {
-
+      "comment" : "Tooltip for the button that removes a key-value row."
     },
     "Remove from /usr/local/bin" : {
 
@@ -713,13 +1074,19 @@
     "Resources" : {
 
     },
-    "Restart" : {
+    "Resources & Network" : {
 
+    },
+    "Restart" : {
+      "comment" : "Context menu action that restarts the container.\nTooltip for the toolbar button that restarts this container."
     },
     "Restart All" : {
 
     },
     "Restart Services" : {
+
+    },
+    "Retry Remaining" : {
 
     },
     "Reveal in Finder" : {
@@ -728,10 +1095,19 @@
     "Rosetta (x86-64 builds)" : {
 
     },
+    "Rosetta couldn't run this image" : {
+      "comment" : "Notification title when an amd64 image could not run under Rosetta."
+    },
     "Run" : {
-
+      "comment" : "Toolbar button that opens the run sheet for this image (verb)."
     },
     "Run Container" : {
+
+    },
+    "Run Container…" : {
+
+    },
+    "Run a container from an image to get started." : {
 
     },
     "Run a container from this image" : {
@@ -750,10 +1126,13 @@
 
     },
     "Run…" : {
-
+      "comment" : "Context menu action that opens the run sheet for this image (verb)."
     },
     "Save" : {
 
+    },
+    "Saved. Container defaults, registry and DNS apply to new operations immediately; builder, kernel, machine and init-image changes apply after a service restart." : {
+      "comment" : "Status after saving the platform configuration."
     },
     "Search Docker Hub or enter a reference (nginx, ghcr.io/org/app:tag)" : {
 
@@ -779,6 +1158,9 @@
     "Set as default machine" : {
 
     },
+    "Shell" : {
+
+    },
     "Show All Groups" : {
 
     },
@@ -786,37 +1168,67 @@
 
     },
     "Showing only “%@”" : {
-
+      "comment" : "Banner when the container list is filtered to one group — the value is the group name."
     },
     "Sign in to a registry to pull private images. Credentials are verified and stored in your login keychain (shared with the `container` CLI)." : {
 
     },
-    "Start" : {
+    "Something went wrong" : {
 
     },
+    "Start" : {
+      "comment" : "Context menu action that starts the container.\nTooltip for the button that starts this container.\nTooltip for the toolbar button that starts this container."
+    },
     "Start All" : {
+
+    },
+    "Start Apple's container services to manage containers, images and more." : {
 
     },
     "Start Services" : {
 
     },
     "Start container services" : {
-
+      "comment" : "Tooltip for the button that starts the container platform services."
     },
     "Start services to manage containers" : {
+
+    },
+    "Start the container to browse its files." : {
+
+    },
+    "Start the container to see live resource usage." : {
+
+    },
+    "Start the machine to see live resource usage." : {
 
     },
     "Start when Davit Opens" : {
 
     },
+    "Started" : {
+
+    },
+    "Starting %@… (pulls the image if needed)" : {
+      "comment" : "Compose import progress — the value is the service name."
+    },
+    "Starting container services…" : {
+      "comment" : "Progress text while the just-installed platform services start."
+    },
+    "Starting…" : {
+      "comment" : "Compose import progress while the plan starts.\nProgress text while a new machine boots.\nProgress text while a newly created container starts.\nProgress text while an image build starts."
+    },
     "Startup" : {
+
+    },
+    "Stats" : {
 
     },
     "Status unknown" : {
 
     },
     "Stop" : {
-
+      "comment" : "Context menu action that stops the container.\nTooltip for the button that stops this container.\nTooltip for the toolbar button that stops this container."
     },
     "Stop All" : {
 
@@ -828,7 +1240,7 @@
 
     },
     "Stop container services" : {
-
+      "comment" : "Tooltip for the button that stops the container platform services."
     },
     "Stop machine" : {
 
@@ -836,11 +1248,23 @@
     "Stopped" : {
 
     },
+    "Stopped: Rosetta couldn't run this image" : {
+
+    },
+    "Stopped: out of memory" : {
+
+    },
+    "Stopping" : {
+
+    },
     "Stops you trigger in Davit (incl. compose down) stay quiet; crashes and external stops notify." : {
 
     },
     "Subnet (optional, e.g. 192.168.100.0/24)" : {
 
+    },
+    "System Default" : {
+      "comment" : "Terminal choice that opens shell scripts with the default .command handler."
     },
     "Tag" : {
 
@@ -866,16 +1290,49 @@
     "The download continues in the background if you close." : {
 
     },
+    "The helper container stopped." : {
+
+    },
+    "This amd64 image needs a newer Rosetta than your macOS provides (auxiliary vector type %@). Rosetta ships with macOS, so a software update usually fixes it; otherwise run an arm64 image." : {
+      "comment" : "Why the container stopped — the value is the kernel auxiliary vector type Rosetta did not support."
+    },
+    "This amd64 image needs a newer Rosetta than your macOS provides. Rosetta ships with macOS, so a software update usually fixes it; otherwise run an arm64 image." : {
+
+    },
+    "This container no longer exists." : {
+
+    },
+    "This image no longer exists." : {
+
+    },
     "This image only ships `linux/amd64` and Rosetta isn't installed." : {
 
     },
     "This image only ships `linux/amd64`. It will run under Rosetta translation on Apple silicon." : {
 
     },
+    "This machine has no backing container yet." : {
+
+    },
+    "This machine no longer exists." : {
+
+    },
+    "This permanently removes it from the container filesystem." : {
+      "comment" : "Body of the confirmation for deleting a file."
+    },
     "Time" : {
 
     },
+    "Total size" : {
+
+    },
     "Type to search Docker Hub, or enter a full reference (e.g. ghcr.io/org/app:tag)." : {
+
+    },
+    "Ungrouped" : {
+      "comment" : "Group of containers that lack the label the list is grouped by."
+    },
+    "Unknown" : {
 
     },
     "Untick services you don't want. A ticked service brings its dependencies with it." : {
@@ -899,6 +1356,9 @@
     "Upload files here" : {
 
     },
+    "Used By" : {
+
+    },
     "Used by container machine commands when no machine name is specified." : {
 
     },
@@ -909,7 +1369,7 @@
 
     },
     "Version %@" : {
-
+      "comment" : "About panel — the value is the app version."
     },
     "View kernel log" : {
 
@@ -920,11 +1380,31 @@
     "Volume name" : {
 
     },
-    "Volume: %@" : {
+    "Volume name or host path" : {
 
     },
+    "Volume: %@" : {
+      "comment" : "Volume browser sheet title — the value is the volume name."
+    },
     "Volumes" : {
+      "comment" : "Sidebar section: the list of volumes (noun)."
+    },
+    "Volumes provide persistent storage for containers." : {
 
+    },
+    "Waiting for %@ (%@)…" : {
+      "comment" : "Compose import progress — the first value is the service name, the second its health condition.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Waiting for %1$@ (%2$@)…"
+          }
+        }
+      }
+    },
+    "Write" : {
+      "comment" : "Disk I/O chart legend: write throughput."
     },
     "`container` command" : {
 
@@ -932,16 +1412,22 @@
     "apple/container on GitHub" : {
 
     },
+    "bind" : {
+      "comment" : "Mount type: a host directory bind-mounted into the container."
+    },
+    "block" : {
+      "comment" : "Mount type: a block device mounted into the container."
+    },
     "built-in" : {
 
     },
-    "davit.app" : {
-
+    "bundled" : {
+      "comment" : "Where the container platform was found: bundled with the app."
+    },
+    "custom path" : {
+      "comment" : "Where the container platform was found: a path the user configured."
     },
     "default" : {
-
-    },
-    "dir" : {
 
     },
     "e.g. alpine" : {
@@ -953,26 +1439,64 @@
     "in use" : {
 
     },
-    "new-name:tag" : {
-
+    "installed by Davit" : {
+      "comment" : "Where the container platform was found: Davit installed it."
     },
-    "nginx:latest" : {
-
+    "limit %@" : {
+      "comment" : "Stats tile subtitle — the value is the container's memory limit."
+    },
+    "max %@" : {
+      "comment" : "Volume size limit — the value is the maximum size."
+    },
+    "network" : {
+      "comment" : "Command palette subtitle for a network without a subnet (noun)."
+    },
+    "not mounted" : {
+      "comment" : "The machine has no host home directory mounted."
+    },
+    "off" : {
+      "comment" : "A boolean platform default is disabled."
+    },
+    "on" : {
+      "comment" : "A boolean platform default is enabled."
     },
     "replaces “%@”" : {
-
+      "comment" : "Run sheet subtitle when recreating — the value is the container name."
+    },
+    "running" : {
+      "comment" : "Stats tile subtitle: the number above is the count of running processes."
     },
     "streaming" : {
-
+      "comment" : "Live log status: new lines keep arriving."
     },
-    "test" : {
-
+    "system install" : {
+      "comment" : "Where the container platform was found: a system-wide install."
     },
     "total %@" : {
+      "comment" : "Layers tab — the value is the total size of all layers."
+    },
+    "value" : {
 
     },
-    "—" : {
-
+    "volume" : {
+      "comment" : "Command palette subtitle for a volume when there is no other detail (noun).\nMount type: a container volume mounted into the container."
+    },
+    "~/ mounted %@" : {
+      "comment" : "Where the host home directory is mounted in the machine — the value is the mount path."
+    },
+    "“%@” exceeded this container's memory limit and was killed by the kernel. Give it more memory and recreate it." : {
+      "comment" : "Why the container stopped — the value is the killed process."
+    },
+    "“%@” exceeded this container's memory limit of %@ and was killed by the kernel. Give it more memory and recreate it." : {
+      "comment" : "Why the container stopped — the first value is the killed process, the second is the memory limit.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@” exceeded this container's memory limit of %2$@ and was killed by the kernel. Give it more memory and recreate it."
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

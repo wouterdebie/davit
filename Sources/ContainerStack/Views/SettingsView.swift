@@ -56,7 +56,7 @@ struct GeneralSettings: View {
                 LabeledField(label: "Install root", hint: "blank = auto-detect", text: $binaryPath, width: 240)
                 if let binary = state.resolvedBinary {
                     LabeledContent("Resolved") {
-                        Text("\(binary.path) — \(binary.label)")
+                        Text(verbatim: "\(binary.path) — \(binary.label)")
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
                     }
@@ -64,7 +64,8 @@ struct GeneralSettings: View {
                     // Found, but the wrong major version to drive over XPC (issue #20).
                     ForEach(state.incompatibleInstalls, id: \.apiserverPath) { install in
                         LabeledContent("Unusable") {
-                            Text("\(install.path) — \(install.label), needs \(PlatformInstaller.pinnedVersion)")
+                            Text("\(install.path) — \(install.label), needs \(PlatformInstaller.pinnedVersion)",
+                                 comment: "An unusable platform install — the first value is its path, the second its source and version, the third the version Davit needs.")
                                 .foregroundStyle(.red)
                                 .textSelection(.enabled)
                         }
@@ -111,7 +112,8 @@ struct GeneralSettings: View {
             }
             Section("Refresh") {
                 Slider(value: $refreshInterval, in: 2...15, step: 1) {
-                    Text("Refresh every \(Int(refreshInterval))s")
+                    Text("Refresh every \(Int(refreshInterval))s",
+                         comment: "Automatic refresh interval — the value is the number of seconds.")
                 }
                 Text("Live stats always refresh every 2 seconds while containers run.")
                     .font(.caption)
@@ -267,7 +269,11 @@ final class SystemConfigModel: ObservableObject {
                 for (key, value) in values {
                     if value is NSNull { continue }
                     let text = (value as? NSNumber).map { n -> String in
-                        String(cString: n.objCType) == "c" ? (n.boolValue ? "on" : "off") : "\(n)"
+                        String(cString: n.objCType) == "c"
+                            ? (n.boolValue
+                                ? String(localized: "on", comment: "A boolean platform default is enabled.")
+                                : String(localized: "off", comment: "A boolean platform default is disabled."))
+                            : "\(n)"
                     } ?? "\(value)"
                     hints["\(section).\(key)"] = text
                 }
@@ -276,7 +282,8 @@ final class SystemConfigModel: ObservableObject {
             rawJSON = (try? await ContainerService.properties()) ?? ""
             loaded = true
         } catch {
-            errorMessage = "Could not load configuration: \(error.localizedDescription)"
+            errorMessage = String(localized: "Could not load configuration: \(error.localizedDescription)",
+                                  comment: "Frame around a platform error — the value is the error text.")
         }
     }
 
@@ -287,7 +294,8 @@ final class SystemConfigModel: ObservableObject {
 
         func setInt(_ section: String, _ key: String, _ text: String) -> Bool {
             guard let n = Int(text.trimmingCharacters(in: .whitespaces)), n > 0 else {
-                errorMessage = "\(section).\(key) must be a positive integer (got “\(text)”)"
+                errorMessage = String(localized: "\(section).\(key) must be a positive integer (got “\(text)”)",
+                                      comment: "Validation error — the first two values are the config section and key, the third is the typed value.")
                 return false
             }
             edited[section, default: [:]][key] = NSNumber(value: n)
@@ -319,7 +327,8 @@ final class SystemConfigModel: ObservableObject {
         saving = true
         do {
             try await SystemConfigStore.save(edited: edited, defaults: defaults)
-            statusMessage = "Saved. Container defaults, registry and DNS apply to new operations immediately; builder, kernel, machine and init-image changes apply after a service restart."
+            statusMessage = String(localized: "Saved. Container defaults, registry and DNS apply to new operations immediately; builder, kernel, machine and init-image changes apply after a service restart.",
+                                   comment: "Status after saving the platform configuration.")
             await load()
         } catch {
             errorMessage = error.localizedDescription
@@ -347,7 +356,7 @@ struct SystemSettings: View {
             if !model.loaded {
                 Spacer()
                 if let error = model.errorMessage {
-                    EmptyState(icon: "wrench.and.screwdriver", title: "Configuration unavailable", message: error)
+                    EmptyState(icon: "wrench.and.screwdriver", title: "Configuration unavailable", errorMessage: error)
                 } else {
                     ProgressView()
                 }
@@ -443,14 +452,14 @@ struct SystemSettings: View {
 /// clearly reads as editable, unlike a bare TextField in a grouped Form.
 /// The platform default is shown in parentheses behind the label.
 struct LabeledField: View {
-    let label: String
+    let label: LocalizedStringKey
     var hint: String? = nil
     @Binding var text: String
     var width: CGFloat = 200
 
     var body: some View {
         LabeledContent {
-            TextField("", text: $text)
+            TextField(text: $text) { EmptyView() }
                 .textFieldStyle(.roundedBorder)
                 .frame(width: width)
                 // Leading, not trailing: trailing-aligned fields read as if they
@@ -463,14 +472,14 @@ struct LabeledField: View {
 }
 
 struct FieldLabel: View {
-    let label: String
+    let label: LocalizedStringKey
     let hint: String?
 
     var body: some View {
         HStack(spacing: 5) {
             Text(label)
             if let hint {
-                Text("(\(hint))")
+                Text(verbatim: "(\(hint))")
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -481,7 +490,7 @@ struct FieldLabel: View {
 
 /// Numeric count with a stepper, System Settings-style.
 struct SteppedCountField: View {
-    let label: String
+    let label: LocalizedStringKey
     var hint: String? = nil
     @Binding var text: String
     var range: ClosedRange<Int> = 1...64
@@ -489,11 +498,11 @@ struct SteppedCountField: View {
     var body: some View {
         LabeledContent {
             HStack(spacing: 6) {
-                TextField("", text: $text)
+                TextField(text: $text) { EmptyView() }
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 52)
                     .multilineTextAlignment(.center)
-                Stepper("", value: intBinding, in: range)
+                Stepper(value: intBinding, in: range) { EmptyView() }
                     .labelsHidden()
             }
         } label: {
@@ -511,7 +520,7 @@ struct SteppedCountField: View {
 
 /// Memory row for the settings form: label + hint left, stepper control right.
 struct MemorySizeField: View {
-    let label: String
+    let label: LocalizedStringKey
     var hint: String? = nil
     @Binding var text: String
 
@@ -542,7 +551,8 @@ struct AboutSettings: View {
             if case .running(let version) = state.systemState, let version {
                 Text(version).font(.caption).foregroundStyle(.tertiary)
             }
-            Text("Version \(UpdateController.currentVersion)")
+            Text("Version \(UpdateController.currentVersion)",
+                 comment: "About panel — the value is the app version.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Button("Check for Updates…") { UpdateController.shared.checkForUpdates() }
@@ -550,8 +560,10 @@ struct AboutSettings: View {
             Divider().frame(width: 200)
             Link("apple/container on GitHub", destination: URL(string: "https://github.com/apple/container")!)
                 .font(.callout)
-            Link("davit.app", destination: URL(string: "https://davit.app")!)
-                .font(.callout)
+            Link(destination: URL(string: "https://davit.app")!) {
+                Text(verbatim: "davit.app")
+            }
+            .font(.callout)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
@@ -599,7 +611,7 @@ struct DNSDomainsRow: View {
             LabeledContent {
                 HStack(spacing: 8) {
                     if working { ProgressView().controlSize(.small) }
-                    TextField("", text: $newDomain, prompt: Text("test"))
+                    TextField(text: $newDomain, prompt: Text(verbatim: "test")) { EmptyView() }
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 140)
                         .multilineTextAlignment(.leading)

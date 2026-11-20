@@ -140,14 +140,29 @@ struct StateChip: View {
 // MARK: - Detail info rows
 
 struct InfoRow: View {
-    let label: String
+    private let label: Text
     let value: String
     var monospaced = false
     var copyable = false
 
+    init(label: LocalizedStringKey, value: String, monospaced: Bool = false, copyable: Bool = false) {
+        self.label = Text(label)
+        self.value = value
+        self.monospaced = monospaced
+        self.copyable = copyable
+    }
+
+    /// A label that is data (a label key on a container, say), not UI text.
+    init(rawLabel: String, value: String, monospaced: Bool = false, copyable: Bool = false) {
+        self.label = Text(verbatim: rawLabel)
+        self.value = value
+        self.monospaced = monospaced
+        self.copyable = copyable
+    }
+
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(label)
+            label
                 .foregroundStyle(.secondary)
                 .frame(width: 130, alignment: .leading)
             if monospaced {
@@ -164,7 +179,7 @@ struct InfoRow: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.tertiary)
-                .help("Copy")
+                .help(Text("Copy", comment: "Tooltip for the button that copies a detail row's value."))
             }
             Spacer(minLength: 0)
         }
@@ -173,9 +188,22 @@ struct InfoRow: View {
 }
 
 struct DetailCard<Content: View>: View {
-    let title: String
+    private let title: LocalizedStringKey?
     var icon: String? = nil
     @ViewBuilder var content: Content
+
+    init(title: LocalizedStringKey, icon: String? = nil, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.icon = icon
+        self.content = content()
+    }
+
+    /// A card with no heading, only its icon (used for image layers).
+    init(icon: String? = nil, @ViewBuilder content: () -> Content) {
+        self.title = nil
+        self.icon = icon
+        self.content = content()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -183,7 +211,9 @@ struct DetailCard<Content: View>: View {
                 if let icon {
                     Image(systemName: icon).foregroundStyle(.secondary)
                 }
-                Text(title).font(.headline)
+                if let title {
+                    Text(title).font(.headline)
+                }
             }
             content
         }
@@ -200,7 +230,7 @@ struct DetailCard<Content: View>: View {
 /// selectable, scrolling once it outgrows a few lines, and copyable (issue #24).
 struct ErrorPanel: View {
     let message: String
-    var title = "Something went wrong"
+    var title: LocalizedStringKey = "Something went wrong"
     /// false in the snapshot harness, which can't render a ScrollView.
     var scrollable = true
 
@@ -209,7 +239,7 @@ struct ErrorPanel: View {
             Image(systemName: "exclamationmark.octagon.fill")
                 .foregroundStyle(.red)
             VStack(alignment: .leading, spacing: 6) {
-                Text(CLIError.rootCause(of: message) ?? title)
+                headline
                     .font(.callout.weight(.semibold))
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
@@ -232,10 +262,19 @@ struct ErrorPanel: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
-            .help("Copy error")
+            .help(Text("Copy error", comment: "Tooltip for the button that copies an error message."))
         }
         .padding(12)
         .background(Color.red.opacity(0.08))
+    }
+
+    @ViewBuilder
+    private var headline: some View {
+        if let cause = CLIError.rootCause(of: message) {
+            Text(cause)
+        } else {
+            Text(title)
+        }
     }
 
     private var fullText: some View {
@@ -252,10 +291,39 @@ struct ErrorPanel: View {
 
 struct EmptyState: View {
     let icon: String
-    let title: String
-    let message: String
-    var actionLabel: String? = nil
+    let title: LocalizedStringKey
+    let message: Text
+    var actionLabel: LocalizedStringKey? = nil
     var action: (() -> Void)? = nil
+
+    init(icon: String, title: LocalizedStringKey, message: LocalizedStringKey,
+         actionLabel: LocalizedStringKey? = nil, action: (() -> Void)? = nil) {
+        self.icon = icon
+        self.title = title
+        self.message = Text(message)
+        self.actionLabel = actionLabel
+        self.action = action
+    }
+
+    /// For a message that needs its own translator comment.
+    init(icon: String, title: LocalizedStringKey, message: Text,
+         actionLabel: LocalizedStringKey? = nil, action: (() -> Void)? = nil) {
+        self.icon = icon
+        self.title = title
+        self.message = message
+        self.actionLabel = actionLabel
+        self.action = action
+    }
+
+    /// For a runtime message such as an error text: shown as-is, never a key.
+    init(icon: String, title: LocalizedStringKey, errorMessage: String,
+         actionLabel: LocalizedStringKey? = nil, action: (() -> Void)? = nil) {
+        self.icon = icon
+        self.title = title
+        self.message = Text(errorMessage)
+        self.actionLabel = actionLabel
+        self.action = action
+    }
 
     var body: some View {
         VStack(spacing: 12) {
@@ -263,13 +331,15 @@ struct EmptyState: View {
                 .font(.system(size: 42))
                 .foregroundStyle(.quaternary)
             Text(title).font(.title3.weight(.semibold))
-            Text(message)
+            message
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             if let actionLabel, let action {
-                Button(actionLabel, action: action)
-                    .buttonStyle(.borderedProminent)
-                    .padding(.top, 4)
+                Button(action: action) {
+                    Text(actionLabel)
+                }
+                .buttonStyle(.borderedProminent)
+                .padding(.top, 4)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -423,8 +493,8 @@ struct ConsoleView: NSViewRepresentable {
 // MARK: - Small form helpers used by sheets
 
 struct KeyValueEditor: View {
-    let keyPlaceholder: String
-    let valuePlaceholder: String
+    let keyPlaceholder: LocalizedStringKey
+    let valuePlaceholder: LocalizedStringKey
     @Binding var pairs: [KVPair]
     var separator = "→"
 
@@ -445,13 +515,18 @@ struct KeyValueEditor: View {
                         Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
                     }
                     .buttonStyle(.borderless)
-                    .help("Remove")
+                    .help(Text("Remove", comment: "Tooltip for the button that removes a key-value row."))
                 }
             }
             Button {
                 pairs.append(KVPair())
             } label: {
-                Label(pairs.isEmpty ? "Add" : "Add another", systemImage: "plus.circle.fill")
+                Label {
+                    Text(pairs.isEmpty ? "Add" : "Add another",
+                         comment: "Button that adds a key-value row, or another one when the editor already has rows.")
+                } icon: {
+                    Image(systemName: "plus.circle.fill")
+                }
             }
             .buttonStyle(.borderless)
             .foregroundStyle(.tint)

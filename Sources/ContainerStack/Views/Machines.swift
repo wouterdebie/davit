@@ -95,14 +95,20 @@ struct MachinesView: View {
                     }
                     .disabled(machine.isDefault)
                     Divider()
-                    Button("Copy DNS Name (\(machine.dnsName))") {
+                    Button {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(machine.dnsName, forType: .string)
+                    } label: {
+                        Text("Copy DNS Name (\(machine.dnsName))",
+                             comment: "Context menu action — the value is the machine's DNS name.")
                     }
                     if let ip = machine.ipAddress {
-                        Button("Copy IP (\(ip))") {
+                        Button {
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(ip, forType: .string)
+                        } label: {
+                            Text("Copy IP (\(ip))",
+                                 comment: "Context menu action — the value is the machine's IP address.")
                         }
                     }
                     Divider()
@@ -141,7 +147,8 @@ struct MachineRow: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
-                Text("\(machine.cpus) CPU · \(formatBytes(Int64(machine.memoryBytes)))")
+                Text("\(machine.cpus) CPU · \(formatBytes(Int64(machine.memoryBytes)))",
+                     comment: "Machine row — the first value is the CPU count, the second is the memory size.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if machine.isRunning, let ip = machine.ipAddress {
@@ -321,7 +328,7 @@ struct CreateMachineSheet: View {
     private func create() {
         working = true
         errorText = nil
-        progressText = "Starting…"
+        progressText = String(localized: "Starting…", comment: "Progress text while a new machine boots.")
         Task {
             do {
                 try await MachineService.create(
@@ -357,6 +364,15 @@ struct MachineDetailView: View {
         case logs = "Logs"
         case stats = "Stats"
         case inspect = "Inspect"
+
+        var title: LocalizedStringResource {
+            switch self {
+            case .overview: "Overview"
+            case .logs: "Logs"
+            case .stats: "Stats"
+            case .inspect: "Inspect"
+            }
+        }
     }
     @State private var showEditSheet = false
     @State private var tab: Tab =
@@ -441,14 +457,15 @@ struct MachineDetailView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 10) {
                         Text(m.id).font(.title2.weight(.semibold))
-                        Text(m.isRunning ? "Running" : "Stopped")
+                        Text(m.isRunning ? "Running" : "Stopped",
+                             comment: "Machine state chip: the machine is running or stopped.")
                             .font(.caption.weight(.medium))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
                             .background((m.isRunning ? Color.green : Color.secondary).opacity(0.15), in: Capsule())
                             .foregroundStyle(m.isRunning ? Color.green : Color.secondary)
                         if m.isDefault {
-                            Text("Default")
+                            Text("Default", comment: "Badge on the machine that container machine commands use by default.")
                                 .font(.caption.weight(.medium))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
@@ -460,8 +477,10 @@ struct MachineDetailView: View {
                 }
                 Spacer()
             }
-            Picker("", selection: $tab) {
-                ForEach(Tab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            Picker(selection: $tab) {
+                ForEach(Tab.allCases, id: \.self) { Text($0.title).tag($0) }
+            } label: {
+                EmptyView()
             }
             .pickerStyle(.segmented)
             .labelsHidden()
@@ -511,7 +530,11 @@ struct MachineOverviewTab: View {
                 if let disk = machine.diskSize {
                     InfoRow(label: "Disk used", value: formatBytes(Int64(disk)))
                 }
-                InfoRow(label: "Home mount", value: machine.homeMount == "none" ? "not mounted" : "~/ mounted \(machine.homeMount)")
+                InfoRow(label: "Home mount",
+                        value: machine.homeMount == "none"
+                            ? String(localized: "not mounted", comment: "The machine has no host home directory mounted.")
+                            : String(localized: "~/ mounted \(machine.homeMount)",
+                                           comment: "Where the host home directory is mounted in the machine — the value is the mount path."))
             }
             DetailCard(title: "Network", icon: "network") {
                 if let ip = machine.ipAddress {
@@ -547,7 +570,9 @@ struct EditMachineSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Edit \(machine.id)").font(.title3.weight(.semibold))
+                Text("Edit \(machine.id)",
+                     comment: "Machine edit sheet title — the value is the machine name.")
+                    .font(.title3.weight(.semibold))
                 Text(machine.isRunning
                      ? "Changes apply after the machine is stopped and booted again."
                      : "Changes apply on the next boot.")

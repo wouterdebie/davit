@@ -405,16 +405,24 @@ final class AppState: ObservableObject {
     /// export API reports no progress, so we poll the output file's size for a
     /// live bytes-written readout (exports can be multi-GB and slow).
     @Published var exportStatus: String?
+    /// True once an export finished; the HUD shows a checkmark for it. Kept
+    /// apart from `exportStatus` so the view never matches on English text.
+    @Published var exportFinished = false
 
     func exportContainer(_ container: ContainerRecord, to url: URL) {
         let id = container.id
-        exportStatus = "Exporting \(id)…"
+        exportFinished = false
+        exportStatus = String(localized: "Exporting \(id)…",
+                              comment: "Bottom HUD while a container filesystem export runs — the value is the container name.")
         let poll = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(500))
                 let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
                 if let bytes = (attrs?[.size] as? NSNumber)?.int64Value, bytes > 0 {
-                    await MainActor.run { self?.exportStatus = "Exporting \(id)… \(formatBytes(bytes))" }
+                    await MainActor.run {
+                        self?.exportStatus = String(localized: "Exporting \(id)… \(formatBytes(bytes))",
+                                                    comment: "Bottom HUD while a container filesystem export runs — the first value is the container name, the second the bytes written so far.")
+                    }
                 }
             }
         }
@@ -422,14 +430,19 @@ final class AppState: ObservableObject {
             defer { poll.cancel() }
             do {
                 try await ContainerService.exportContainer(id, to: url)
-                exportStatus = "Exported \(id)"
+                let finished = String(localized: "Exported \(id)",
+                                      comment: "Bottom HUD when a container filesystem export has finished — the value is the container name.")
+                exportStatus = finished
+                exportFinished = true
                 try? await Task.sleep(for: .seconds(2))
-                if exportStatus == "Exported \(id)" { exportStatus = nil }
+                if exportStatus == finished { exportStatus = nil; exportFinished = false }
             } catch let e as CLIError {
                 exportStatus = nil
+                exportFinished = false
                 lastError = e
             } catch {
                 exportStatus = nil
+                exportFinished = false
                 lastError = CLIError(command: "export", message: error.localizedDescription)
             }
         }

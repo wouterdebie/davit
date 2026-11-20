@@ -49,7 +49,8 @@ struct ComposeImportSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Import Compose — \(file.project)")
+                Text("Import Compose — \(file.project)",
+                     comment: "Compose import sheet title — the value is the project name.")
                     .font(.title3.weight(.semibold))
                 Text("Untick services you don't want. A ticked service brings its dependencies with it.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -106,7 +107,12 @@ struct ComposeImportSheet: View {
                     Text(step).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button(phase == .done ? "Close" : "Cancel") { dismiss() }
+                Button {
+                    dismiss()
+                } label: {
+                    Text(phase == .done ? "Close" : "Cancel",
+                         comment: "Compose import sheet button: closes after a successful import, or cancels one.")
+                }
                 Button {
                     up()
                 } label: {
@@ -126,10 +132,12 @@ struct ComposeImportSheet: View {
     /// can't be unticked on its own: untick what needs it instead.
     private func checkbox(_ svc: Compose.ServicePlan, included: Bool) -> some View {
         let dependency = included && !picked.contains(svc.service)
-        return Toggle("", isOn: Binding(
+        return Toggle(isOn: Binding(
             get: { included },
             set: { if $0 { picked.insert(svc.service) } else { picked.remove(svc.service) } }
-        ))
+        )) {
+            EmptyView()
+        }
         .toggleStyle(.checkbox)
         .labelsHidden()
         .disabled(dependency || isRunning || phase == .done)
@@ -139,21 +147,24 @@ struct ComposeImportSheet: View {
     private func pickNote(_ svc: Compose.ServicePlan, included: Bool) -> String? {
         if included && !picked.contains(svc.service) {
             let dependents = plan.services.filter { $0.dependsOn[svc.service] != nil }.map(\.service)
-            return "Needed by \(dependents.joined(separator: ", "))"
+            return String(localized: "Needed by \(dependents.joined(separator: ", "))",
+                          comment: "Why an unticked service is brought up — the value is the list of services that depend on it.")
         }
         if !included && !svc.profiles.isEmpty {
-            return "Profile \(svc.profiles.joined(separator: ", "))"
+            return String(localized: "Profile \(svc.profiles.joined(separator: ", "))",
+                          comment: "Why a service is not brought up — the value is the profile name that gates it.")
         }
         return nil
     }
 
-    private var buttonTitle: String {
+    private var buttonTitle: LocalizedStringResource {
         switch phase {
         case .failed: return "Retry Remaining"
         case .done: return "Done"
         default:
             let n = plan.services.count
-            return "Create & Start \(n) Service\(n == 1 ? "" : "s")"
+            return LocalizedStringResource("Create & Start \(n) Services",
+                                           comment: "Compose import button — the value is the number of services to create.")
         }
     }
 
@@ -210,8 +221,20 @@ struct ComposeImportSheet: View {
             if !ports.isEmpty {
                 Label(ports.joined(separator: "  "), systemImage: "arrow.left.arrow.right")
             }
-            if mounts > 0 { Label("\(mounts) mount\(mounts == 1 ? "" : "s")", systemImage: "externaldrive") }
-            if envs > 0 { Label("\(envs) env", systemImage: "list.bullet") }
+            if mounts > 0 {
+                Label {
+                    Text("\(mounts) mounts", comment: "Compose service summary — the value is the number of volume mounts.")
+                } icon: {
+                    Image(systemName: "externaldrive")
+                }
+            }
+            if envs > 0 {
+                Label {
+                    Text("\(envs) env", comment: "Compose service summary — the value is the number of environment variables.")
+                } icon: {
+                    Image(systemName: "list.bullet")
+                }
+            }
         }
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -224,7 +247,7 @@ struct ComposeImportSheet: View {
     }
 
     private func up() {
-        phase = .running("Starting…")
+        phase = .running(String(localized: "Starting…", comment: "Compose import progress while the plan starts."))
         Task {
             do {
                 let result = try await Compose.up(plan: plan) { step, done in
@@ -235,12 +258,21 @@ struct ComposeImportSheet: View {
                             if case .waiting = step {} else if case .building = step {} else { completed.insert(step) }
                         } else {
                             switch step {
-                            case .volume(let v): phase = .running("Creating volume \(v)…")
-                            case .network(let n): phase = .running("Creating network \(n)…")
-                            case .service(let s): phase = .running("Starting \(s)… (pulls the image if needed)")
-                            case .building(let s): phase = .running("Building \(s)…")
+                            case .volume(let v):
+                                phase = .running(String(localized: "Creating volume \(v)…",
+                                                         comment: "Compose import progress — the value is the volume name."))
+                            case .network(let n):
+                                phase = .running(String(localized: "Creating network \(n)…",
+                                                         comment: "Compose import progress — the value is the network name."))
+                            case .service(let s):
+                                phase = .running(String(localized: "Starting \(s)… (pulls the image if needed)",
+                                                         comment: "Compose import progress — the value is the service name."))
+                            case .building(let s):
+                                phase = .running(String(localized: "Building \(s)…",
+                                                         comment: "Compose import progress — the value is the service name."))
                             case .waiting(let s, let c):
-                                phase = .running("Waiting for \(s) (\(c.replacingOccurrences(of: "service_", with: "")))…")
+                                phase = .running(String(localized: "Waiting for \(s) (\(c.replacingOccurrences(of: "service_", with: "")))…",
+                                                         comment: "Compose import progress — the first value is the service name, the second its health condition."))
                             }
                         }
                     }
@@ -267,7 +299,7 @@ enum ComposeImport {
     @MainActor
     static func pickAndParse() -> Result<Compose.Plan, CLIError>? {
         let panel = NSOpenPanel()
-        panel.title = "Import Compose File"
+        panel.title = String(localized: "Import Compose File", comment: "Open panel title for choosing a compose file to import.")
         panel.allowedContentTypes = [.yaml]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
@@ -305,7 +337,8 @@ enum ComposeImport {
     /// to activate a profile is to tick a service it gates.
     static func pickError(_ error: Error) -> String {
         if case Compose.Error.inactiveProfile(service: let service, profile: let profile) = error {
-            return "A ticked service needs \(service), which only runs under profile \(profile). Tick \(service) too."
+            return String(localized: "A ticked service needs \(service), which only runs under profile \(profile). Tick \(service) too.",
+                          comment: "Compose import error — the first and third values are the service name, the second is the profile name.")
         }
         return (error as? LocalizedError)?.errorDescription ?? String(describing: error)
     }

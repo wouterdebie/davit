@@ -30,10 +30,12 @@ struct MemoryStepperControl: View {
                 .frame(width: 58)
                 .multilineTextAlignment(.trailing)
                 .onChange(of: value) { writeBack() }
-            Stepper("", onIncrement: { step(+1) }, onDecrement: { step(-1) })
+            Stepper(onIncrement: { step(+1) }, onDecrement: { step(-1) }) { EmptyView() }
                 .labelsHidden()
-            Picker("", selection: $unit) {
+            Picker(selection: $unit) {
                 ForEach(Unit.allCases) { Text($0.rawValue).tag($0) }
+            } label: {
+                EmptyView()
             }
             .labelsHidden()
             .fixedSize()
@@ -121,7 +123,7 @@ struct CountStepperControl: View {
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 58)
                 .multilineTextAlignment(.trailing)
-            Stepper("", onIncrement: { step(+1) }, onDecrement: { step(-1) })
+            Stepper(onIncrement: { step(+1) }, onDecrement: { step(-1) }) { EmptyView() }
                 .labelsHidden()
         }
     }

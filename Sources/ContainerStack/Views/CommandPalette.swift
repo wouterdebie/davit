@@ -31,11 +31,15 @@ struct CommandPalette: View {
         }
         for v in state.volumes {
             hits.append(Hit(section: .volumes, id: v.id, title: v.name,
-                            subtitle: "volume", icon: "externaldrive"))
+                            subtitle: String(localized: "volume",
+                                             comment: "Command palette subtitle for a volume when there is no other detail (noun)."),
+                            icon: "externaldrive"))
         }
         for n in state.networks {
             hits.append(Hit(section: .networks, id: n.id, title: n.name,
-                            subtitle: n.subnet ?? "network", icon: "network"))
+                            subtitle: n.subnet ?? String(localized: "network",
+                                                         comment: "Command palette subtitle for a network without a subnet (noun)."),
+                            icon: "network"))
         }
         for m in state.machines {
             hits.append(Hit(section: .machines, id: m.id, title: m.id,

@@ -42,7 +42,8 @@ struct RunContainerSheet: View {
             HStack {
                 Text(recreate == nil ? "Run Container" : "Recreate Container").font(.title3.weight(.semibold))
                 if let recreate {
-                    Text("replaces “\(recreate.id)”")
+                    Text("replaces “\(recreate.id)”",
+                         comment: "Run sheet subtitle when recreating — the value is the container name.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -143,7 +144,7 @@ struct RunContainerSheet: View {
         VStack(spacing: 14) {
             DetailCard(title: "Image", icon: "square.stack.3d.down.forward") {
                 HStack(spacing: 8) {
-                    TextField("nginx:latest", text: $image)
+                    TextField(text: $image, prompt: Text(verbatim: "nginx:latest")) { EmptyView() }
                         .textFieldStyle(.roundedBorder)
                     if !state.images.isEmpty {
                         Menu {
@@ -193,10 +194,12 @@ struct RunContainerSheet: View {
                     }
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Network").font(.caption).foregroundStyle(.secondary)
-                        Picker("", selection: $network) {
+                        Picker(selection: $network) {
                             ForEach(state.networks) { net in
                                 Text(net.name).tag(net.name)
                             }
+                        } label: {
+                            EmptyView()
                         }
                         .labelsHidden()
                         .fixedSize()
@@ -357,7 +360,8 @@ struct RunContainerSheet: View {
     private func run() {
         running = true
         errorText = nil
-        progressText = "Creating container… (pulls the image on first run)"
+        progressText = String(localized: "Creating container… (pulls the image on first run)",
+                              comment: "Progress text while the run sheet creates a container.")
 
         let args = buildArgs()
         let processArgs = args.process
@@ -400,7 +404,9 @@ struct RunContainerSheet: View {
                         }
                     }
                 )
-                await MainActor.run { progressText = "Starting…" }
+                await MainActor.run {
+                    progressText = String(localized: "Starting…", comment: "Progress text while a newly created container starts.")
+                }
                 if let replacing, !sameName {
                     // Rename: the new container is up, now retire the old one.
                     try? await ContainerService.stop(replacing.id)
@@ -454,7 +460,7 @@ struct PullImageSheet: View {
                         if model.isRunning {
                             ProgressView().controlSize(.small)
                         } else {
-                            Text("Pull")
+                            Text("Pull", comment: "Button that starts downloading the entered image (verb).")
                         }
                     }
                     .buttonStyle(.borderedProminent)
@@ -485,7 +491,12 @@ struct PullImageSheet: View {
                                             }
                                             Spacer()
                                             if let stars = hit.stars {
-                                                Label("\(stars)", systemImage: "star").font(.caption).foregroundStyle(.secondary)
+                                                Label {
+                                                    Text(verbatim: "\(stars)")
+                                                } icon: {
+                                                    Image(systemName: "star")
+                                                }
+                                                .font(.caption).foregroundStyle(.secondary)
                                             }
                                         }
                                         .contentShape(Rectangle())
@@ -524,18 +535,25 @@ struct PullImageSheet: View {
             Divider()
             HStack {
                 if let ok = model.succeeded {
-                    Label(ok ? "Pull complete" : "Pull failed",
-                          systemImage: ok ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundStyle(ok ? .green : .red)
-                        .font(.callout)
+                    Label {
+                        Text(ok ? "Pull complete" : "Pull failed",
+                             comment: "Pull sheet result: the image download finished or failed.")
+                    } icon: {
+                        Image(systemName: ok ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    }
+                    .foregroundStyle(ok ? .green : .red)
+                    .font(.callout)
                 } else if model.isRunning {
                     Text("The download continues in the background if you close.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button(model.succeeded == true ? "Done" : "Close") {
+                Button {
                     model.cancel()
                     dismiss()
+                } label: {
+                    Text(model.succeeded == true ? "Done" : "Close",
+                         comment: "Pull sheet button: dismisses after a successful pull, or closes a running one.")
                 }
             }
             .padding(16)

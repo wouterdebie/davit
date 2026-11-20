@@ -111,7 +111,11 @@ struct ImageListContent: View {
                 ImageRow(image: image)
             }
             .contextMenu {
-                Button("Run…") { run(image) }
+                Button {
+                    run(image)
+                } label: {
+                    Text("Run…", comment: "Context menu action that opens the run sheet for this image (verb).")
+                }
                 Button("Pull Latest") { pullLatest(image) }
                 Button("Copy Reference") {
                     NSPasteboard.general.clearContents()
@@ -190,6 +194,14 @@ struct ImageDetailView: View {
         case overview = "Overview"
         case layers = "Layers"
         case inspect = "Inspect"
+
+        var title: LocalizedStringResource {
+            switch self {
+            case .overview: "Overview"
+            case .layers: "Layers"
+            case .inspect: "Inspect"
+            }
+        }
     }
     @State private var tab: Tab = .overview
     @State private var showRunSheet = false
@@ -215,14 +227,19 @@ struct ImageDetailView: View {
                            message: "This image no longer exists.")
             }
         }
-        .navigationTitle(image?.shortNameTag ?? "Image")
+        .navigationTitle(image.map { Text(verbatim: $0.shortNameTag) }
+                         ?? Text("Image", comment: "Window title fallback when the image no longer exists."))
         .toolbar {
             if let image {
                 ToolbarItemGroup(placement: .primaryAction) {
                     Button {
                         showRunSheet = true
                     } label: {
-                        Label("Run", systemImage: "play.fill")
+                        Label {
+                            Text("Run", comment: "Toolbar button that opens the run sheet for this image (verb).")
+                        } icon: {
+                            Image(systemName: "play.fill")
+                        }
                     }
                     .help("Run a container from this image")
                     Menu {
@@ -257,13 +274,16 @@ struct ImageDetailView: View {
                     .foregroundStyle(.tint)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(img.shortNameTag).font(.title2.weight(.semibold))
-                    Text("\(formatBytes(img.totalSize)) · \(img.platforms.count) platform variant\(img.platforms.count == 1 ? "" : "s")")
+                    Text("\(formatBytes(img.totalSize)) · \(img.platforms.count) platform variants",
+                         comment: "Image header — the first value is the image size, the second is the number of platform variants.")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
             }
-            Picker("", selection: $tab) {
-                ForEach(Tab.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            Picker(selection: $tab) {
+                ForEach(Tab.allCases, id: \.self) { Text($0.title).tag($0) }
+            } label: {
+                EmptyView()
             }
             .pickerStyle(.segmented)
             .labelsHidden()
@@ -332,7 +352,7 @@ struct TagImageSheet: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Tag Image").font(.title3.weight(.semibold))
             Text(source).font(.system(.callout, design: .monospaced)).foregroundStyle(.secondary)
-            TextField("new-name:tag", text: $target)
+            TextField(text: $target, prompt: Text(verbatim: "new-name:tag")) { EmptyView() }
                 .textFieldStyle(.roundedBorder)
             HStack {
                 Spacer()
@@ -362,22 +382,26 @@ struct ImageLayersTab: View {
     var body: some View {
         Group {
             if let error {
-                EmptyState(icon: "exclamationmark.triangle", title: "Couldn't read layers", message: error)
+                EmptyState(icon: "exclamationmark.triangle", title: "Couldn't read layers", errorMessage: error)
             } else if let layers {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
-                            Text("\(layers.count) layer\(layers.count == 1 ? "" : "s")")
+                            Text("\(layers.count) layers",
+                                 comment: "Layers tab heading — the value is the number of image layers.")
                                 .font(.headline)
                             Spacer()
-                            Text("total \(formatBytes(layers.reduce(0) { $0 + $1.sizeBytes }))")
+                            Text("total \(formatBytes(layers.reduce(0) { $0 + $1.sizeBytes }))",
+                                 comment: "Layers tab — the value is the total size of all layers.")
                                 .foregroundStyle(.secondary)
                         }
                         ForEach(layers) { layer in
-                            DetailCard(title: "", icon: "square.3.layers.3d.down.right") {
+                            DetailCard(icon: "square.3.layers.3d.down.right") {
                                 VStack(alignment: .leading, spacing: 6) {
                                     HStack {
-                                        Text("Layer \(layer.index + 1)").font(.body.weight(.medium))
+                                        Text("Layer \(layer.index + 1)",
+                                             comment: "Image layer heading — the value is the layer number.")
+                                            .font(.body.weight(.medium))
                                         Spacer()
                                         Text(formatBytes(layer.sizeBytes)).foregroundStyle(.secondary)
                                     }
